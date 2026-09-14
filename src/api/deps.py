@@ -1,31 +1,33 @@
 import logging
 from typing import Annotated
 
-from fastapi import Header, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from auth import DEV_PRINCIPAL, AuthError, AuthUnavailable, Principal, TokenVerifier
+from auth import AuthError, AuthUnavailable, Principal, TokenVerifier
 
 log = logging.getLogger("talent.auth")
 
+_bearer = HTTPBearer(
+    auto_error=False,
+    description="A sign-in token from the company identity provider, or from /dev/token in dev.",
+)
 _CHALLENGE = {"WWW-Authenticate": "Bearer"}
 
 
 def current_principal(
-    request: Request, authorization: Annotated[str | None, Header()] = None
+    request: Request,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> Principal:
-    """The signed-in user. Every route except health and readiness depends on this."""
-    if request.app.state.settings.auth_dev_bypass:
-        return DEV_PRINCIPAL
-
-    scheme, _, token = (authorization or "").partition(" ")
-    if scheme.lower() != "bearer" or not token:
+    """The signed-in user. Every route except health, readiness and dev sign-in depends on this."""
+    if credentials is None:
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED, "Sign in with your company account.", _CHALLENGE
         )
 
     verifier: TokenVerifier = request.app.state.verifier
     try:
-        return verifier.verify(token)
+        return verifier.verify(credentials.credentials)
     except AuthUnavailable as exc:
         log.error("identity provider unreachable", extra={"error": str(exc)})
         raise HTTPException(

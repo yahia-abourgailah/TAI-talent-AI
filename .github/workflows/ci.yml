@@ -51,12 +51,44 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: pytest tests/unit -q
 
+  changes:
+    name: Detect scoring changes
+    runs-on: ubuntu-latest
+    outputs:
+      scoring: ${{ steps.diff.outputs.scoring }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: diff
+        name: Did this change touch src/scoring?
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "$EVENT" = "pull_request" ]; then base="origin/$BASE_REF"; else base="$BEFORE"; fi
+          # If the comparison point is unknown (new branch, force push), assume scoring changed.
+          if changed=$(git diff --name-only "$base" HEAD -- src/scoring 2>/dev/null); then
+            [ -n "$changed" ] && scoring=true || scoring=false
+          else
+            scoring=true
+          fi
+          echo "scoring=$scoring" >> "$GITHUB_OUTPUT"
+
   parity:
     name: Golden replay parity
-    runs-on: [self-hosted, talent]
-    needs: guard-data
-    if: contains(github.event.pull_request.changed_files, 'src/scoring') || github.event_name == 'push'
+    needs: [guard-data, changes]
+    if: needs.changes.outputs.scoring == 'true'
+    # The master record never leaves company machines, so parity runs only on the self-hosted
+    # runner. Until it exists, a scoring change fails here loudly instead of queueing forever.
+    runs-on: ${{ vars.PARITY_RUNNER_READY == 'true' && fromJSON('["self-hosted", "talent"]') || 'ubuntu-latest' }}
     steps:
+      - name: Require the parity runner
+        if: vars.PARITY_RUNNER_READY != 'true'
+        run: |
+          echo "::error::src/scoring changed, but the self-hosted parity runner is not set up. Register a runner labelled 'talent' with access to the master record, then set the repository variable PARITY_RUNNER_READY=true."
+          exit 1
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:

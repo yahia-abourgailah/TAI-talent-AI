@@ -11,9 +11,10 @@ from collections.abc import Awaitable, Callable, Mapping
 
 from fastapi import FastAPI, Request, Response
 
+from api.dev_routes import router as dev_router
 from api.routes import router
-from auth import TokenVerifier
-from config import Environment, Settings, get_settings
+from auth import DevIdentity, TokenVerifier
+from config import AuthMode, Environment, Settings, get_settings
 from config.logs import configure_logging
 from infra.probes import Probe, default_probes
 
@@ -39,9 +40,12 @@ def create_app(
     )
     app.state.settings = settings
     app.state.probes = dict(probes) if probes is not None else default_probes(settings)
-    if settings.auth_dev_bypass:
-        app.state.verifier = None
-        log.warning("login bypass is on: every request runs as the local developer (dev only)")
+    if settings.auth_mode is AuthMode.DEV:
+        dev_identity = DevIdentity()
+        app.state.dev_identity = dev_identity
+        app.state.verifier = verifier or dev_identity.verifier()
+        app.include_router(dev_router)
+        log.warning("sign-in uses fake dev accounts from POST /dev/token (dev only)")
     else:
         app.state.verifier = verifier or TokenVerifier(settings.oidc_issuer, settings.oidc_audience)
 

@@ -26,7 +26,16 @@ docker compose up --build
 
 The API answers on `http://127.0.0.1:8090` — `/health`, `/ready`, `/docs`. It is the only published port; the database, cache and object storage stay inside the compose network.
 
-Sign-in uses the company identity provider (`TALENT_OIDC_ISSUER`, `TALENT_OIDC_AUDIENCE`). On a dev machine only, `TALENT_AUTH_DEV_BYPASS=true` skips it; the API refuses to start with the bypass on in staging or prod.
+Sign-in uses the company identity provider (`TALENT_OIDC_ISSUER`, `TALENT_OIDC_AUDIENCE`). On a dev machine, set `TALENT_AUTH_MODE=dev` to sign in as a fake account instead. The tokens are checked exactly like real ones, and the API refuses to start in dev mode outside dev.
+
+```bash
+curl -s http://127.0.0.1:8090/dev/accounts            # recruiter-a, recruiter-b, ta-lead, criteria-owner, admin
+TOKEN=$(curl -s -X POST http://127.0.0.1:8090/dev/token -H 'Content-Type: application/json' \
+  -d '{"account": "recruiter-a"}' | python3 -c 'import sys, json; print(json.load(sys.stdin)["access_token"])')
+curl -s http://127.0.0.1:8090/v1/me -H "Authorization: Bearer $TOKEN"
+```
+
+In `/docs`, use **Authorize** and paste the token.
 
 ### Tests
 
@@ -38,6 +47,16 @@ python3.12 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 docker compose -f compose.yaml -f compose.test.yaml up -d --wait postgres
 docker compose -f compose.yaml -f compose.test.yaml run --rm migrate
 .venv/bin/pytest tests/integration
+```
+
+### Baseline replay
+
+Replays criteria version 2026-08-04 over every master row. The per-row output holds candidate data, so it must go outside the repository; the aggregate report holds counts only.
+
+```bash
+set -a; . ./.env; set +a
+.venv/bin/python -m replay.baseline --out ~/TAI-data/baseline --run-date 2026-09-14 \
+  --report-copy docs/migration/BASELINE_REPORT.md
 ```
 
 ### Database areas
@@ -58,6 +77,7 @@ docker compose -f compose.yaml -f compose.test.yaml run --rm migrate
 | `src/config/` | Settings from `TALENT_*` variables, JSON logging |
 | `src/db/` | Database engine for the app role |
 | `src/infra/` | Readiness checks, dev storage bootstrap |
+| `src/replay/` | Golden replay: re-runs a criteria version over the master workbook |
 | `src/scoring/` | Candidate scoring. `rulesets/` holds one immutable module per criteria version |
 | `migrations/` | Database migrations, run as the schema owner |
 | `docker/` | Database role setup |

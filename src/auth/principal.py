@@ -25,11 +25,3 @@ class Principal:
             name=str(name) if name else None,
             roles=frozenset(str(role) for role in raw_roles),
         )
-
-
-DEV_PRINCIPAL = Principal(
-    subject="dev-bypass",
-    email=None,
-    name="Local developer (login bypass)",
-    roles=frozenset({"admin"}),
-)

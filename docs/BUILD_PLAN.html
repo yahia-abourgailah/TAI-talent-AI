@@ -152,6 +152,22 @@ pre code{font-family:"IBM Plex Mono",monospace; color:var(--ink-2); background:n
   text-transform:uppercase; color:var(--good); display:block; margin-bottom:3px}
 .check.gate{background:var(--crit-soft)} .check.gate b{color:var(--crit)}
 
+.st{display:inline-block; font-family:"IBM Plex Mono",monospace; font-size:9px; font-weight:600;
+  letter-spacing:.08em; text-transform:uppercase; padding:1px 5px; border-radius:3px; margin-right:6px;
+  vertical-align:1px; white-space:nowrap}
+.st.done{background:var(--good-soft); color:var(--good)}
+.st.part{background:var(--warn-soft); color:var(--warn)}
+.st.block{background:var(--crit-soft); color:var(--crit)}
+.st.todo{background:var(--surface-2); color:var(--ink-3); box-shadow:inset 0 0 0 1px var(--rule-2)}
+.lane li .sn{display:block; font-size:12px; line-height:1.45; color:var(--ink-3); margin-top:3px}
+.wk-h .prog{margin-left:auto}
+.status{padding:11px 15px; border-top:1px solid var(--rule); font-size:12.8px; line-height:1.5; color:var(--ink-2)}
+.status .h{font-family:"IBM Plex Mono",monospace; font-size:9.5px; font-weight:600; letter-spacing:.11em;
+  text-transform:uppercase; color:var(--ink); display:block; margin-bottom:6px}
+.status ul{margin:0; padding-left:16px; max-width:none}
+.status li{margin-bottom:4px}
+.status li:last-child{margin-bottom:0}
+
 footer{margin-top:48px; padding-top:20px; border-top:2px solid var(--ink); font-size:11.5px;
   color:var(--ink-3); font-family:"IBM Plex Mono",monospace; letter-spacing:.04em; line-height:1.8}
 
@@ -196,6 +212,7 @@ footer{margin-top:48px; padding-top:20px; border-top:2px solid var(--ink); font-
     <div class="fact"><dt>Candidates moved</dt><dd>5,140</dd></div>
     <div class="fact"><dt>Big gate</dt><dd>Week 2</dd></div>
     <div class="fact"><dt>Decide first</dt><dd>Where OCR runs</dd></div>
+    <div class="fact"><dt>Now</dt><dd>Week 1 built &middot; decisions open</dd></div>
   </dl>
 </header>
 
@@ -485,23 +502,39 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
   <div class="phase"><span class="r">Same scores, same data</span><span class="w">Weeks 1&ndash;2 &middot; BRD P0, P1, P2</span></div>
 
   <div class="week">
-    <div class="wk-h"><span class="no">WEEK 1</span><span class="ti">Start clean, and save today's answers</span></div>
+    <div class="wk-h"><span class="no">WEEK 1</span><span class="ti">Start clean, and save today's answers</span><span class="prog st done">Built &middot; 14 Sep</span></div>
     <div class="lanes">
       <div class="lane A"><p class="who">Person A</p><ul>
-        <li>Run today's scorer over all <b>5,140</b> rows. Save the answers &mdash; score, tier, flags, signals. <b>This file is the truth we compare against.</b> <span class="r">BR-702</span></li>
-        <li>Write the map: each of the 47 sheet columns &rarr; where it goes in the new database. List every column with no home and ask Karim. <span class="r">BR-701</span></li>
-        <li>Compare <code>CLAUDE.md</code>, <code>CRITERIA.md</code> and the code. Where they disagree, <b>the code wins</b>. Write the differences down as questions. Do not fix them yet.</li>
-        <li>Ask TA: what does "active candidate" mean for the 95% goal? Old rows with no step will never have one. <span class="r">OBJ-01</span></li>
+        <li><span class="st done">Done</span>Run today's scorer over all <b>5,140</b> rows. Save the answers &mdash; score, tier, flags, signals. <b>This file is the truth we compare against.</b> <span class="r">BR-702</span>
+          <span class="sn">3,938 of 3,940 stored scores reproduced exactly (99.95%). The old runs never used the last-active date, and CRITERIA.md has no recency either. The baseline file sits outside the repo, and any run with the same workbook and date produces an identical file. 2 rows stored as disqualified pass the gates on replay and need a ruling.</span></li>
+        <li><span class="st done">Done</span>Write the map: each of the 47 sheet columns &rarr; where it goes in the new database. List every column with no home and ask Karim. <span class="r">BR-701</span>
+          <span class="sn">27 questions for Karim: 6 existing decisions, 21 new.</span></li>
+        <li><span class="st done">Done</span>Compare <code>CLAUDE.md</code>, <code>CRITERIA.md</code> and the code. Where they disagree, <b>the code wins</b>. Write the differences down as questions. Do not fix them yet.
+          <span class="sn">18 differences written as questions for Karim; nothing fixed. <code>CLAUDE.md</code> still not received, so the comparison repeats when it arrives.</span></li>
+        <li><span class="st done">Done</span>Ask TA: what does "active candidate" mean for the 95% goal? Old rows with no step will never have one. <span class="r">OBJ-01</span>
+          <span class="sn">Answered: anyone still in the process &mdash; not hired and not rejected. So all 5,140 migrated candidates count as active today, and 5,125 have no stage. OPN-11 decides which of them stay in the process.</span></li>
       </ul></div>
       <div class="lane B"><p class="who">Person B</p><ul>
-        <li>Repo, three environments, Docker. Only one port open to the outside.</li>
-        <li>Database with four areas. The raw area can be written but <b>never changed or deleted</b> &mdash; set by database permissions, not by trust. <span class="r">BR-107</span></li>
-        <li>Automatic checks on every push: secrets, types, tests, build, deploy to test server.</li>
-        <li>Login with company accounts. <b>The developer bypass refuses to start outside the dev machine.</b> <span class="r">NFR-09</span></li>
-        <li>Send the API plan to the CRM team and the website team <b>this week</b>.</li>
+        <li><span class="st done">Done</span>Repo, three environments, Docker. Only one port open to the outside.
+          <span class="sn">Runs locally with one port, on loopback. No staging or production server yet.</span></li>
+        <li><span class="st done">Done</span>Database with four areas. The raw area can be written but <b>never changed or deleted</b> &mdash; set by database permissions, not by trust. <span class="r">BR-107</span>
+          <span class="sn">Tested against a real database: both the app and the owner are refused.</span></li>
+        <li><span class="st part">Partly</span>Automatic checks on every push: secrets, types, tests, build, deploy to test server.
+          <span class="sn">Secret scan, types, tests and image build are in. The parity check now fails clearly instead of waiting forever. Deploy waits for a test server.</span></li>
+        <li><span class="st done">Done</span>Login with company accounts. <b>The developer bypass refuses to start outside the dev machine.</b> <span class="r">NFR-09</span>
+          <span class="sn">In dev, five fake accounts sign in through the same token checks as real ones. The bypass is gone. Staging needs the identity provider details from IT.</span></li>
+        <li><span class="st part">Drafted</span>Send the API plan to the CRM team and the website team <b>this week</b>.
+          <span class="sn">Written: 29 proposed endpoints, 11 decisions for the two teams. Not yet sent.</span></li>
       </ul></div>
     </div>
-    <div class="check"><b>End of week</b> The baseline file exists. The system starts clean and asks for a login. The OCR decision is made.</div>
+    <div class="check"><b>End of week</b> <span class="st done">Yes</span>The baseline file exists. <span class="st done">Yes</span>The system starts clean and asks for a login. <span class="st todo">Open</span>The OCR decision is made.</div>
+    <div class="status"><span class="h">Before week 2 starts</span><ul>
+      <li><b>Karim:</b> rule on the 2 rows that differ, and send <code>CLAUDE.md</code>.</li>
+      <li><b>Send:</b> the API plan to the CRM and website teams.</li>
+      <li><b>TA:</b> decide which of the 5,140 migrated candidates are still in the process (OPN-11); every one of them counts toward the 95% until it has a stage or is closed.</li>
+      <li><b>Set up:</b> a self-hosted parity runner. Any change to scoring fails CI until it exists.</li>
+      <li><b>Code:</b> on <code>feature/p0-foundation</code>, not yet pushed.</li>
+    </ul></div>
   </div>
 
   <div class="week">
