@@ -1,0 +1,7 @@
+# Nothing but code goes into the image. Candidate data and secrets never do.
+*
+!pyproject.toml
+!src/
+!alembic.ini
+!migrations/
+**/__pycache__
