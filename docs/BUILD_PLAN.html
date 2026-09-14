@@ -1,0 +1,707 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Talent Platform Build Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap">
+
+<style>
+:root{
+  --ground:#F1F4F3; --surface:#FFFFFF; --surface-2:#E7ECEA;
+  --ink:#111A1B; --ink-2:#3B4A4B; --ink-3:#66787A;
+  --rule:#D3DBD9; --rule-2:#B7C3C0;
+  --accent:#14675C; --accent-soft:#DBEAE6;
+  --a:#1D5A85; --b:#8A6014;
+  --warn:#8E5E10; --warn-soft:#F4E8D0;
+  --crit:#9E3722; --crit-soft:#F5DFD8;
+  --good:#2A6640; --good-soft:#DCEADF;
+  --shadow:0 1px 2px rgba(17,26,27,.06),0 8px 24px -16px rgba(17,26,27,.28);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0D1213; --surface:#141B1C; --surface-2:#1B2425;
+    --ink:#E5EDEB; --ink-2:#B2C0BE; --ink-3:#7C8D8B;
+    --rule:#25302F; --rule-2:#37474A;
+    --accent:#4FC0AA; --accent-soft:#0F2E2A;
+    --a:#71B6E0; --b:#DDB35C;
+    --warn:#D6A342; --warn-soft:#31260F;
+    --crit:#E17E66; --crit-soft:#371C15;
+    --good:#6FBE87; --good-soft:#152E1D;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -16px rgba(0,0,0,.8);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0D1213; --surface:#141B1C; --surface-2:#1B2425;
+  --ink:#E5EDEB; --ink-2:#B2C0BE; --ink-3:#7C8D8B;
+  --rule:#25302F; --rule-2:#37474A;
+  --accent:#4FC0AA; --accent-soft:#0F2E2A;
+  --a:#71B6E0; --b:#DDB35C;
+  --warn:#D6A342; --warn-soft:#31260F;
+  --crit:#E17E66; --crit-soft:#371C15;
+  --good:#6FBE87; --good-soft:#152E1D;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -16px rgba(0,0,0,.8);
+}
+
+*{box-sizing:border-box}
+body{background:var(--ground); color:var(--ink);
+  font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-size:14.5px; line-height:1.58; -webkit-font-smoothing:antialiased}
+.wrap{max-width:1020px; margin:0 auto; padding:0 26px 80px}
+
+.topbar{position:sticky; top:0; z-index:50;
+  background:color-mix(in srgb, var(--ground) 92%, transparent);
+  backdrop-filter:blur(10px); border-bottom:1px solid var(--rule)}
+.topbar-in{max-width:1020px; margin:0 auto; padding:8px 26px; display:flex; align-items:center; gap:16px}
+.mark{font-family:"IBM Plex Mono",monospace; font-size:10.5px; font-weight:600; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--accent); white-space:nowrap}
+.navscroll{display:flex; gap:2px; overflow-x:auto; scrollbar-width:thin}
+.navscroll a{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-3);
+  text-decoration:none; padding:4px 8px; border-radius:4px; white-space:nowrap}
+.navscroll a:hover{color:var(--ink); background:var(--surface-2)}
+.navscroll a:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+
+.mast{padding:48px 0 30px; border-bottom:2px solid var(--ink)}
+.eyebrow{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-3); margin:0 0 14px}
+h1{font-family:"Newsreader",Georgia,serif; font-weight:500; font-size:clamp(32px,5.2vw,50px);
+  line-height:1.05; letter-spacing:-.02em; margin:0 0 14px; text-wrap:balance}
+.standfirst{font-size:16.5px; line-height:1.5; color:var(--ink-2); max-width:62ch; margin:0}
+.facts{display:grid; grid-template-columns:repeat(auto-fit,minmax(135px,1fr)); gap:1px;
+  background:var(--rule); border:1px solid var(--rule); margin-top:26px}
+.fact{background:var(--ground); padding:13px 15px}
+.fact dt{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--ink-3); margin:0 0 5px}
+.fact dd{margin:0; font-size:14px; font-weight:600}
+
+section{padding-top:44px; scroll-margin-top:54px}
+h2{font-family:"Newsreader",Georgia,serif; font-weight:500; font-size:27px; letter-spacing:-.015em;
+  margin:0 0 4px; text-wrap:balance}
+h2 .num{font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--accent);
+  letter-spacing:.06em; display:block; margin-bottom:8px}
+h3{font-size:15px; font-weight:600; margin:24px 0 8px}
+p{margin:0 0 12px; max-width:72ch}
+.lede{font-size:15.5px; color:var(--ink-2); max-width:68ch; margin-bottom:16px}
+ul,ol{margin:0 0 14px; padding-left:19px; max-width:72ch}
+li{margin-bottom:6px}
+li::marker{color:var(--ink-3)}
+strong{font-weight:600}
+a{color:var(--accent)}
+
+.tw{overflow-x:auto; margin:16px 0 22px; border:1px solid var(--rule); background:var(--surface)}
+table{border-collapse:collapse; width:100%; font-size:13px; min-width:520px}
+th{text-align:left; font-family:"IBM Plex Mono",monospace; font-size:10px; font-weight:600;
+  letter-spacing:.09em; text-transform:uppercase; color:var(--ink-3);
+  padding:9px 13px; border-bottom:1px solid var(--rule-2); white-space:nowrap}
+td{padding:9px 13px; border-bottom:1px solid var(--rule); vertical-align:top; color:var(--ink-2)}
+tr:last-child td{border-bottom:none}
+td:first-child{color:var(--ink)}
+.n{font-variant-numeric:tabular-nums; text-align:right; white-space:nowrap}
+code,.mono{font-family:"IBM Plex Mono",monospace; font-size:.9em}
+td code{background:var(--surface-2); padding:1px 4px; border-radius:3px; color:var(--ink)}
+.id{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--accent); white-space:nowrap}
+.wk{font-family:"IBM Plex Mono",monospace; font-size:11px; font-weight:600; white-space:nowrap}
+
+.chip{display:inline-block; font-family:"IBM Plex Mono",monospace; font-size:9.5px; font-weight:600;
+  letter-spacing:.07em; text-transform:uppercase; padding:1px 6px; border-radius:3px; white-space:nowrap}
+.chip.hi{background:var(--crit-soft); color:var(--crit)}
+.chip.med{background:var(--warn-soft); color:var(--warn)}
+.chip.lo{background:var(--good-soft); color:var(--good)}
+.chip.ask{background:var(--accent-soft); color:var(--accent)}
+.chip.drop{background:var(--surface-2); color:var(--ink-3)}
+
+.note{border-left:3px solid var(--accent); background:var(--surface); padding:14px 18px; margin:18px 0;
+  box-shadow:var(--shadow)}
+.note.crit{border-left-color:var(--crit)}
+.note.warn{border-left-color:var(--warn)}
+.note .t{font-family:"IBM Plex Mono",monospace; font-size:10px; font-weight:600; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--accent); margin:0 0 6px}
+.note.crit .t{color:var(--crit)}
+.note.warn .t{color:var(--warn)}
+.note p:last-child{margin-bottom:0}
+
+pre{background:var(--surface-2); border:1px solid var(--rule); padding:14px 16px; overflow-x:auto;
+  margin:14px 0 20px; font-size:12px; line-height:1.6; border-radius:2px}
+pre code{font-family:"IBM Plex Mono",monospace; color:var(--ink-2); background:none; padding:0}
+.kw{color:var(--accent)}
+
+.phase{margin:26px 0 3px; padding:11px 16px; background:var(--ink); color:var(--ground);
+  display:flex; flex-wrap:wrap; gap:4px 14px; align-items:baseline}
+.phase .r{font-weight:700; font-size:15px; letter-spacing:-.012em}
+.phase .w{font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.06em; opacity:.7}
+.week{background:var(--surface); border:1px solid var(--rule); margin:9px 0; box-shadow:var(--shadow)}
+.wk-h{display:flex; flex-wrap:wrap; gap:6px 12px; align-items:baseline; padding:9px 15px;
+  border-bottom:1px solid var(--rule); background:var(--surface-2)}
+.wk-h .no{font-family:"IBM Plex Mono",monospace; font-weight:600; font-size:11px; letter-spacing:.06em}
+.wk-h .ti{font-weight:600; font-size:14.5px; letter-spacing:-.01em}
+.lanes{display:grid; grid-template-columns:1fr 1fr}
+.lane{padding:13px 15px}
+.lane:first-child{border-right:1px solid var(--rule)}
+.lane .who{font-family:"IBM Plex Mono",monospace; font-size:9.5px; font-weight:600; letter-spacing:.11em;
+  text-transform:uppercase; margin:0 0 8px; display:flex; align-items:center; gap:6px}
+.lane .who::before{content:""; width:8px; height:8px; border-radius:2px; flex:none}
+.lane.A .who{color:var(--a)} .lane.A .who::before{background:var(--a)}
+.lane.B .who{color:var(--b)} .lane.B .who::before{background:var(--b)}
+.lane ul{margin:0; padding-left:15px; font-size:13.2px; line-height:1.5; max-width:none}
+.lane li{margin-bottom:6px; color:var(--ink-2)}
+.lane li:last-child{margin-bottom:0}
+.lane.A li::marker{color:var(--a)} .lane.B li::marker{color:var(--b)}
+.lane li b{color:var(--ink); font-weight:600}
+.lane .r{font-family:"IBM Plex Mono",monospace; font-size:10px; color:var(--ink-3); white-space:nowrap}
+.check{padding:9px 15px; border-top:1px solid var(--rule); background:var(--good-soft);
+  font-size:12.8px; color:var(--ink-2); line-height:1.48}
+.check b{font-family:"IBM Plex Mono",monospace; font-size:9.5px; font-weight:600; letter-spacing:.11em;
+  text-transform:uppercase; color:var(--good); display:block; margin-bottom:3px}
+.check.gate{background:var(--crit-soft)} .check.gate b{color:var(--crit)}
+
+footer{margin-top:48px; padding-top:20px; border-top:2px solid var(--ink); font-size:11.5px;
+  color:var(--ink-3); font-family:"IBM Plex Mono",monospace; letter-spacing:.04em; line-height:1.8}
+
+@media (max-width:740px){.lanes{grid-template-columns:1fr}
+  .lane:first-child{border-right:none; border-bottom:1px solid var(--rule)}}
+@media (max-width:600px){.wrap{padding:0 16px 60px}.topbar-in{padding:8px 16px}
+  .mast{padding:34px 0 24px}h2{font-size:23px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="topbar">
+  <div class="topbar-in">
+    <span class="mark">Talent Platform</span>
+    <nav class="navscroll">
+      <a href="#what">What we build</a>
+      <a href="#words">Words</a>
+      <a href="#phases">BRD phases</a>
+      <a href="#cover">Every requirement</a>
+      <a href="#goals">The six goals</a>
+      <a href="#weeks">The 8 weeks</a>
+      <a href="#decide">Decisions needed</a>
+      <a href="#risk">Risks</a>
+      <a href="#after">After week 8</a>
+    </nav>
+  </div>
+</div>
+
+<div class="wrap">
+
+<header class="mast">
+  <p class="eyebrow">Delivery plan v2 &middot; built from BRD v0.1 &middot; 14 September 2026</p>
+  <h1>Talent Platform</h1>
+  <p class="standfirst">A plan to build the platform in the BRD. <strong>8 weeks. 2 people.</strong>
+  Every requirement in the BRD is listed here with the week it is built, or the reason it is left for
+  later. Nothing is hidden.</p>
+  <dl class="facts">
+    <div class="fact"><dt>Time</dt><dd>8 weeks</dd></div>
+    <div class="fact"><dt>Team</dt><dd>2 people</dd></div>
+    <div class="fact"><dt>BRD phases done</dt><dd>P0 to P5, P10</dd></div>
+    <div class="fact"><dt>Left for later</dt><dd>P7, P8, P9</dd></div>
+    <div class="fact"><dt>Must rules built</dt><dd>50 of 61</dd></div>
+    <div class="fact"><dt>Candidates moved</dt><dd>5,140</dd></div>
+    <div class="fact"><dt>Big gate</dt><dd>Week 2</dd></div>
+    <div class="fact"><dt>Decide first</dt><dd>Where OCR runs</dd></div>
+  </dl>
+</header>
+
+<!-- ============ WHAT ============ -->
+<section id="what">
+  <h2><span class="num">01</span>What we build in 8 weeks</h2>
+
+  <p class="lede">One sentence: <strong>a candidate applies on our own page, the system scores them, and a
+  recruiter moves them through real steps that are recorded.</strong></p>
+
+  <p>Today this is the problem, from the BRD:</p>
+  <ul>
+    <li>Candidate data sits in Google Sheets and on an outside host. The law says this must stop.</li>
+    <li>Candidates are copied from LinkedIn, Facebook and TikTok. Those sites forbid it. The account was flagged once.</li>
+    <li>Only <strong>15 of 5,140</strong> candidates have a hiring step recorded. So no one can measure anything.</li>
+    <li>Everything runs on one laptop. If it is off, work stops.</li>
+  </ul>
+
+  <p>After 8 weeks, this is the new way a candidate arrives:</p>
+
+<pre><code>We post a job on LinkedIn, TikTok or Facebook.
+The post has a link to <span class="kw">our own page</span>.
+        │
+        ▼
+Candidate uploads a CV.  ──►  <span class="kw">OCR API</span> reads it  ──►  form comes back filled
+        │
+        ▼
+Candidate checks the form and <span class="kw">agrees to be contacted</span>.
+        │
+        ▼
+Rules check: Cairo? age? manager? our own staff? ──[no]──► <span class="kw">human review</span>
+        │                                                   (never rejected by the system)
+        ▼
+Rules give points out of 100  ──►  tier P1 to P4  ──►  saved forever
+        │
+        ▼
+Recruiter gets the candidate  ──►  moves them step by step  ──►  <span class="kw">funnel report</span>
+</code></pre>
+
+  <p><strong>This takes seconds, not hours.</strong> The rules are simple maths. No AI is needed to give a
+  tier.</p>
+
+  <div class="note crit">
+    <p class="t">Decide this before we start &mdash; where your OCR runs</p>
+    <p>You have an OCR API to read CVs. We need it in week 5.</p>
+    <p><strong>If it runs outside the company, every CV leaves the company.</strong> That breaks rule
+    <b>CR-01</b> in the BRD, which is a <em>Must</em>. It is also the exact problem we are trying to fix.</p>
+    <p>Choose one: <b>(1)</b> run the OCR inside our own network &mdash; best, and the plan assumes this.
+    <b>(2)</b> Sign a data agreement with the OCR company and get legal to accept it. <b>(3)</b> Find a
+    different OCR we can host &mdash; this costs about one week of Person B.</p>
+  </div>
+</section>
+
+<!-- ============ WORDS ============ -->
+<section id="words">
+  <h2><span class="num">02</span>Words used in this plan</h2>
+  <p class="lede">The BRD uses some heavy words. Here is what each one means, in normal language.</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Word</th><th>What it means here</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Hard gate</strong></td><td>A yes/no check before anything else. Example: not in Cairo &rarr; stop. No points are counted.</td></tr>
+        <tr><td><strong>Tier</strong></td><td>The grade a candidate gets. P1 is the best, P4 is the lowest. T1 to T4 for the senior track.</td></tr>
+        <tr><td><strong>Criteria version</strong></td><td>One saved copy of all the rules, with a number. Rules are never edited. A change makes version 2.</td></tr>
+        <tr><td><strong>Golden replay</strong></td><td>Run the new scorer over all 5,140 old candidates and check every answer is the same as today.</td></tr>
+        <tr><td><strong>Stage</strong> / <strong>stage event</strong></td><td>The step a candidate is at (called, interviewed, hired). Each move is saved with who did it and when.</td></tr>
+        <tr><td><strong>Funnel</strong></td><td>How many candidates reach each step. 100 called &rarr; 40 replied &rarr; 10 interviewed.</td></tr>
+        <tr><td><strong>Provenance</strong></td><td>Where a value came from, who checked it, and when. Saved next to the value itself.</td></tr>
+        <tr><td><strong>Borderline</strong></td><td>A candidate close to the line. The system does not guess &mdash; a person looks at them.</td></tr>
+        <tr><td><strong>Consent</strong></td><td>The candidate said yes, we may contact you. Saved with the date and the channel.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ PHASES ============ -->
+<section id="phases">
+  <h2><span class="num">03</span>The BRD has 11 phases. We do 7.</h2>
+  <p class="lede">The BRD lists phases P0 to P10. Two people in 8 weeks cannot do all of them. This is which
+  ones we do, and why the others can wait.</p>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>Phase</th><th>What the BRD asks for</th><th>Week</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td class="id">P0</td><td>Foundation: repo, servers, database, health checks</td><td class="wk">Week 1</td><td><span class="chip lo">In</span></td></tr>
+        <tr><td class="id">P1</td><td>Scoring parity: the same scores as today</td><td class="wk">Week 2</td><td><span class="chip lo">In</span> This is the gate. Nothing starts before it passes</td></tr>
+        <tr><td class="id">P2</td><td>Move the 5,140 candidates into the new database</td><td class="wk">Weeks 2&ndash;3</td><td><span class="chip lo">In</span></td></tr>
+        <tr><td class="id">P3</td><td>Pipeline and API: jobs, steps, recruiters, reports</td><td class="wk">Weeks 3&ndash;4</td><td><span class="chip lo">In</span> This is what fixes the 0.3% problem</td></tr>
+        <tr><td class="id">P4</td><td>Apply page, CV reading, cleaning, saving files</td><td class="wk">Weeks 5&ndash;6</td><td><span class="chip lo">In</span> Uses your OCR API</td></tr>
+        <tr><td class="id">P5</td><td>Same person found twice &mdash; Arabic names, merging</td><td class="wk">Week 6</td><td><span class="chip lo">In</span></td></tr>
+        <tr><td class="id">P6</td><td>Criteria management and change reports</td><td class="wk">Weeks 2 &amp; 7</td><td><span class="chip med">Half</span> Rules are versioned and can be replayed. The pretty report for non-engineers comes later</td></tr>
+        <tr><td class="id">P7</td><td>AI layer: soft scoring, evidence, review queue</td><td class="wk">Week 7</td><td><span class="chip med">Half</span> <b>We build the review queue. We do not build the AI scoring.</b> The tier never came from AI, so nothing is lost</td></tr>
+        <tr><td class="id">P8</td><td>Search and shortlists by similarity</td><td class="wk">&mdash;</td><td><span class="chip drop">Later</span> A list sorted by score answers the same question now</td></tr>
+        <tr><td class="id">P9</td><td>Outreach: messages, consent guards, interviews</td><td class="wk">&mdash;</td><td><span class="chip hi">Blocked</span> <b>Legal must answer OPN-01 first.</b> The old 5,140 have no consent, so there is nobody to write to</td></tr>
+        <tr><td class="id">P10</td><td>Switch off the old system, freeze the sheet</td><td class="wk">Week 8</td><td><span class="chip lo">In</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note warn">
+    <p class="t">What this means on day one of go-live</p>
+    <p>Because P9 is not built, <strong>the platform sends no messages</strong>. Recruiters keep calling and
+    writing to candidates the way they do today. Then they record what happened in the system.</p>
+    <p>This is not a gap in the build. It is the law waiting for an answer. And it still fixes the real
+    problem, because now every call is recorded.</p>
+  </div>
+</section>
+
+<!-- ============ COVERAGE ============ -->
+<section id="cover">
+  <h2><span class="num">04</span>Every requirement in the BRD, and its week</h2>
+  <p class="lede">The BRD has 53 business rules, 9 technical rules and 7 legal rules. Here is all of them.
+  <span class="chip lo">Week n</span> we build it &middot; <span class="chip med">Part</span> we build
+  some of it &middot; <span class="chip drop">Later</span> after week 8.</p>
+
+  <h3>BR-1xx &mdash; Getting candidates in</h3>
+  <div class="tw">
+    <table>
+      <thead><tr><th>ID</th><th>Rule, in short</th><th>When</th></tr></thead>
+      <tbody>
+        <tr><td class="id">BR-101</td><td>Apply on our careers page, and agree to be contacted</td><td class="wk">Week 6</td></tr>
+        <tr><td class="id">BR-102</td><td>Upload a CV, form comes back filled</td><td class="wk">Week 5</td></tr>
+        <tr><td class="id">BR-103</td><td>Recruiter types in a candidate they found</td><td class="wk">Week 5</td></tr>
+        <tr><td class="id">BR-104</td><td>Load old CVs from drives and email</td><td class="wk">Week 7 <span class="chip drop">Drops first</span></td></tr>
+        <tr><td class="id">BR-105</td><td>One simple way to add a new source; job boards only by official API</td><td class="wk">Week 5 <span class="chip med">Part</span> the door is built, no job board is connected</td></tr>
+        <tr><td class="id">BR-106</td><td>Import the same file twice &rarr; still one candidate</td><td class="wk">Week 5</td></tr>
+        <tr><td class="id">BR-107</td><td>Keep the original file forever, never change it</td><td class="wk">Week 5</td></tr>
+        <tr><td class="id">BR-108</td><td>Remember which recruiter and team brought the candidate</td><td class="wk">Week 3</td></tr>
+        <tr><td class="id">BR-109</td><td>A phone or WhatsApp number is required to apply. Report how many candidates we can reach</td><td class="wk">Week 6</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>BR-2xx &mdash; One person, one record</h3>
+  <div class="tw">
+    <table>
+      <thead><tr><th>ID</th><th>Rule, in short</th><th>When</th></tr></thead>
+      <tbody>
+        <tr><td class="id">BR-201</td><td>Every field says where it came from and who checked it. Never guess a value</td><td class="wk">Week 2</td></tr>
+        <tr><td class="id">BR-202</td><td>Unchecked candidates are marked, and cannot be contacted</td><td class="wk">Week 6 <span class="chip med">Part</span> full effect when outreach is built</td></tr>
+        <tr><td class="id">BR-203</td><td>Find the same person twice, with Arabic name spellings</td><td class="wk">Week 6</td></tr>
+        <tr><td class="id">BR-204</td><td>Joining two records keeps both histories, and can be undone</td><td class="wk">Week 6</td></tr>
+        <tr><td class="id">BR-205</td><td>Nothing is deleted. It is archived with a reason and a name</td><td class="wk">Week 2</td></tr>
+        <tr><td class="id">BR-206</td><td>If it is not clear who someone is, ask a human. Do not choose</td><td class="wk">Week 6</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>BR-3xx &mdash; Scoring</h3>
+  <div class="tw">
+    <table>
+      <thead><tr><th>ID</th><th>Rule, in short</th><th>When</th></tr></thead>
+      <tbody>
+        <tr><td class="id">BR-301</td><td>Give exactly the same scores as the 4 August rules, both tracks</td><td class="wk">Week 2</td></tr>
+        <tr><td class="id">BR-302</td><td>A candidate who fails a gate is saved with the reason, and never sent to AI</td><td class="wk">Week 2</td></tr>
+        <tr><td class="id">BR-303</td><td>Rules are versioned and never edited</td><td class="wk">Week 2</td></tr>
+        <tr><td class="id">BR-304</td><td>Before new rules go live, show who changes tier</td><td class="wk">Week 7 <span class="chip med">Part</span> the report works, it is not pretty yet</td></tr>
+        <tr><td class="id">BR-305</td><td>AI scoring with evidence, one candidate per call</td><td class="wk">&mdash; <span class="chip drop">Later</span></td></tr>
+        <tr><td class="id">BR-306</td><td>AI can never change a tier or reverse a gate</td><td class="wk">&mdash; <span class="chip drop">Later</span> true by default: there is no AI</td></tr>
+        <tr><td class="id">BR-307</td><td>Any old decision can be explained from saved data alone</td><td class="wk">Week 2</td></tr>
+        <tr><td class="id">BR-308</td><td>Find hidden text in CVs, remove it, send the CV to a human</td><td class="wk">Week 5</td></tr>
+        <tr><td class="id">BR-309</td><td>Read Arabic, English and mixed CVs. Never translate names</td><td class="wk">Week 5</td></tr>
+        <tr><td class="id">BR-310</td><td>Borderline is a real answer, not rounded up or down</td><td class="wk">Week 7 <span class="chip ask">Needs a number</span></td></tr>
+        <tr><td class="id">BR-311</td><td>A test set of real CVs, with accuracy reported on every change</td><td class="wk">Week 5 <span class="chip med">Part</span> reading and hidden text only</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>BR-4xx &mdash; Pipeline (this is the one that fixes the 0.3%)</h3>
+  <div class="tw">
+    <table>
+      <thead><tr><th>ID</th><th>Rule, in short</th><th>When</th></tr></thead>
+      <tbody>
+        <tr><td class="id">BR-401</td><td>Job openings with brand, department, track, headcount, owner</td><td class="wk">Week 3</td></tr>
+        <tr><td class="id">BR-402</td><td>Fixed list of steps, and only allowed moves between them</td><td class="wk">Week 3 <span class="chip ask">TA must confirm the list</span></td></tr>
+        <tr><td class="id">BR-403</td><td>Every move saved with who, when, from, to. <b>No free typing</b></td><td class="wk">Week 3</td></tr>
+        <tr><td class="id">BR-404</td><td>A rejection needs the step and a reason from a list</td><td class="wk">Week 3 <span class="chip ask">TA must give the list</span></td></tr>
+        <tr><td class="id">BR-405</td><td>The system never rejects anybody. A person confirms</td><td class="wk">Week 3</td></tr>
+        <tr><td class="id">BR-406</td><td>Changing a decision needs a reason, and is kept for learning</td><td class="wk">Week 3</td></tr>
+        <tr><td class="id">BR-407</td><td>A review list: borderline, flagged, unchecked, unclear</td><td class="wk">Week 7</td></tr>
+        <tr><td class="id">BR-408</td><td>A recruiter sees only their own candidates</td><td class="wk">Week 3</td></tr>
+        <tr><td class="id">BR-409</td><td>Ranked shortlist with a cap per employer</td><td class="wk">&mdash; <span class="chip drop">Later</span></td></tr>
+        <tr><td class="id">BR-410</td><td>API and events for the CRM dashboard</td><td class="wk">Week 4</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>BR-5xx &mdash; Messages to candidates</h3>
+  <div class="tw">
+    <table>
+      <thead><tr><th>ID</th><th>Rule, in short</th><th>When</th></tr></thead>
+      <tbody>
+        <tr><td class="id">BR-501</td><td>No message without consent</td><td class="wk">&mdash; <span class="chip hi">Blocked by OPN-01</span></td></tr>
+        <tr><td class="id">BR-502</td><td>System writes the message, a person presses send</td><td class="wk">&mdash; <span class="chip drop">Later</span></td></tr>
+        <tr><td class="id">BR-503</td><td>Block do-not-contact, cooldown, own staff, closed job, daily cap</td><td class="wk">&mdash; <span class="chip drop">Later</span> <span class="chip ask">numbers not yet decided</span></td></tr>
+        <tr><td class="id">BR-504</td><td>Withdrawing consent removes the person everywhere</td><td class="wk">Week 6 <span class="chip med">Part</span> built with consent</td></tr>
+        <tr><td class="id">BR-505</td><td>Log every message written and sent</td><td class="wk">&mdash; <span class="chip drop">Later</span></td></tr>
+        <tr><td class="id">BR-506</td><td>Brand voice, right language</td><td class="wk">&mdash; <span class="chip drop">Later</span></td></tr>
+        <tr><td class="id">BR-507</td><td>Book interviews on an internal calendar</td><td class="wk">&mdash; <span class="chip drop">Later</span></td></tr>
+        <tr><td class="id">BR-508</td><td>Messages are recruiting, never selling</td><td class="wk">&mdash; <span class="chip drop">Later</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>BR-6xx and BR-7xx &mdash; Reports and moving the old data</h3>
+  <div class="tw">
+    <table>
+      <thead><tr><th>ID</th><th>Rule, in short</th><th>When</th></tr></thead>
+      <tbody>
+        <tr><td class="id">BR-601</td><td>Funnel report from the saved moves</td><td class="wk">Week 4</td></tr>
+        <tr><td class="id">BR-602</td><td>Which source brings good candidates</td><td class="wk">Week 6 <span class="chip med">Part</span> link tracking only</td></tr>
+        <tr><td class="id">BR-603</td><td>How well the rules perform over time</td><td class="wk">&mdash; <span class="chip drop">Later</span> needs months of results first</td></tr>
+        <tr><td class="id">BR-604</td><td>Every night job reports what it did and skipped</td><td class="wk">Week 2</td></tr>
+        <tr><td class="id">BR-701</td><td>Move all 5,140 with scores, tiers, flags, owners</td><td class="wk">Week 2</td></tr>
+        <tr><td class="id">BR-702</td><td>Replay every record and prove the same result</td><td class="wk">Week 2 <span class="chip hi">Gate</span></td></tr>
+        <tr><td class="id">BR-703</td><td>Empty fields stay empty and are marked "not recorded"</td><td class="wk">Week 2</td></tr>
+        <tr><td class="id">BR-704</td><td>Re-score candidates from before 3 August, report changes first</td><td class="wk">Week 3</td></tr>
+        <tr><td class="id">BR-705</td><td>Switch off the old parts one by one. Freeze the sheet</td><td class="wk">Week 8</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>NFR &mdash; Technical rules, and CR &mdash; Legal rules</h3>
+  <div class="tw">
+    <table>
+      <thead><tr><th>ID</th><th>Rule, in short</th><th>When</th></tr></thead>
+      <tbody>
+        <tr><td class="id">NFR-01</td><td>Do not overload the shared AI server</td><td class="wk">Week 5 <span class="chip lo">Easy</span> we call no AI. The same limits are used on the OCR API instead</td></tr>
+        <tr><td class="id">NFR-02</td><td>Nothing depends on one person's laptop or browser</td><td class="wk">Week 1, proved week 8</td></tr>
+        <tr><td class="id">NFR-03</td><td>Work queue is saved and can be inspected later</td><td class="wk">Week 2</td></tr>
+        <tr><td class="id">NFR-04</td><td>If a worker dies, it continues, not restarts</td><td class="wk">Week 5</td></tr>
+        <tr><td class="id">NFR-05</td><td>Logs and traces everywhere</td><td class="wk">Weeks 2 &amp; 7</td></tr>
+        <tr><td class="id">NFR-06</td><td>CV reading scales on its own</td><td class="wk">Week 5</td></tr>
+        <tr><td class="id">NFR-07</td><td>Arabic and English word lists stay equal</td><td class="wk">Week 5</td></tr>
+        <tr><td class="id">NFR-08</td><td>Same input + same rules = same answer, always</td><td class="wk">Week 2</td></tr>
+        <tr><td class="id">NFR-09</td><td>Login, roles, and who did what</td><td class="wk">Weeks 1 &amp; 3</td></tr>
+        <tr><td class="id">CR-01</td><td>No candidate data leaves the company</td><td class="wk">Week 8 <span class="chip hi">Depends on the OCR decision</span></td></tr>
+        <tr><td class="id">CR-02</td><td>Record the legal basis before contacting anyone</td><td class="wk">Week 6</td></tr>
+        <tr><td class="id">CR-03</td><td>Delete candidates after their time is up</td><td class="wk">Week 7 <span class="chip ask">Legal must give the periods &mdash; OPN-07</span></td></tr>
+        <tr><td class="id">CR-04</td><td>A candidate can ask why, and we can answer from saved data</td><td class="wk">Week 2</td></tr>
+        <tr><td class="id">CR-05</td><td>No final decision without a human</td><td class="wk">Week 3</td></tr>
+        <tr><td class="id">CR-06</td><td>No forbidden copying, no hiding from detection</td><td class="wk">Week 8 <span class="chip lo">By design</span> we build none of it</td></tr>
+        <tr><td class="id">CR-07</td><td>Legal checks the rules for discrimination before they go live</td><td class="wk">Week 2 <span class="chip hi">Urgent &mdash; OPN-02, age bands</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ GOALS ============ -->
+<section id="goals">
+  <h2><span class="num">05</span>The six goals in the BRD</h2>
+  <p class="lede">Section 3 of the BRD sets six goals with numbers. This is what happens to each one.</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th>ID</th><th>Goal</th><th>Result after 8 weeks</th></tr></thead>
+      <tbody>
+        <tr><td class="id">OBJ-01</td><td>95% of active candidates have a step recorded</td><td><span class="chip lo">Possible</span> The system is ready in week 3. The number is measured 30 days after go-live. <b>It also needs the CPO to tell recruiters to use it</b> &mdash; that part is not engineering</td></tr>
+        <tr><td class="id">OBJ-02</td><td>100% same scores on all 5,140</td><td><span class="chip lo">Met in week 2</span> This is the gate</td></tr>
+        <tr><td class="id">OBJ-03</td><td>No candidate data outside the company</td><td><span class="chip lo">Met in week 8</span> Only if the OCR runs inside. Proof is the egress log, not a promise</td></tr>
+        <tr><td class="id">OBJ-04</td><td>No dependence on one person's machine</td><td><span class="chip lo">Met in week 8</span> We turn that laptop off for a day and nothing stops</td></tr>
+        <tr><td class="id">OBJ-05</td><td>1,000 candidates a month, without slowing the chatbots</td><td><span class="chip lo">No longer a risk</span> We call no AI at all, so the shared server is untouched. The same limits are applied to the OCR API</td></tr>
+        <tr><td class="id">OBJ-06</td><td>Scored and assigned in under 12 hours</td><td><span class="chip lo">Met in week 4</span> It takes seconds. The rules run the moment the person applies</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ WEEKS ============ -->
+<section id="weeks">
+  <h2><span class="num">06</span>The 8 weeks</h2>
+  <p class="lede"><strong style="color:var(--a)">Person A</strong> owns the data and the rules. If a score
+  or a number is wrong, it is their work.
+  <strong style="color:var(--b)">Person B</strong> owns the platform. If it will not run, deploy or log in,
+  it is their work. Each one checks the other's code.</p>
+  <p class="lede">Each line shows the BRD rule it builds. Friday is a demo. If it was not shown on Friday,
+  it is not done.</p>
+
+  <div class="note">
+    <p class="t">Six things to start before week 1</p>
+    <p><b>1.</b> Decide where the OCR runs. <b>2.</b> Get the server, database and storage. <b>3.</b> Get
+    read access to employee data, for the own-staff check. <b>4.</b> Book a weekly hour with Karim for
+    rulings. <b>5.</b> Send the API plan to the CRM team and the website team. <b>6.</b> Ask legal about
+    OPN-02 (age) &mdash; it is needed in week 2, not later.</p>
+  </div>
+
+  <div class="phase"><span class="r">Same scores, same data</span><span class="w">Weeks 1&ndash;2 &middot; BRD P0, P1, P2</span></div>
+
+  <div class="week">
+    <div class="wk-h"><span class="no">WEEK 1</span><span class="ti">Start clean, and save today's answers</span></div>
+    <div class="lanes">
+      <div class="lane A"><p class="who">Person A</p><ul>
+        <li>Run today's scorer over all <b>5,140</b> rows. Save the answers &mdash; score, tier, flags, signals. <b>This file is the truth we compare against.</b> <span class="r">BR-702</span></li>
+        <li>Write the map: each of the 47 sheet columns &rarr; where it goes in the new database. List every column with no home and ask Karim. <span class="r">BR-701</span></li>
+        <li>Compare <code>CLAUDE.md</code>, <code>CRITERIA.md</code> and the code. Where they disagree, <b>the code wins</b>. Write the differences down as questions. Do not fix them yet.</li>
+        <li>Ask TA: what does "active candidate" mean for the 95% goal? Old rows with no step will never have one. <span class="r">OBJ-01</span></li>
+      </ul></div>
+      <div class="lane B"><p class="who">Person B</p><ul>
+        <li>Repo, three environments, Docker. Only one port open to the outside.</li>
+        <li>Database with four areas. The raw area can be written but <b>never changed or deleted</b> &mdash; set by database permissions, not by trust. <span class="r">BR-107</span></li>
+        <li>Automatic checks on every push: secrets, types, tests, build, deploy to test server.</li>
+        <li>Login with company accounts. <b>The developer bypass refuses to start outside the dev machine.</b> <span class="r">NFR-09</span></li>
+        <li>Send the API plan to the CRM team and the website team <b>this week</b>.</li>
+      </ul></div>
+    </div>
+    <div class="check"><b>End of week</b> The baseline file exists. The system starts clean and asks for a login. The OCR decision is made.</div>
+  </div>
+
+  <div class="week">
+    <div class="wk-h"><span class="no">WEEK 2</span><span class="ti">Move the scorer. Prove it did not change.</span></div>
+    <div class="lanes">
+      <div class="lane A"><p class="who">Person A</p><ul>
+        <li>Move the 1,243-line scorer into the new system as <b>rules version 1</b>: gates, weights, bonuses, caps, tiers, routing, own-staff check. <b>No improvements. No tidying.</b> <span class="r">BR-301, BR-303</span></li>
+        <li>Build the replay: run version 1 over all 5,140 and compare to the week 1 file. <span class="r">BR-702</span></li>
+        <li>Write down every difference with the candidate and the field. <b>Collect them and ask Karim once</b>, not one by one. <span class="r">RSK-04</span></li>
+        <li>Tests named after the old lessons: Shorouk word boundary, senior consultant is not a manager, team leaders are routed, own staff by current job only.</li>
+      </ul></div>
+      <div class="lane B"><p class="who">Person B</p><ul>
+        <li>Move the 47 columns into real tables. Every field keeps <b>where it came from and who checked it</b>. <span class="r">BR-201</span></li>
+        <li>Empty fields become <b>"not recorded"</b>. Nothing is guessed or filled in. <span class="r">BR-703</span></li>
+        <li>Archive with a reason instead of delete, everywhere. <span class="r">BR-205</span></li>
+        <li>Background workers with a saved job history, and readable logs. <span class="r">NFR-03, BR-604</span></li>
+      </ul></div>
+    </div>
+    <div class="check gate"><b>Gate &mdash; week 2</b> <b>Zero unexplained differences on all 5,140 records.</b> Every difference answered by Karim and written down. Row counts match the sheet. <b>Week 3 does not start until this passes.</b> If it is late, everything moves by a week. That is correct, not failure.</div>
+  </div>
+
+  <div class="phase"><span class="r">Steps that cannot be skipped</span><span class="w">Weeks 3&ndash;4 &middot; BRD P3</span></div>
+
+  <div class="week">
+    <div class="wk-h"><span class="no">WEEK 3</span><span class="ti">The pipeline</span></div>
+    <div class="lanes">
+      <div class="lane A"><p class="who">Person A</p><ul>
+        <li>Re-score the candidates from before the 3 August fix. <b>Show the tier changes first. Apply only after Karim signs.</b> Last time 1,518 people moved. <span class="r">BR-704</span></li>
+        <li>Own-staff check against live employee data: current employer <b>and</b> current title. Compare with the 38 rows removed by hand. <span class="r">BR-301</span></li>
+        <li>Ask Karim about the two candidates whose employer is exactly "The Address". It blocks sign-off. <span class="r">OPN-03</span></li>
+        <li>Get the rejection reason list from TA and load it. <span class="r">BR-404</span></li>
+      </ul></div>
+      <div class="lane B"><p class="who">Person B</p><ul>
+        <li>Job openings and applications. <b>The step machine</b>: new, contacted, replied, phone screen, HR interview, test, technical interview, offer, hired, rejected &mdash; with the allowed moves. <span class="r">BR-401, BR-402</span></li>
+        <li>Every move saved with who, when, from and to. <b>A test proves there is no other way to change a step.</b> <span class="r">BR-403</span></li>
+        <li>Owner, team label, and each recruiter sees only their own people. <span class="r">BR-108, BR-408</span></li>
+        <li>Changing a decision needs a reason and a name. Nobody is rejected by the system. <span class="r">BR-405, BR-406</span></li>
+      </ul></div>
+    </div>
+    <div class="check"><b>End of week</b> A candidate can be moved through every step, and cannot be moved any other way. The re-score report is with Karim. <span class="chip ask">Ask</span> the step list and the reason list come from TA &mdash; ask in week 1, not here.</div>
+  </div>
+
+  <div class="week">
+    <div class="wk-h"><span class="no">WEEK 4</span><span class="ti">The funnel, and the API others build on</span></div>
+    <div class="lanes">
+      <div class="lane A"><p class="who">Person A</p><ul>
+        <li><b>The funnel report</b>, built from the saved moves: how many at each step, by job, brand, recruiter, team and source. <span class="r">BR-601</span></li>
+        <li>Load the real open jobs, so the API is tested with real shapes, not fake data.</li>
+        <li>Time report: applied &rarr; scored &rarr; assigned. It will read seconds, not hours. <span class="r">OBJ-06</span></li>
+      </ul></div>
+      <div class="lane B"><p class="who">Person B</p><ul>
+        <li>Finish and <b>freeze</b> the API: candidates, scores, jobs, moves, review list, funnel. <span class="r">BR-410</span></li>
+        <li>Events to the CRM: scored, step changed, review needed &mdash; with retry if the CRM is down.</li>
+        <li>Roles and permissions finished. Every admin action has a name on it. <span class="r">NFR-09</span></li>
+        <li>Written API docs and a test server the CRM team can use <b>without asking us</b>.</li>
+      </ul></div>
+    </div>
+    <div class="check gate"><b>Gate &mdash; week 4</b> The CRM team is building against a frozen API. <b>The funnel report shows real numbers.</b> <span class="chip ask">Ask</span> if the CRM team cannot commit now, Person B builds a small internal screen in week 7. It costs about 3 days, taken from hardening.</div>
+  </div>
+
+  <div class="phase"><span class="r">CVs in, and one record per person</span><span class="w">Weeks 5&ndash;6 &middot; BRD P4, P5</span></div>
+
+  <div class="week">
+    <div class="wk-h"><span class="no">WEEK 5</span><span class="ti">Reading CVs safely</span></div>
+    <div class="lanes">
+      <div class="lane A"><p class="who">Person A</p><ul>
+        <li><b>Clean the CV before anything reads it</b>: white text on white, tiny text, text off the page, invisible characters. Remove it, save what was found, send the CV to a human. <span class="r">BR-308</span></li>
+        <li>Map the OCR output into fields for <b>Arabic, English and mixed</b> CVs. Never translate names. <span class="r">BR-309, NFR-07</span></li>
+        <li>Build the test set: real CVs in both languages, plus CVs with hidden text. Report accuracy on every change. <span class="r">BR-311</span></li>
+        <li><span class="chip drop">Drops first</span> loading old CVs from drives and email. <span class="r">BR-104</span></li>
+      </ul></div>
+      <div class="lane B"><p class="who">Person B</p><ul>
+        <li>Upload &rarr; <b>keep the original file forever</b> &rarr; call the OCR API &rarr; save its answer &rarr; return the filled form. <span class="r">BR-102, BR-107</span></li>
+        <li>Same file twice = one candidate. <span class="r">BR-106</span></li>
+        <li>Limits and retries on the OCR API. If it fails, the candidate goes to the review list &mdash; never lost. <span class="r">NFR-01, NFR-04</span></li>
+        <li>Recruiters can type in a candidate. Marked as manual, and <b>must be checked before contact</b>. <span class="r">BR-103</span></li>
+      </ul></div>
+    </div>
+    <div class="check"><b>End of week</b> A real CV is uploaded and the form comes back correct. A CV with hidden instructions is cleaned, flagged and sent to a human &mdash; whatever its score.</div>
+  </div>
+
+  <div class="week">
+    <div class="wk-h"><span class="no">WEEK 6</span><span class="ti">Apply from a job post</span></div>
+    <div class="lanes">
+      <div class="lane A"><p class="who">Person A</p><ul>
+        <li>Find the same person twice: phone, email, profile link, and <b>Arabic name spellings</b> &mdash; "ال" prefix, ة and ه, ي and ى, and English spellings of the same name. <span class="r">BR-203</span></li>
+        <li>Joining keeps both histories and <b>can be undone</b>. If it is not clear, ask a human. <span class="r">BR-204, BR-206</span></li>
+        <li>Check the matcher on <b>500 pairs by hand</b>. Wrong joins must be under 0.5%. Run it over the 5,140 and show the groups <b>before</b> joining anything.</li>
+      </ul></div>
+      <div class="lane B"><p class="who">Person B</p><ul>
+        <li>The apply page API, with <b>consent taken at the moment of applying</b> &mdash; what they agreed to, when, and through which channel. <span class="r">BR-101, CR-02</span></li>
+        <li><b>A phone or WhatsApp number is required</b> to apply. Report how many candidates can be reached, next to how many there are &mdash; today it is 4.6%. <span class="r">BR-109</span></li>
+        <li>If a candidate withdraws consent, remove them everywhere, not only the main table. <span class="r">BR-504</span></li>
+        <li>A tracking code per job post, so we can see which post brings good people. <span class="r">BR-602</span></li>
+        <li><span class="chip ask">Ask</span> the website team adds upload and prefill. If they are late, we put a simple apply page on our own domain in one day. <b>Applications cannot stop before week 8.</b></li>
+      </ul></div>
+    </div>
+    <div class="check"><b>End of week</b> A person taps a link in a TikTok post, uploads a CV, checks the form, agrees, and arrives scored, tiered, de-duplicated and assigned &mdash; in under a minute, with no recruiter involved.</div>
+  </div>
+
+  <div class="phase"><span class="r">Make it safe, then switch over</span><span class="w">Weeks 7&ndash;8 &middot; BRD P6, P10</span></div>
+
+  <div class="week">
+    <div class="wk-h"><span class="no">WEEK 7</span><span class="ti">Backups, review list, security</span></div>
+    <div class="lanes">
+      <div class="lane A"><p class="who">Person A</p><ul>
+        <li><b>The review list</b>: borderline candidates, flagged CVs, unchecked people, unclear matches &mdash; each with the reason it is there. <span class="r">BR-407</span></li>
+        <li>Decide the number for <b>borderline</b> and get Karim to sign it. The BRD does not say how close is close. <span class="r">BR-310</span></li>
+        <li>Put the full replay into the automatic checks, so any future rule change proves itself. <span class="r">BR-304</span></li>
+        <li>Score the last 200 candidates in both systems and list every difference.</li>
+      </ul></div>
+      <div class="lane B"><p class="who">Person B</p><ul>
+        <li>Nightly backups. <b>Then restore one for real.</b> A backup that was never restored is not a backup.</li>
+        <li>Delete candidates when their time is up. The mechanism ships now; <b>legal still owes us the periods</b>. <span class="r">CR-03, OPN-07</span></li>
+        <li>Alerts on failures and queue size. A runbook written for someone who is not you. <span class="r">NFR-05</span></li>
+        <li>Security check on the public upload page &mdash; it takes files from strangers.</li>
+      </ul></div>
+    </div>
+    <div class="check"><b>End of week</b> A backup is restored onto a clean machine and works. <span class="chip med">Risk</span> this is the week that gets eaten if week 2 or week 5 ran late &mdash; and it is the week you least want to lose.</div>
+  </div>
+
+  <div class="week">
+    <div class="wk-h"><span class="no">WEEK 8</span><span class="ti">Run both, train, switch off</span></div>
+    <div class="lanes">
+      <div class="lane A"><p class="who">Person A</p><ul>
+        <li>Run both systems side by side for three days on real applications. <b>Any difference stops the switch.</b></li>
+        <li>Train the recruiters: how to record a step, what the review list needs, and <b>that messages are still sent outside the system for now</b>.</li>
+        <li>Hand over the rules: how to make version 2, replay it and sign it &mdash; so the next change does not need an engineer.</li>
+      </ul></div>
+      <div class="lane B"><p class="who">Person B</p><ul>
+        <li>Deploy to production. Practise the rollback once, before it is needed.</li>
+        <li><b>Switch off in this order</b>: scrapers, then the Railway portal, then the Google Sheet copy, then delete the outside AI key. Each one only after its replacement works. <span class="r">BR-705</span></li>
+        <li><b>The sheet becomes read-only and is kept</b>, not deleted. It is the proof behind old decisions.</li>
+        <li>Show with logs that no candidate data leaves the network. <b>Proof, not a promise.</b> <span class="r">CR-01, OBJ-03</span></li>
+      </ul></div>
+    </div>
+    <div class="check gate"><b>Go live</b> Every new candidate comes through our own page. Every active candidate has a step. The funnel report is generated, not typed. The sheet is frozen. The three outside services are gone. <b>The laptop is switched off for a full day and nothing stops.</b></div>
+  </div>
+</section>
+
+<!-- ============ DECIDE ============ -->
+<section id="decide">
+  <h2><span class="num">07</span>Decisions we need from other people</h2>
+  <p class="lede">These are not engineering problems. Each one stops a week if it is late.</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th>ID</th><th>Question</th><th>Who answers</th><th>Stops</th></tr></thead>
+      <tbody>
+        <tr><td class="id">&mdash;</td><td><b>Where does the OCR API run?</b> Inside our network, or outside?</td><td>AI/ML + Legal</td><td><b>Week 5</b>, and CR-01</td></tr>
+        <tr><td class="id">OPN-02</td><td><b>Are age limits allowed?</b> And can we guess age from graduation year?</td><td>Legal + Karim</td><td><b>Week 2.</b> Rules version 1 cannot go live without this</td></tr>
+        <tr><td class="id">&mdash;</td><td>What are the steps, and what moves are allowed between them? What are the rejection reasons?</td><td>TA leadership</td><td>Week 3</td></tr>
+        <tr><td class="id">OPN-03</td><td>Two candidates say their employer is "The Address". Keep them out, or bring them back?</td><td>Karim</td><td>Week 3 sign-off</td></tr>
+        <tr><td class="id">&mdash;</td><td>How close to the line is <b>borderline</b>? Give a number</td><td>Karim</td><td>Week 7</td></tr>
+        <tr><td class="id">OPN-07</td><td>How long do we keep candidate records &mdash; hired, rejected, never contacted?</td><td>Legal</td><td>Week 7</td></tr>
+        <tr><td class="id">OPN-01</td><td>The 5,140 old candidates have no consent. What do we do?</td><td>Legal + CPO</td><td>Nothing in these 8 weeks. But it decides if those 5,140 are useful or only history. <b>Ask now.</b></td></tr>
+        <tr><td class="id">OPN-04</td><td>How do we find senior candidates now that copying is stopped?</td><td>TA leadership</td><td>Volume after week 8</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ RISK ============ -->
+<section id="risk">
+  <h2><span class="num">08</span>What can go wrong</h2>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Risk</th><th>Size</th><th>What we do</th></tr></thead>
+      <tbody>
+        <tr><td><b>There is no spare time.</b> 8 weeks &times; 2 people is fully used</td><td><span class="chip hi">High</span></td><td>The drop order is decided now: first old-CV import, then source reports, then the manual-entry screen. <b>Never drop the replay, the step machine or the backups</b></td></tr>
+        <tr><td>Week 2 finds many differences and Karim must rule on all of them</td><td><span class="chip hi">High</span></td><td>Collect them, ask once. If it runs long, everything moves one week. Do not start week 3 to look busy</td></tr>
+        <tr><td>The OCR turns out to be outside-only and legal says no</td><td><span class="chip hi">High</span></td><td>Decide in week 1. A self-hosted replacement costs about one week of Person B, taken from week 7</td></tr>
+        <tr><td>CRM team or website team are late</td><td><span class="chip med">Medium</span></td><td>API sent week 1, frozen week 4. Small internal screens held ready, about 4 days total</td></tr>
+        <tr><td>Recruiters still do not record steps</td><td><span class="chip med">Medium</span></td><td>A recruiter who wants to act <b>must</b> record, because there is no other way to move a candidate. The rest needs the CPO. It is not something code can fix</td></tr>
+        <tr><td>Fewer candidates arrive after the scrapers stop</td><td><span class="chip med">Medium</span></td><td>The apply page is live in week 6 and the scrapers stop in week 8. Measure every week. <b>If the numbers are low at week 8, do not switch off</b> &mdash; run both longer and take it to TA leadership</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ AFTER ============ -->
+<section id="after">
+  <h2><span class="num">09</span>After week 8</h2>
+  <p class="lede">In order of value:</p>
+  <ol>
+    <li><strong>Outreach (P9)</strong> &mdash; as soon as legal answers OPN-01. Messages, consent guards, a person pressing send, interview booking. This is where the business value of the BRD sits.</li>
+    <li><strong>AI soft scoring (P7)</strong> &mdash; ranking inside a tier with evidence, run at night against the shared server.</li>
+    <li><strong>Shortlists (P8)</strong> &mdash; ranked lists per job, with a limit per employer.</li>
+    <li><strong>Readable rule-change reports (P6)</strong> &mdash; so Karim can review a new version without an engineer.</li>
+    <li><strong>Rule performance (BR-603)</strong> &mdash; after about three months of real hiring results exist.</li>
+  </ol>
+  <p><strong>None of these are needed for the platform to be useful.</strong> That is the reason to ship the
+  8 weeks first.</p>
+</section>
+
+<footer>
+  <div>Talent Platform &mdash; delivery plan v2 &middot; 14 September 2026</div>
+  <div>Built from BRD v0.1 &middot; every BR, NFR and CR mapped to a week</div>
+  <div>The Address Investments &mdash; Talent Acquisition &amp; HRIS &middot; Draft for review</div>
+</footer>
+
+</div>
+
+</body></html>

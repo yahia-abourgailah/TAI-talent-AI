@@ -1,0 +1,1104 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found]){display:none!important}</style></head><body>
+<title>TAI Talent Platform BRD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --paper:#FAFAF8;
+    --surface:#FFFFFF;
+    --sunken:#F1F3F2;
+    --ink:#15191B;
+    --body:#2E3538;
+    --muted:#6A7478;
+    --faint:#97A0A3;
+    --rule:#DCE0DE;
+    --rule-strong:#C2C8C5;
+    --accent:#0F5C57;
+    --accent-ink:#0B4643;
+    --accent-wash:#E3EDEB;
+    --blocker:#93291E;
+    --blocker-wash:#F6E5E2;
+    --open:#7A5411;
+    --open-wash:#F6EEDC;
+    --ratified:#2B6B47;
+    --ratified-wash:#E2EFE7;
+    --shadow:0 1px 2px rgba(21,25,27,.05);
+    --display:"Archivo","Helvetica Neue",Arial,sans-serif;
+    --text:"Source Serif 4",Georgia,"Times New Roman",serif;
+    --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --paper:#111416;
+      --surface:#181C1E;
+      --sunken:#1E2325;
+      --ink:#EDEFEE;
+      --body:#C6CCCB;
+      --muted:#8E9998;
+      --faint:#6E7877;
+      --rule:#2A3032;
+      --rule-strong:#3A4244;
+      --accent:#5FB8AD;
+      --accent-ink:#8FD3CA;
+      --accent-wash:#16302E;
+      --blocker:#E08174;
+      --blocker-wash:#33201D;
+      --open:#D7AE5F;
+      --open-wash:#2E2716;
+      --ratified:#74BC90;
+      --ratified-wash:#192C21;
+      --shadow:0 1px 2px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#111416;
+    --surface:#181C1E;
+    --sunken:#1E2325;
+    --ink:#EDEFEE;
+    --body:#C6CCCB;
+    --muted:#8E9998;
+    --faint:#6E7877;
+    --rule:#2A3032;
+    --rule-strong:#3A4244;
+    --accent:#5FB8AD;
+    --accent-ink:#8FD3CA;
+    --accent-wash:#16302E;
+    --blocker:#E08174;
+    --blocker-wash:#33201D;
+    --open:#D7AE5F;
+    --open-wash:#2E2716;
+    --ratified:#74BC90;
+    --ratified-wash:#192C21;
+    --shadow:0 1px 2px rgba(0,0,0,.35);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    background:var(--paper);
+    color:var(--body);
+    font-family:var(--text);
+    font-size:17px;
+    line-height:1.62;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--accent);text-underline-offset:2px}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+
+  .shell{
+    max-width:1240px;
+    margin:0 auto;
+    padding:0 28px 120px;
+    display:grid;
+    grid-template-columns:232px minmax(0,1fr);
+    gap:56px;
+    align-items:start;
+  }
+
+  /* ---------- masthead ---------- */
+  .masthead{
+    grid-column:1/-1;
+    border-bottom:2px solid var(--ink);
+    padding:44px 0 20px;
+    margin-bottom:40px;
+  }
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.13em;
+    text-transform:uppercase;
+    color:var(--muted);
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px 18px;
+    margin-bottom:22px;
+  }
+  .eyebrow .sep{color:var(--rule-strong)}
+  h1{
+    font-family:var(--display);
+    font-weight:700;
+    font-size:clamp(34px,5vw,52px);
+    line-height:1.04;
+    letter-spacing:-.022em;
+    color:var(--ink);
+    margin:0 0 10px;
+    text-wrap:balance;
+  }
+  .standfirst{
+    font-size:20px;
+    line-height:1.5;
+    color:var(--muted);
+    max-width:60ch;
+    margin:0 0 30px;
+  }
+  .control{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(148px,1fr));
+    gap:2px;
+    background:var(--rule);
+    border:1px solid var(--rule);
+  }
+  .control div{background:var(--paper);padding:11px 14px}
+  .control dt{
+    font-family:var(--mono);
+    font-size:10px;
+    letter-spacing:.11em;
+    text-transform:uppercase;
+    color:var(--faint);
+    margin:0 0 3px;
+  }
+  .control dd{
+    margin:0;
+    font-family:var(--display);
+    font-weight:600;
+    font-size:14px;
+    color:var(--ink);
+  }
+
+  /* ---------- nav rail ---------- */
+  nav{
+    position:sticky;
+    top:20px;
+    font-family:var(--display);
+    font-size:13px;
+    line-height:1.35;
+  }
+  nav h2{
+    font-family:var(--mono);
+    font-size:10px;
+    letter-spacing:.13em;
+    text-transform:uppercase;
+    color:var(--faint);
+    font-weight:500;
+    margin:0 0 12px;
+    padding-bottom:9px;
+    border-bottom:1px solid var(--rule);
+  }
+  nav ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
+  nav a{
+    display:grid;
+    grid-template-columns:24px 1fr;
+    gap:8px;
+    padding:5px 6px 5px 0;
+    color:var(--muted);
+    text-decoration:none;
+    border-left:2px solid transparent;
+    padding-left:9px;
+  }
+  nav a:hover{color:var(--ink);border-left-color:var(--rule-strong)}
+  nav a .n{font-family:var(--mono);font-size:11px;color:var(--faint);padding-top:1px}
+  nav .rail-note{
+    margin-top:18px;padding-top:14px;border-top:1px solid var(--rule);
+    font-family:var(--text);font-size:12.5px;line-height:1.5;color:var(--faint);
+  }
+
+  /* ---------- sections ---------- */
+  main{min-width:0}
+  section{margin:0 0 60px;scroll-margin-top:20px}
+  .sec-head{
+    display:grid;
+    grid-template-columns:44px 1fr;
+    gap:12px;
+    align-items:baseline;
+    border-top:1px solid var(--ink);
+    padding-top:14px;
+    margin-bottom:22px;
+  }
+  .sec-head .n{
+    font-family:var(--mono);
+    font-size:12px;
+    font-weight:600;
+    color:var(--accent);
+    letter-spacing:.04em;
+  }
+  h2{
+    font-family:var(--display);
+    font-weight:600;
+    font-size:27px;
+    letter-spacing:-.014em;
+    line-height:1.2;
+    color:var(--ink);
+    margin:0;
+    text-wrap:balance;
+  }
+  h3{
+    font-family:var(--display);
+    font-weight:600;
+    font-size:15px;
+    letter-spacing:.01em;
+    color:var(--ink);
+    margin:34px 0 12px;
+  }
+  h3:first-of-type{margin-top:0}
+  p{margin:0 0 15px;max-width:68ch}
+  ul,ol.plain{margin:0 0 15px;padding-left:20px;max-width:68ch}
+  li{margin-bottom:6px}
+  strong{font-weight:600;color:var(--ink)}
+  em{font-style:italic}
+  code{
+    font-family:var(--mono);
+    font-size:.86em;
+    background:var(--sunken);
+    padding:1px 5px;
+    border-radius:2px;
+    color:var(--ink);
+  }
+
+  /* ---------- tables ---------- */
+  .tw{overflow-x:auto;margin:0 0 18px;border:1px solid var(--rule)}
+  table{border-collapse:collapse;width:100%;font-size:14.5px;font-family:var(--display);background:var(--surface)}
+  th{
+    font-family:var(--mono);
+    font-size:10px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    font-weight:500;
+    color:var(--muted);
+    text-align:left;
+    padding:10px 13px;
+    border-bottom:1px solid var(--rule-strong);
+    background:var(--sunken);
+    white-space:nowrap;
+  }
+  td{padding:10px 13px;border-bottom:1px solid var(--rule);vertical-align:top;color:var(--body)}
+  tbody tr:last-child td{border-bottom:none}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--mono);font-size:13px}
+  td.id{font-family:var(--mono);font-size:12.5px;color:var(--accent);white-space:nowrap;font-weight:500}
+  td strong{font-weight:600}
+
+  /* ---------- requirements ---------- */
+  .reqs{border-top:1px solid var(--rule-strong)}
+  .req{
+    display:grid;
+    grid-template-columns:86px minmax(0,1fr);
+    gap:18px;
+    padding:16px 0;
+    border-bottom:1px solid var(--rule);
+  }
+  .req .rid{
+    font-family:var(--mono);
+    font-size:12.5px;
+    font-weight:600;
+    color:var(--accent);
+    padding-top:2px;
+    letter-spacing:.01em;
+  }
+  .req .rbody{min-width:0}
+  .req p{margin:0 0 8px;font-size:16px}
+  .meta{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 14px;
+    font-family:var(--mono);
+    font-size:10.5px;
+    letter-spacing:.07em;
+    text-transform:uppercase;
+    color:var(--faint);
+  }
+  .meta b{font-weight:500;color:var(--muted)}
+  .pri{
+    font-family:var(--mono);
+    font-size:10px;
+    letter-spacing:.09em;
+    text-transform:uppercase;
+    padding:2px 7px;
+    border:1px solid currentColor;
+    border-radius:2px;
+  }
+  .pri.must{color:var(--blocker)}
+  .pri.should{color:var(--open)}
+  .pri.could{color:var(--muted)}
+
+  /* ---------- callouts ---------- */
+  .note{
+    border-left:3px solid var(--accent);
+    background:var(--accent-wash);
+    padding:14px 18px;
+    margin:0 0 18px;
+    font-size:16px;
+  }
+  .note.blocker{border-left-color:var(--blocker);background:var(--blocker-wash)}
+  .note.open{border-left-color:var(--open);background:var(--open-wash)}
+  .note.ratified{border-left-color:var(--ratified);background:var(--ratified-wash)}
+  .note p{margin:0 0 8px;max-width:none}
+  .note p:last-child{margin:0}
+  .note .lbl{
+    font-family:var(--mono);
+    font-size:10px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    display:block;
+    margin-bottom:6px;
+    color:var(--ink);
+  }
+
+  /* ---------- metric strip ---------- */
+  .metrics{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(132px,1fr));
+    border:1px solid var(--rule);
+    background:var(--rule);
+    gap:1px;
+    margin:0 0 20px;
+  }
+  .metrics div{background:var(--surface);padding:14px 16px}
+  .metrics .v{
+    font-family:var(--display);
+    font-weight:700;
+    font-size:27px;
+    line-height:1.1;
+    color:var(--ink);
+    font-variant-numeric:tabular-nums;
+    letter-spacing:-.02em;
+  }
+  .metrics .k{
+    font-family:var(--mono);
+    font-size:10px;
+    letter-spacing:.09em;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-top:5px;
+    line-height:1.4;
+  }
+
+  /* ---------- flow ---------- */
+  .flow{
+    font-family:var(--mono);
+    font-size:12.5px;
+    line-height:1.85;
+    background:var(--surface);
+    border:1px solid var(--rule);
+    padding:18px 20px;
+    overflow-x:auto;
+    white-space:pre;
+    color:var(--body);
+    margin:0 0 18px;
+  }
+  .flow b{color:var(--accent);font-weight:600}
+
+  /* ---------- layered model ---------- */
+  .layers{display:flex;flex-direction:column;gap:1px;background:var(--rule);border:1px solid var(--rule);margin:0 0 18px}
+  .layer{background:var(--surface);padding:14px 18px;display:grid;grid-template-columns:78px 1fr;gap:16px;align-items:start}
+  .layer .lv{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:600;padding-top:3px}
+  .layer h4{font-family:var(--display);font-size:15px;font-weight:600;color:var(--ink);margin:0 0 4px}
+  .layer p{margin:0;font-size:15px;max-width:64ch}
+  .layer.det{border-left:3px solid var(--ratified)}
+  .layer.prob{border-left:3px solid var(--open)}
+
+  footer{
+    grid-column:1/-1;
+    border-top:2px solid var(--ink);
+    margin-top:20px;
+    padding-top:18px;
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--faint);
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px 22px;
+  }
+
+  @media (max-width:920px){
+    .shell{grid-template-columns:1fr;gap:0;padding:0 20px 80px}
+    nav{position:static;margin-bottom:44px;padding-bottom:24px;border-bottom:1px solid var(--rule)}
+    nav ol{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:0}
+    body{font-size:16.5px}
+    .req{grid-template-columns:1fr;gap:6px}
+  }
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="shell">
+
+  <header class="masthead">
+    <div class="eyebrow">
+      <span>Business Requirements Document</span><span class="sep">/</span>
+      <span>The Address Investments</span><span class="sep">/</span>
+      <span>Talent Acquisition &amp; HRIS</span><span class="sep">/</span>
+      <span>Cairo, Egypt</span>
+    </div>
+    <h1>Talent Platform</h1>
+    <p class="standfirst">Consolidating Leila AI into a governed, auditable, on-premises hiring platform — candidate sourcing through offer, with every decision reconstructable and every outbound message consented.</p>
+    <dl class="control">
+      <div><dt>Version</dt><dd>0.1 — Draft</dd></div>
+      <div><dt>Date</dt><dd>13 Sep 2026</dd></div>
+      <div><dt>Author</dt><dd>AI/ML Team</dd></div>
+      <div><dt>Criteria owner</dt><dd>Karim AlAkkad</dd></div>
+      <div><dt>Status</dt><dd>For review</dd></div>
+      <div><dt>Supersedes</dt><dd>Talent AI Service Spec</dd></div>
+    </dl>
+  </header>
+
+  <nav aria-label="Contents">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#s1"><span class="n">01</span><span>Executive summary</span></a></li>
+      <li><a href="#s2"><span class="n">02</span><span>Current state</span></a></li>
+      <li><a href="#s3"><span class="n">03</span><span>Objectives &amp; success measures</span></a></li>
+      <li><a href="#s4"><span class="n">04</span><span>Scope</span></a></li>
+      <li><a href="#s5"><span class="n">05</span><span>Stakeholders</span></a></li>
+      <li><a href="#s6"><span class="n">06</span><span>Solution principles</span></a></li>
+      <li><a href="#s7"><span class="n">07</span><span>Business requirements</span></a></li>
+      <li><a href="#s8"><span class="n">08</span><span>Non-functional</span></a></li>
+      <li><a href="#s9"><span class="n">09</span><span>Compliance &amp; legal</span></a></li>
+      <li><a href="#s10"><span class="n">10</span><span>Assumptions &amp; dependencies</span></a></li>
+      <li><a href="#s11"><span class="n">11</span><span>Risks</span></a></li>
+      <li><a href="#s12"><span class="n">12</span><span>Delivery phases</span></a></li>
+      <li><a href="#s13"><span class="n">13</span><span>Open decisions</span></a></li>
+      <li><a href="#s14"><span class="n">14</span><span>Acceptance &amp; sign-off</span></a></li>
+      <li><a href="#s15"><span class="n">15</span><span>Glossary</span></a></li>
+    </ol>
+    <p class="rail-note">Requirement IDs are permanent. Re-number nothing; supersede with a new ID and mark the old one withdrawn.</p>
+  </nav>
+
+  <main>
+
+    <!-- ============ 1 ============ -->
+    <section id="s1">
+      <div class="sec-head"><span class="n">01</span><h2>Executive summary</h2></div>
+
+      <p>The Address Investments runs its sales recruiting on <strong>Leila AI</strong> — a candidate sourcing and scoring system built by Karim AlAkkad, HRIS Lead, on his own initiative. It works. It has processed 5,140 candidates, it encodes six months of ratified hiring criteria, and it was the basis of a CEO and Managing Director briefing.</p>
+
+      <p>It also runs on one laptop, keeps candidate personal data in Google Sheets and on a third-party host, acquires much of its pipeline through browser automation against platforms that forbid it, and records a hiring stage for <strong>15 of its 5,140 candidates</strong>. None of those four things survives contact with Egypt's Personal Data Protection Law, which becomes enforceable in <strong>October 2026</strong>.</p>
+
+      <p>This document specifies the platform that replaces it: the same criteria, the same tiers, the same rulings — moved onto owned infrastructure, with a real database, enforced pipeline stages, consent as a precondition for contact, and a complete audit trail behind every verdict. Sourcing shifts from scraping to inbound: job posts on LinkedIn, TikTok and Facebook carry a link to our own application page, where a candidate uploads a CV and we extract and prefill it.</p>
+
+      <div class="note ratified">
+        <span class="lbl">The organising principle</span>
+        <p>Deterministic rules decide. Language models order and explain. A candidate's tier is always traceable to a rule and a number — never to a model output — because that is what a rejected applicant is entitled to ask for, and what the regulator is entitled to see.</p>
+      </div>
+    </section>
+
+    <!-- ============ 2 ============ -->
+    <section id="s2">
+      <div class="sec-head"><span class="n">02</span><h2>Current state</h2></div>
+
+      <h3>2.1 What exists today</h3>
+      <div class="metrics">
+        <div><div class="v">5,140</div><div class="k">Candidate rows</div></div>
+        <div><div class="v">76.7%</div><div class="k">Have a score</div></div>
+        <div><div class="v">4.6%</div><div class="k">Have a phone number</div></div>
+        <div><div class="v">0.3%</div><div class="k">Have a stage</div></div>
+        <div><div class="v">0</div><div class="k">Recorded outcomes</div></div>
+      </div>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th>Layer</th><th>Implementation today</th><th>Problem</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Database</strong></td><td><code>TAI_Master.xlsx</code> mirrored to a Google Sheet</td><td>Candidate PII with a third party; no constraints, no transactions, no history</td></tr>
+            <tr><td><strong>Scoring</strong></td><td><code>TAI/scorer.py</code>, ratified 4 Aug 2026</td><td>Sound logic; validated only by 13 hardcoded self-test cases</td></tr>
+            <tr><td><strong>Criteria</strong></td><td><code>CLAUDE.md</code> + <code>CRITERIA.md</code></td><td>Have contradicted each other and the code — four versions once ran simultaneously</td></tr>
+            <tr><td><strong>Sourcing</strong></td><td>Browser automation: LinkedIn, Facebook (16 groups), TikTok; Wuzzuf; Apollo</td><td>Prohibited by platform terms; the LinkedIn account has already been flagged once</td></tr>
+            <tr><td><strong>Portal</strong></td><td>FastAPI on Railway, reads Google Sheets, chat via a third-party model API</td><td>Candidate names, phones and emails sent to two external processors</td></tr>
+            <tr><td><strong>Orchestration</strong></td><td>Windows Task Scheduler on one workstation, interactive logon</td><td>Stops when that person is unavailable; browser sessions expire every few days</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>2.2 The measurement gap</h3>
+      <p>Recruiter activity is largely unrecorded. These are the populated counts across 5,140 rows:</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th>Field</th><th class="num">Rows filled</th><th class="num">Coverage</th><th>Consequence</th></tr></thead>
+          <tbody>
+            <tr><td>Score and tier</td><td class="num">3,940</td><td class="num">76.7%</td><td><strong>1,200 candidates have never been scored at all</strong></td></tr>
+            <tr><td>Profile URL</td><td class="num">5,082</td><td class="num">98.9%</td><td>Identity is near-complete &mdash; the record exists, the means to act on it does not</td></tr>
+            <tr><td>Phone number</td><td class="num">238</td><td class="num">4.6%</td><td><strong>The pipeline is almost entirely uncontactable by phone</strong>, while scoring awards 10 points for holding one</td></tr>
+            <tr><td>Email</td><td class="num">49</td><td class="num">1.0%</td><td>No viable email channel</td></tr>
+            <tr><td>Assigned recruiter</td><td class="num">596</td><td class="num">11.6%</td><td>Ownership unclear for nine in ten candidates</td></tr>
+            <tr><td>First contact sent</td><td class="num">508</td><td class="num">9.9%</td><td>Outreach volume unverifiable</td></tr>
+            <tr><td>Reply received</td><td class="num">82</td><td class="num">1.6%</td><td>No response rate by channel or message</td></tr>
+            <tr><td>HR feedback</td><td class="num">56</td><td class="num">1.1%</td><td>No signal to improve criteria; unchanged since 25 May</td></tr>
+            <tr><td>Stage</td><td class="num">15</td><td class="num">0.3%</td><td><strong>No funnel exists.</strong> Conversion cannot be computed at any step</td></tr>
+            <tr><td>Hire and rejection outcome</td><td class="num">0</td><td class="num">0%</td><td><strong>Not one outcome has ever been recorded.</strong> There is no ground truth against which any criterion can be validated</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note blocker">
+        <span class="lbl">Counts verified against the workbook, 14 September 2026</span>
+        <p>The master holds <strong>5,140 candidate rows</strong>. A higher figure taken from the sheet's last row includes roughly 617 blank rows carrying formatting only; it is not a candidate count and should not be quoted.</p>
+        <p><strong>Two findings outrank the stage gap.</strong> Contactability is 4.6% &mdash; 238 phone numbers across the entire pipeline &mdash; so most scored candidates cannot actually be reached, and acquiring contact details is a higher-value problem than acquiring more profiles. And with zero recorded hires or rejection reasons, there is no outcome data in the system at all, which independently confirms that model training has no basis and stays out of scope.</p>
+      </div>
+
+      <p>This is not a defect in the code, and Leila's own documentation says so. A stage is a spreadsheet cell nobody is compelled to fill. The platform makes a stage transition the <em>only</em> way to move a candidate, which converts the funnel from a manual tally into a query.</p>
+
+      <h3>2.3 What must be preserved</h3>
+      <p>The scoring logic is the most valuable asset in the handover, because it encodes rulings that cost real money to learn:</p>
+      <ul>
+        <li><strong>The Shorouk bug.</strong> A substring test matched <code>"uk"</code> inside <code>"Shorouk"</code> and hard-disqualified every El Shorouk candidate at score 0 for weeks. It had been recorded as a missing allow-list entry — the wrong cause. Fixed 3 Aug 2026 by anchoring to word boundaries.</li>
+        <li><strong>The 4 August re-scale.</strong> Correcting a 115-point scale to a true 100 moved <strong>1,518 candidates</strong> between tiers and cut P1 from 775 to 331. Priority counts before and after that date are not comparable.</li>
+        <li><strong>Seniority is not management.</strong> A Senior Property Consultant is a target; a Senior Sales Manager is disqualified. Only actual management scope disqualifies.</li>
+        <li><strong>Team Leaders and Supervisors are routed, not rejected</strong> — out of entry-level scoring and into the tenured track.</li>
+        <li><strong>Own staff are never sourced.</strong> Matched on current employer and current title only — a past stint makes someone a rehire candidate, which is a different case. 38 rows excluded; 6 had been P1.</li>
+      </ul>
+      <p>Every one of these must survive migration byte-identically, and be provable.</p>
+    </section>
+
+    <!-- ============ 3 ============ -->
+    <section id="s3">
+      <div class="sec-head"><span class="n">03</span><h2>Objectives &amp; success measures</h2></div>
+      <p>Six objectives. Each has a baseline, a target and a verification method, so delivery is arguable from evidence rather than opinion.</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th>ID</th><th>Objective</th><th>Baseline</th><th>Target</th><th>Verified by</th></tr></thead>
+          <tbody>
+            <tr><td class="id">OBJ-01</td><td><strong>Restore measurement.</strong> Every active application carries a current stage</td><td>0.3% (15 / 5,140)</td><td>&ge; 95% of active applications, 30 days after go-live</td><td>Funnel report generated from stage-transition events</td></tr>
+            <tr><td class="id">OBJ-02</td><td><strong>Preserve decision integrity</strong> across the migration</td><td>n/a</td><td>100% score, tier, flag and signal parity on all 5,140 rows</td><td>Golden replay suite, zero unexplained differences</td></tr>
+            <tr><td class="id">OBJ-03</td><td><strong>Remove data-protection exposure</strong></td><td>PII with 3 external processors</td><td>Zero candidate PII outside owned infrastructure</td><td>Egress review plus decommissioning evidence</td></tr>
+            <tr><td class="id">OBJ-04</td><td><strong>Remove key-person and session dependency</strong></td><td>1 workstation, interactive logon</td><td>No production path depends on a named individual's machine or browser session</td><td>Full pipeline runs with that workstation powered off</td></tr>
+            <tr><td class="id">OBJ-05</td><td><strong>Screen at volume without degrading shared services</strong></td><td>Manual, ad-hoc</td><td>&ge; 1,000 candidates/month screened; <code>:8061</code> p95 latency unchanged for interactive chatbots during a full batch</td><td>Latency comparison across a batch window</td></tr>
+            <tr><td class="id">OBJ-06</td><td><strong>Shorten time to recruiter action</strong></td><td>Not measurable today</td><td>&lt; 12 hours from application received to scored, tiered and assigned</td><td>Timestamp delta report</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note open">
+        <span class="lbl">Note on OBJ-01</span>
+        <p>Stage discipline is partly a process change, not only a system change — the existing ask sits with the CPO. The platform makes recording structurally unavoidable; adoption still needs management backing. Treat OBJ-01 as jointly owned by TA leadership and this project.</p>
+      </div>
+    </section>
+
+    <!-- ============ 4 ============ -->
+    <section id="s4">
+      <div class="sec-head"><span class="n">04</span><h2>Scope</h2></div>
+
+      <h3>4.1 In scope</h3>
+      <ul>
+        <li>Compliant candidate acquisition: inbound applications, a public application page fed by social job posts, recruiter-assisted manual import, job-board integrations where commercial access exists</li>
+        <li>CV ingestion, text and OCR extraction, sanitisation, structured profile capture — Arabic, English and mixed documents</li>
+        <li>Candidate identity resolution and de-duplication with Arabic-aware name handling</li>
+        <li>Two-track evaluation, ranking and shortlisting, with versioned criteria and shadow testing</li>
+        <li>The recruitment pipeline: requisitions, applications, enforced stages, recruiter assignment, review queue, overrides with reasons</li>
+        <li>Outreach drafting, consent and contact guards, human-approved sending, interview scheduling on an internal calendar</li>
+        <li>Pipeline and funnel reporting; API and event surface for the CRM dashboard and the careers site</li>
+        <li>Migration of all 5,140 candidate records and the ratified criteria from Leila AI</li>
+      </ul>
+
+      <h3>4.2 Out of scope</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th>Excluded</th><th>Reason</th></tr></thead>
+          <tbody>
+            <tr><td>Core HRIS — employee records, contracts, payroll, L&amp;D</td><td>Talent acquisition only for this programme. Employee data is consumed read-only for the own-staff gate and org chart</td></tr>
+            <tr><td>Any crawler or browser automation against LinkedIn, Facebook or TikTok</td><td>Prohibited by platform terms; the account has already been flagged once</td></tr>
+            <tr><td>Proxy rotation, fingerprint spoofing, CAPTCHA handling</td><td>Detection evasion is not a capability this platform will contain</td></tr>
+            <tr><td>Third-party contact-data brokers</td><td>Introduces candidate PII of unknown provenance; incompatible with consent-first processing</td></tr>
+            <tr><td>The recruiter dashboard UI</td><td>Hosted by the existing CRM. We supply the API and events</td></tr>
+            <tr><td>The public careers page UI</td><td>Owned by the website team. We supply upload, extraction, prefill and submission APIs</td></tr>
+            <tr><td>Model fine-tuning</td><td>No outcome data exists yet — the feedback layer is 1% populated</td></tr>
+            <tr><td>Fully automatic rejection</td><td>Every negative verdict is confirmed by a person</td></tr>
+            <tr><td>Personality, emotion or appearance inference</td><td>Not defensible, not permitted</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 5 ============ -->
+    <section id="s5">
+      <div class="sec-head"><span class="n">05</span><h2>Stakeholders</h2></div>
+      <div class="tw">
+        <table>
+          <thead><tr><th>Role</th><th>Who</th><th>Accountable for</th><th>Needed from them</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Criteria owner</strong></td><td>Karim AlAkkad — HRIS Lead</td><td>All scoring rules, thresholds, tier definitions and rulings on ambiguity</td><td>Ruling on every golden-replay discrepancy; sign-off on each ruleset version</td></tr>
+            <tr><td><strong>Executive sponsor</strong></td><td>CPO</td><td>Stage-discipline mandate; resourcing</td><td>Backing for OBJ-01 as a process change</td></tr>
+            <tr><td><strong>End users</strong></td><td>TA recruiters</td><td>Day-to-day pipeline operation</td><td>Review-queue and shortlist usability feedback from the pilot</td></tr>
+            <tr><td><strong>Delivery</strong></td><td>AI/ML team</td><td>Build, migration, evaluation harness, operations</td><td>&mdash;</td></tr>
+            <tr><td><strong>CRM team</strong></td><td>Existing CRM owners</td><td>Recruiter dashboard hosting the review queue and calendar</td><td>API contract agreement; dashboard build</td></tr>
+            <tr><td><strong>Website team</strong></td><td>Corporate site owners</td><td>Public careers and application pages</td><td>Integration of the upload and prefill flow</td></tr>
+            <tr><td><strong>Legal / compliance</strong></td><td>To be named</td><td>PDPL position, consent wording, retention periods</td><td><strong>Ruling on the consent gap — see OPN-01</strong></td></tr>
+            <tr><td><strong>Infrastructure</strong></td><td>Platform owners of the shared GPU host</td><td>Model serving, database, object storage, cache</td><td>Redis index allocation; database role; capacity confirmation</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 6 ============ -->
+    <section id="s6">
+      <div class="sec-head"><span class="n">06</span><h2>Solution principles</h2></div>
+
+      <h3>6.1 The evaluation stack</h3>
+      <p>Leila's scorer is entirely deterministic — there is no model anywhere in it. Language models are additive here, and strictly subordinate:</p>
+
+      <div class="layers">
+        <div class="layer det"><div class="lv">Layer 0</div><div><h4>Hard gates — deterministic</h4><p>Outside Greater Cairo, age outside band, managerial title, current employee, eleven or more years. Rule expressions over structured fields. No model call. Failure ends the evaluation and costs nothing.</p></div></div>
+        <div class="layer det"><div class="lv">Layer 1</div><div><h4>Component score — deterministic</h4><p>Location 30, sales fit 25, entry level 20, education 15, contact 10; bonuses applied on top and capped at 100. <strong>This layer alone assigns the tier.</strong> Fully reproducible, fully auditable.</p></div></div>
+        <div class="layer prob"><div class="lv">Layer 2</div><div><h4>Soft criteria — model-scored</h4><p>Only what rules cannot read: CV narrative and summary. One isolated call per criterion returning a score and a verbatim evidence span. Orders candidates <em>within</em> a tier and can raise a review flag. It can never cross a tier boundary or reverse a gate.</p></div></div>
+        <div class="layer prob"><div class="lv">Layer 3</div><div><h4>Similarity — tiebreaker</h4><p>Vector retrieval for shortlist ordering only. Never affects a verdict.</p></div></div>
+      </div>
+
+      <h3>6.2 Standing rules become schema</h3>
+      <p>Three rules Leila carries as written policy are implemented as structure, so compliance stops depending on anyone remembering:</p>
+      <div class="tw">
+        <table>
+          <thead><tr><th>Rule today</th><th>Implemented as</th></tr></thead>
+          <tbody>
+            <tr><td>Never invent candidate data; blank beats guessed</td><td>Every candidate field stores its own value, source, verified-at and verified-by. Unverified is the default and is visible. A guessed value has nowhere to live</td></tr>
+            <tr><td>Unverified candidates are never contacted or shortlisted</td><td>Verification state is a precondition on outreach and shortlist queries, enforced in code</td></tr>
+            <tr><td>No assumptions — surface ambiguity, never resolve it quietly</td><td>A first-class <em>borderline</em> verdict and a review queue. Unattended runs record the ambiguity and safely do nothing</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>6.3 Processing flow</h3>
+      <div class="flow">source record  <b>&rarr;</b>  immutable raw capture (hash-keyed, original bytes retained)
+              <b>&rarr;</b>  normalise  <b>&rarr;</b>  identity resolution / de-duplication
+              <b>&rarr;</b>  extract (text layer | OCR)  <b>&rarr;</b>  sanitise  <b>&rarr;</b>  structured profile
+              <b>&rarr;</b>  profile summary  <b>&rarr;</b>  embed  <b>&rarr;</b>  vector index
+              <b>&rarr;</b>  <b>Layer 0</b> gates ──[fail]──&rarr;  evaluation (FAIL)  &rarr;  review queue  &rarr;  end
+              <b>&rarr;</b>  <b>Layer 1</b> deterministic score  <b>&rarr;</b>  tier
+              <b>&rarr;</b>  <b>Layer 2</b> soft criteria  <b>&rarr;</b>  rank within tier
+              <b>&rarr;</b>  evaluation persisted (criteria, model and prompt versions pinned)
+              <b>&rarr;</b>  stage transition  <b>&rarr;</b>  CRM notification
+              <b>&rarr;</b>  shortlist  <b>&rarr;</b>  outreach draft  <b>&rarr;</b>  guards  <b>&rarr;</b>  human approval  <b>&rarr;</b>  send</div>
+
+      <h3>6.4 Prompt-injection defence</h3>
+      <p>CVs are adversarial input — candidates embed hidden instructions and invisible keyword lists to game screening. Text matching the background colour, text below four points, text outside the page bounds, zero-width and bidirectional-override characters are all detected and <strong>stripped before any model call</strong>, and recorded on the evaluation. A flagged document goes to human review regardless of score, and the recruiter is shown what was found. Structurally, the scoring model never sees raw document text — only the sanitised, schema-constrained profile.</p>
+    </section>
+
+    <!-- ============ 7 ============ -->
+    <section id="s7">
+      <div class="sec-head"><span class="n">07</span><h2>Business requirements</h2></div>
+      <p>Priorities are <strong>Must</strong> (required for go-live), <strong>Should</strong> (required for full operation), <strong>Could</strong> (valuable, deferrable). Every requirement names an owning team.</p>
+
+      <h3>BR-1xx &mdash; Sourcing &amp; intake</h3>
+      <div class="reqs">
+        <div class="req"><div class="rid">BR-101</div><div class="rbody">
+          <p>The platform shall accept applications submitted through the public careers site, capturing explicit consent at the point of submission.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML + Website</span><span><b>Phase</b> P4</span></div></div></div>
+        <div class="req"><div class="rid">BR-102</div><div class="rbody">
+          <p>The platform shall accept a CV upload, extract its contents, and return prefilled form fields for the candidate to confirm or correct — so a job post on any social platform can carry a link that converts a viewer into a verified applicant.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P4</span></div></div></div>
+        <div class="req"><div class="rid">BR-103</div><div class="rbody">
+          <p>The platform shall provide a recruiter-assisted manual import so a recruiter can enter a candidate they sourced themselves, with the source recorded as manual and verification required before that candidate can be contacted or shortlisted.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P4</span></div></div></div>
+        <div class="req"><div class="rid">BR-104</div><div class="rbody">
+          <p>The platform shall support a bulk archive import for historic CVs held on shared drives and in mailboxes.</p>
+          <div class="meta"><span class="pri should">Should</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P4</span></div></div></div>
+        <div class="req"><div class="rid">BR-105</div><div class="rbody">
+          <p>The platform shall provide a uniform connector interface so a new source can be added as a single self-contained module. Job-board connectors shall be implemented against official employer APIs only, once commercial access is granted.</p>
+          <div class="meta"><span class="pri should">Should</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P4</span></div></div></div>
+        <div class="req"><div class="rid">BR-106</div><div class="rbody">
+          <p>Every intake shall be idempotent on source, external identifier and content hash. Re-running an import shall never create a duplicate.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P4</span></div></div></div>
+        <div class="req"><div class="rid">BR-107</div><div class="rbody">
+          <p>Original submitted files and raw source payloads shall be retained immutably and never overwritten, so any extraction can be re-derived and audited.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P4</span></div></div></div>
+        <div class="req"><div class="rid">BR-108</div><div class="rbody">
+          <p>Every candidate shall carry the sourcing recruiter and team, and that label shall persist through scoring, assignment and reporting — so candidates route back to the team whose project sourced them.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P3</span></div></div></div>
+        <div class="req"><div class="rid">BR-109</div><div class="rbody">
+          <p>Intake shall be designed to capture a usable contact channel &mdash; phone or messaging handle &mdash; as a required field at the point of application, and the platform shall report contactability as a first-class pipeline metric.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML + Website</span><span><b>Phase</b> P4</span></div></div></div>
+      </div>
+
+      <h3>BR-2xx &mdash; Candidate identity &amp; data integrity</h3>
+      <div class="reqs">
+        <div class="req"><div class="rid">BR-201</div><div class="rbody">
+          <p>Every candidate attribute shall record its own source, verification state and verification timestamp. An attribute that cannot be traced to a primary source shall remain empty and shall never be inferred, predicted or filled in.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P2</span></div></div></div>
+        <div class="req"><div class="rid">BR-202</div><div class="rbody">
+          <p>Unverified candidates shall be clearly marked and shall be excluded from outreach and from shortlists until verified.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P3</span></div></div></div>
+        <div class="req"><div class="rid">BR-203</div><div class="rbody">
+          <p>The platform shall de-duplicate candidates across sources using Arabic-aware name normalisation — definite-article prefix, tāʾ marbūṭa and yāʾ variants, diacritics and transliteration alternatives — in addition to phone, email and profile identifiers.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P5</span></div></div></div>
+        <div class="req"><div class="rid">BR-204</div><div class="rbody">
+          <p>Merging two candidate records shall preserve the full source history of both and shall be reversible.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P5</span></div></div></div>
+        <div class="req"><div class="rid">BR-205</div><div class="rbody">
+          <p>Records removed or failing validation shall be archived with reason and actor, never silently deleted.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P2</span></div></div></div>
+        <div class="req"><div class="rid">BR-206</div><div class="rbody">
+          <p>Where a profile identifier is ambiguous — a common-name collision, a duplicate URL across two names, a headline inconsistent with the claimed role — the platform shall flag it for human resolution and shall not choose between the alternatives.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P5</span></div></div></div>
+      </div>
+
+      <h3>BR-3xx &mdash; Evaluation &amp; scoring</h3>
+      <div class="reqs">
+        <div class="req"><div class="rid">BR-301</div><div class="rbody">
+          <p>The platform shall reproduce the ratified scoring of 4 August 2026 exactly, for both the entry-level and tenured tracks, including all component weights, bonuses, caps, tier thresholds, disqualifiers, routing rules and the own-staff exclusion.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P1</span></div></div></div>
+        <div class="req"><div class="rid">BR-302</div><div class="rbody">
+          <p>A candidate failing a hard gate shall be recorded as failed with the specific reason and shall not be submitted to any model.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P6</span></div></div></div>
+        <div class="req"><div class="rid">BR-303</div><div class="rbody">
+          <p>Criteria shall be versioned and immutable. Editing criteria shall produce a new version; every evaluation shall record the criteria version, model version and prompt version that produced it.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P6</span></div></div></div>
+        <div class="req"><div class="rid">BR-304</div><div class="rbody">
+          <p>Before a criteria version goes live, the platform shall re-run it against previously decided candidates and present a difference report showing exactly which candidates change tier. No version shall be activated without this report being reviewed.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML + Criteria owner</span><span><b>Phase</b> P6</span></div></div></div>
+        <div class="req"><div class="rid">BR-305</div><div class="rbody">
+          <p>Model-scored criteria shall return a numeric score and a verbatim evidence span from the sanitised profile, shall be evaluated one criterion per isolated call, and shall never place more than one candidate in a single model context.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P7</span></div></div></div>
+        <div class="req"><div class="rid">BR-306</div><div class="rbody">
+          <p>Model-scored criteria shall not move a candidate across a tier boundary, override a hard gate, or alter a deterministic component score.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P7</span></div></div></div>
+        <div class="req"><div class="rid">BR-307</div><div class="rbody">
+          <p>Any verdict shall be fully reconstructable at any later date from stored data alone — criteria version, extracted profile, component scores, evidence spans, injection flags and verification state — without re-running anything.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P6</span></div></div></div>
+        <div class="req"><div class="rid">BR-308</div><div class="rbody">
+          <p>The platform shall detect and strip hidden or adversarial content in submitted documents, record what was found, and route any flagged document to human review regardless of score.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P4</span></div></div></div>
+        <div class="req"><div class="rid">BR-309</div><div class="rbody">
+          <p>Extraction shall handle Arabic-only, English-only and mixed-language documents, and shall not translate proper nouns.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P4</span></div></div></div>
+        <div class="req"><div class="rid">BR-310</div><div class="rbody">
+          <p>A borderline verdict shall be a first-class outcome, surfaced for review rather than rounded into a pass or a fail.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P7</span></div></div></div>
+        <div class="req"><div class="rid">BR-311</div><div class="rbody">
+          <p>The platform shall maintain a labelled evaluation set — bilingual, including documents with deliberately hidden content — and shall report extraction accuracy, gate correctness, agreement with human labels, false-merge rate and injection-detection recall on every criteria or prompt change.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P7</span></div></div></div>
+      </div>
+
+      <h3>BR-4xx &mdash; Pipeline &amp; recruitment operations</h3>
+      <div class="reqs">
+        <div class="req"><div class="rid">BR-401</div><div class="rbody">
+          <p>The platform shall maintain requisitions with brand, department, track, open headcount, status, owning recruiter and the criteria version in force.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P3</span></div></div></div>
+        <div class="req"><div class="rid">BR-402</div><div class="rbody">
+          <p>An application shall move through a defined stage sequence — new, contacted, replied, phone screen, HR interview, aptitude test, technical interview, offer, hired, rejected — with transitions validated against permitted moves.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P3</span></div></div></div>
+        <div class="req"><div class="rid">BR-403</div><div class="rbody">
+          <p>Every stage change shall be recorded as an event carrying the actor, timestamp, previous stage and new stage. Stage shall not be settable as a free-text field.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P3</span></div></div></div>
+        <div class="req"><div class="rid">BR-404</div><div class="rbody">
+          <p>A rejection shall require both the stage at which it occurred and a reason drawn from a defined list.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML + TA</span><span><b>Phase</b> P3</span></div></div></div>
+        <div class="req"><div class="rid">BR-405</div><div class="rbody">
+          <p>No candidate shall be rejected automatically. Every negative verdict shall be queued for human confirmation.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P3</span></div></div></div>
+        <div class="req"><div class="rid">BR-406</div><div class="rbody">
+          <p>A human override of any verdict shall require a reason, shall be attributed, and shall be retained as a labelled signal for future criteria review.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P3</span></div></div></div>
+        <div class="req"><div class="rid">BR-407</div><div class="rbody">
+          <p>The platform shall present a review queue containing borderline verdicts, flagged documents, unverified candidates and unresolved ambiguities, each with the evidence behind it.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML + CRM</span><span><b>Phase</b> P7</span></div></div></div>
+        <div class="req"><div class="rid">BR-408</div><div class="rbody">
+          <p>Recruiters shall see only candidates within their scope, determined by assignment and organisational position.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P3</span></div></div></div>
+        <div class="req"><div class="rid">BR-409</div><div class="rbody">
+          <p>The platform shall produce a ranked shortlist for a requisition, from passing and borderline candidates only, with a cap on how many may come from any single current employer.</p>
+          <div class="meta"><span class="pri should">Should</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P8</span></div></div></div>
+        <div class="req"><div class="rid">BR-410</div><div class="rbody">
+          <p>The platform shall expose a versioned API and an event stream for the CRM dashboard covering requisitions, candidates, evaluations, the review queue, stage transitions and shortlists.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML + CRM</span><span><b>Phase</b> P3</span></div></div></div>
+      </div>
+
+      <h3>BR-5xx &mdash; Outreach &amp; scheduling</h3>
+      <div class="reqs">
+        <div class="req"><div class="rid">BR-501</div><div class="rbody">
+          <p>No outbound message shall be sent without a valid, in-scope, un-withdrawn consent record for that candidate. This shall be enforced as a data constraint, not a runtime check.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML + Legal</span><span><b>Phase</b> P9</span></div></div></div>
+        <div class="req"><div class="rid">BR-502</div><div class="rbody">
+          <p>Message drafting shall be automatic; sending shall require an explicit human approval action. The approval step shall be built in from the outset and shall remain enabled for at least the first six months of operation.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P9</span></div></div></div>
+        <div class="req"><div class="rid">BR-503</div><div class="rbody">
+          <p>The platform shall block outreach where the candidate is on a do-not-contact list, has been contacted within the cooldown window, is a current employee of any group brand, the requisition is closed, or the sending recruiter has reached their daily volume cap. These guards shall be implemented in code, never as model instructions.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P9</span></div></div></div>
+        <div class="req"><div class="rid">BR-504</div><div class="rbody">
+          <p>Consent withdrawal shall cascade across all stores — structured records, document storage and vector indexes — not only the primary record.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P9</span></div></div></div>
+        <div class="req"><div class="rid">BR-505</div><div class="rbody">
+          <p>Every message generated and every message sent shall be logged with its content, channel, recruiter, approval actor, and the model and prompt versions used.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P9</span></div></div></div>
+        <div class="req"><div class="rid">BR-506</div><div class="rbody">
+          <p>Drafts shall follow the confirmed brand voice — first-person plural, high positioning, brief, no filler — and shall be composed in the candidate's likely language, inferred from their application.</p>
+          <div class="meta"><span class="pri should">Should</span><span><b>Owner</b> AI/ML + TA</span><span><b>Phase</b> P9</span></div></div></div>
+        <div class="req"><div class="rid">BR-507</div><div class="rbody">
+          <p>The platform shall support scheduling an interview onto an internal recruiter calendar, recording the slot, attendees and outcome against the application, and shall isolate the calendar behind an interface so an external calendar can be integrated later without altering outreach.</p>
+          <div class="meta"><span class="pri should">Should</span><span><b>Owner</b> AI/ML + CRM</span><span><b>Phase</b> P9</span></div></div></div>
+        <div class="req"><div class="rid">BR-508</div><div class="rbody">
+          <p>Outreach shall be positioned as recruitment communication, not sales. No promotional or commercial content shall be included in candidate messages.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> TA</span><span><b>Phase</b> P9</span></div></div></div>
+      </div>
+
+      <h3>BR-6xx &mdash; Reporting</h3>
+      <div class="reqs">
+        <div class="req"><div class="rid">BR-601</div><div class="rbody">
+          <p>The platform shall produce a funnel report computed from stage-transition events — volume and conversion at each stage, by requisition, brand, recruiter, team and source.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P3</span></div></div></div>
+        <div class="req"><div class="rid">BR-602</div><div class="rbody">
+          <p>The platform shall report source effectiveness: candidates acquired, tier distribution, reply rate and hires, per source and per campaign link.</p>
+          <div class="meta"><span class="pri should">Should</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P8</span></div></div></div>
+        <div class="req"><div class="rid">BR-603</div><div class="rbody">
+          <p>The platform shall report criteria performance — override rate by component, tier distribution drift, and agreement between verdicts and eventual hiring outcomes.</p>
+          <div class="meta"><span class="pri could">Could</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P10</span></div></div></div>
+        <div class="req"><div class="rid">BR-604</div><div class="rbody">
+          <p>Every scheduled and unattended run shall report what it did, what it skipped, and any ambiguity it declined to resolve.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P2</span></div></div></div>
+      </div>
+
+      <h3>BR-7xx &mdash; Migration</h3>
+      <div class="reqs">
+        <div class="req"><div class="rid">BR-701</div><div class="rbody">
+          <p>All 5,140 existing candidate records shall migrate with their scores, tiers, flags, signals, recruiter assignments and pipeline data intact, each carrying its origin as provenance.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P2</span></div></div></div>
+        <div class="req"><div class="rid">BR-702</div><div class="rbody">
+          <p>The migrated scoring implementation shall be validated by replaying every existing record and asserting identical score, tier, flags and signals. Each discrepancy shall be individually triaged and ruled on by the criteria owner; none shall be resolved by assumption.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML + Criteria owner</span><span><b>Phase</b> P1</span></div></div></div>
+        <div class="req"><div class="rid">BR-703</div><div class="rbody">
+          <p>Records whose pipeline fields are empty today shall be migrated into an explicit unrecorded state. No historic value shall be inferred or back-filled.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P2</span></div></div></div>
+        <div class="req"><div class="rid">BR-704</div><div class="rbody">
+          <p>Candidates scored before the location fix of 3 August 2026 shall be re-scored, and the resulting tier changes reported before they are applied.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span><span><b>Phase</b> P2</span></div></div></div>
+        <div class="req"><div class="rid">BR-705</div><div class="rbody">
+          <p>Existing capabilities shall be decommissioned one at a time, each only after its replacement has run in parallel and matched. The spreadsheet shall be made read-only at cut-over and retained as an archive.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML + Criteria owner</span><span><b>Phase</b> P10</span></div></div></div>
+      </div>
+    </section>
+
+    <!-- ============ 8 ============ -->
+    <section id="s8">
+      <div class="sec-head"><span class="n">08</span><h2>Non-functional requirements</h2></div>
+      <div class="reqs">
+        <div class="req"><div class="rid">NFR-01</div><div class="rbody">
+          <p><strong>Shared-capacity discipline.</strong> The language model host is shared with customer-facing chatbots, one of which is going public at substantial volume. Screening shall run through a globally rate-limited client with a configured concurrency ceiling of four, and batch screening shall default to an overnight window. Both values shall be configuration, not constants in code. Raising the ceiling is not a permitted remedy for insufficient throughput.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML + Infrastructure</span></div></div></div>
+        <div class="req"><div class="rid">NFR-02</div><div class="rbody">
+          <p><strong>No interactive dependency.</strong> No production path shall depend on a desktop session, a logged-in browser, or an individual's workstation.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span></div></div></div>
+        <div class="req"><div class="rid">NFR-03</div><div class="rbody">
+          <p><strong>Durable, queryable work queue.</strong> Screening work shall be recorded durably and be inspectable after the fact. Hiring decisions require a job record that can be audited, not an ephemeral queue.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span></div></div></div>
+        <div class="req"><div class="rid">NFR-04</div><div class="rbody">
+          <p><strong>Resumability.</strong> A worker failure mid-evaluation shall resume from its last completed step rather than restarting, given the scarcity of the processing window.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span></div></div></div>
+        <div class="req"><div class="rid">NFR-05</div><div class="rbody">
+          <p><strong>Observability.</strong> Every model call shall be traced with its prompt version, model version and subject record. Logs shall be structured.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span></div></div></div>
+        <div class="req"><div class="rid">NFR-06</div><div class="rbody">
+          <p><strong>Horizontal scale where it is needed.</strong> Document processing shall scale out independently of model-bound scoring, which stays deliberately constrained.</p>
+          <div class="meta"><span class="pri should">Should</span><span><b>Owner</b> AI/ML</span></div></div></div>
+        <div class="req"><div class="rid">NFR-07</div><div class="rbody">
+          <p><strong>Bilingual throughout.</strong> Keyword sets, location vocabularies and intent signals shall be maintained in both English and Egyptian Arabic. A change to one language requires the corresponding change to the other.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span></div></div></div>
+        <div class="req"><div class="rid">NFR-08</div><div class="rbody">
+          <p><strong>Deterministic reproducibility.</strong> Re-running the deterministic layers over an unchanged profile with an unchanged criteria version shall always produce an identical result.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span></div></div></div>
+        <div class="req"><div class="rid">NFR-09</div><div class="rbody">
+          <p><strong>Access control.</strong> Authentication and role-based authorisation, with candidate visibility scoped by assignment and organisational position, and every administrative action attributed.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML + CRM</span></div></div></div>
+      </div>
+    </section>
+
+    <!-- ============ 9 ============ -->
+    <section id="s9">
+      <div class="sec-head"><span class="n">09</span><h2>Compliance &amp; legal</h2></div>
+      <div class="note blocker">
+        <span class="lbl">Timing</span>
+        <p>Egypt's Personal Data Protection Law executive regulations were issued in November 2025 with a one-year grace period. <strong>Treat October 2026 as the enforcement date.</strong> That is roughly one month after this document's date, and it falls inside the delivery window — compliance requirements are therefore delivery blockers, not follow-up work.</p>
+      </div>
+      <div class="reqs">
+        <div class="req"><div class="rid">CR-01</div><div class="rbody">
+          <p>Candidate personal data shall remain on infrastructure controlled by the company. No candidate personal data shall be transmitted to any external service, including model APIs, spreadsheet services and third-party application hosts.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML + Legal</span></div></div></div>
+        <div class="req"><div class="rid">CR-02</div><div class="rbody">
+          <p>A lawful basis shall be recorded before any candidate is contacted, and the record shall capture what the candidate agreed to, when, and through which channel.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> Legal</span></div></div></div>
+        <div class="req"><div class="rid">CR-03</div><div class="rbody">
+          <p>Each candidate shall carry a retention deadline, and expired records shall be purged automatically across every store.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML + Legal</span></div></div></div>
+        <div class="req"><div class="rid">CR-04</div><div class="rbody">
+          <p>A candidate shall be able to obtain the reasons for a decision about them, and the platform shall be able to produce those reasons from stored records without re-processing.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span></div></div></div>
+        <div class="req"><div class="rid">CR-05</div><div class="rbody">
+          <p>No automated decision shall have final effect on a candidate without human confirmation.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML + TA</span></div></div></div>
+        <div class="req"><div class="rid">CR-06</div><div class="rbody">
+          <p>The platform shall not acquire candidate data by any means prohibited by a source platform's terms of service, and shall contain no capability whose purpose is to evade detection.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> AI/ML</span></div></div></div>
+        <div class="req"><div class="rid">CR-07</div><div class="rbody">
+          <p>Criteria shall be reviewed for unlawful or indefensible discrimination before each version is activated, and that review shall be recorded against the version.</p>
+          <div class="meta"><span class="pri must">Must</span><span><b>Owner</b> Legal + Criteria owner</span></div></div></div>
+      </div>
+      <div class="note open">
+        <span class="lbl">Flagged for legal review</span>
+        <p>Present criteria include <strong>age bands</strong> as hard disqualifiers and infer age from graduation year where it is not stated. Age-based screening carries discrimination exposure in many jurisdictions. CR-07 exists to get a documented position on this before the first criteria version is activated — this document does not assume one.</p>
+      </div>
+    </section>
+
+    <!-- ============ 10 ============ -->
+    <section id="s10">
+      <div class="sec-head"><span class="n">10</span><h2>Assumptions &amp; dependencies</h2></div>
+
+      <h3>10.1 Assumptions</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th>ID</th><th>Assumption</th><th>If wrong</th></tr></thead>
+          <tbody>
+            <tr><td class="id">ASM-01</td><td>Sustained volume is in the low thousands of candidates per month</td><td>An order of magnitude higher makes the shared model host insufficient; a second serving instance becomes necessary</td></tr>
+            <tr><td class="id">ASM-02</td><td>Existing infrastructure — model serving, OCR, embeddings, database, object store, cache, vector store — is available and its current allocation is respected</td><td>Capacity and deployment planning are reopened</td></tr>
+            <tr><td class="id">ASM-03</td><td>The criteria owner remains available to rule on discrepancies and sign off criteria versions</td><td>Migration stalls at the golden-replay stage; see RSK-04</td></tr>
+            <tr><td class="id">ASM-04</td><td>The CRM team will build the recruiter dashboard against our API within the delivery window</td><td>The platform has no recruiter interface; a minimal internal one becomes in scope</td></tr>
+            <tr><td class="id">ASM-05</td><td>The website team will integrate the application and prefill flow</td><td>The inbound sourcing route does not open and acquisition volume drops</td></tr>
+            <tr><td class="id">ASM-06</td><td>The existing spreadsheet is a faithful record of current pipeline state for the fields that are populated</td><td>Migrated data needs manual reconciliation beyond the planned sample check</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>10.2 Dependencies</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th>ID</th><th>Dependency</th><th>On</th><th>Needed by</th></tr></thead>
+          <tbody>
+            <tr><td class="id">DEP-01</td><td>Legal position on the consent gap for migrated candidates</td><td>Legal / compliance</td><td>Before P9</td></tr>
+            <tr><td class="id">DEP-02</td><td>Agreed API contract for the recruiter dashboard</td><td>CRM team</td><td>Before P3 completes</td></tr>
+            <tr><td class="id">DEP-03</td><td>Careers-site integration of upload and prefill</td><td>Website team</td><td>Before P4 completes</td></tr>
+            <tr><td class="id">DEP-04</td><td>Read access to employee and organisational data for the own-staff gate and scoping</td><td>HRIS / backend</td><td>Before P3</td></tr>
+            <tr><td class="id">DEP-05</td><td>Cache index allocation, database role and storage provisioning</td><td>Infrastructure</td><td>Before P0 completes</td></tr>
+            <tr><td class="id">DEP-06</td><td>Commercial employer-API access for job boards</td><td>Procurement / TA leadership</td><td>Before those connectors are built</td></tr>
+            <tr><td class="id">DEP-07</td><td>Labelled evaluation set — bilingual, with adversarial documents</td><td>TA + AI/ML</td><td>Before P7</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 11 ============ -->
+    <section id="s11">
+      <div class="sec-head"><span class="n">11</span><h2>Risks</h2></div>
+      <div class="tw">
+        <table>
+          <thead><tr><th>ID</th><th>Risk</th><th>Impact</th><th>Mitigation</th></tr></thead>
+          <tbody>
+            <tr><td class="id">RSK-01</td><td><strong>Migrated candidates have no consent record.</strong> Under a consent-first regime none of the 5,140 can lawfully be contacted</td><td>Severe — the existing pipeline becomes uncontactable</td><td>Legal ruling required before outreach is built. Options include a re-permission campaign under current practice, or restricting outreach to newly consented candidates. See OPN-01</td></tr>
+            <tr><td class="id">RSK-02</td><td><strong>Batch screening starves the shared model host</strong> and degrades customer-facing chatbots</td><td>High — external service quality</td><td>Concurrency ceiling and overnight window as configuration; latency comparison is an explicit exit criterion for that phase</td></tr>
+            <tr><td class="id">RSK-03</td><td><strong>Losing the existing sourcing channels drops acquisition volume</strong> before inbound routes mature</td><td>High — hiring targets missed during transition</td><td>Sequence the application page and manual import ahead of decommissioning; measure acquisition weekly through the transition</td></tr>
+            <tr><td class="id">RSK-04</td><td><strong>Key-person dependency on the criteria owner</strong> for every ruling</td><td>High — migration cannot complete without rulings</td><td>Batch discrepancies for review rather than serialising on them; record each ruling as a versioned decision so it need never be asked twice</td></tr>
+            <tr><td class="id">RSK-05</td><td><strong>The scoring port diverges subtly</strong> from current behaviour and silently re-tiers candidates</td><td>High — invisible until someone is wrongly rejected</td><td>Full-population replay as a gate on all later work; no new scoring logic until parity is proven</td></tr>
+            <tr><td class="id">RSK-06</td><td><strong>Stage discipline does not improve</strong> because recording remains optional in practice</td><td>Medium — the funnel stays unmeasurable</td><td>Make stage transitions the only state-changing mechanism; escalate adoption through the executive sponsor</td></tr>
+            <tr><td class="id">RSK-07</td><td><strong>Adversarial CVs game the screen</strong> through hidden instructions or invisible keyword stuffing</td><td>Medium — wrong candidates promoted</td><td>Detection and stripping before any model call; flagged documents forced to human review; adversarial cases in the evaluation set</td></tr>
+            <tr><td class="id">RSK-08</td><td><strong>Age-based criteria are challenged</strong> as discriminatory</td><td>Medium — legal and reputational</td><td>Documented legal review of criteria before activation, recorded against the version</td></tr>
+            <tr><td class="id">RSK-10</td><td><strong>The migrated pipeline is largely uncontactable.</strong> Only 4.6% of candidates have a phone number and 1.0% an email, so most scored records cannot be acted on at all</td><td>High &mdash; the existing pipeline is worth far less than its row count suggests</td><td>Make contact capture mandatory at intake (BR-109); report contactability alongside volume; treat historic rows without a channel as archive rather than pipeline</td></tr>
+            <tr><td class="id">RSK-11</td><td><strong>No outcome data exists.</strong> Zero hires and zero rejection reasons are recorded, so no criterion has ever been validated against a real hiring result</td><td>Medium &mdash; criteria are unfalsifiable until outcomes accumulate</td><td>Outcome capture enforced from P3; criteria performance reporting deferred to P10 by necessity; no model training proposed</td></tr>
+            <tr><td class="id">RSK-12</td><td><strong>Portal session tokens may be forgeable.</strong> The existing portal falls back to a hardcoded signing secret when the environment variable is unset</td><td>High if present in the deployed environment</td><td>Verify the deployed configuration immediately; rotate; forbid a default secret in the replacement</td></tr>
+            <tr><td class="id">RSK-09</td><td><strong>CRM or website teams do not deliver within the window</strong></td><td>Medium — platform has no user-facing surface</td><td>Contracts agreed early; a minimal internal review interface held as a contingency</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 12 ============ -->
+    <section id="s12">
+      <div class="sec-head"><span class="n">12</span><h2>Delivery phases</h2></div>
+      <p>Phases are sequential and each is independently shippable. The order is chosen so the two highest risks — changing someone's score without noticing, and the unmeasurable funnel — are addressed first.</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th>Phase</th><th>Delivers</th><th>Exit criterion</th></tr></thead>
+          <tbody>
+            <tr><td class="id">P0</td><td>Foundation — repository, environments, schemas, configuration, external interfaces with test doubles, health checks</td><td>All processes start clean and report healthy</td></tr>
+            <tr><td class="id">P1</td><td><strong>Scoring parity.</strong> Current scorer ported as a versioned criteria set; full-population replay harness</td><td><strong>Zero unexplained differences across all 5,140 records.</strong> Every difference ruled on by the criteria owner. No later phase begins until this passes</td></tr>
+            <tr><td class="id">P2</td><td>Data migration — 47 spreadsheet columns decomposed into structured entities, provenance recorded, unrecorded states made explicit, historic location fix re-scored</td><td>Counts reconcile; a 200-record sample passes manual inspection; the re-score difference report is accepted</td></tr>
+            <tr><td class="id">P3</td><td><strong>Pipeline and API.</strong> Requisitions, applications, enforced stage machine, transition events, assignment, scoping, override with reason, CRM API and event stream</td><td>A recruiter moves a candidate through the full funnel from the dashboard, and the funnel report is generated from events</td></tr>
+            <tr><td class="id">P4</td><td>Intake and extraction — application and prefill API, CV parsing, OCR routing, sanitisation, immutable document storage, archive import</td><td>A candidate applies from a social link, uploads a CV, and receives an accurate prefilled form</td></tr>
+            <tr><td class="id">P5</td><td>Identity — Arabic-aware de-duplication, canonical merge, source history, ambiguity flagging</td><td>False-merge rate below 0.5% on 500 manually checked pairs</td></tr>
+            <tr><td class="id">P6</td><td>Criteria management — rule expressions, gates, versioning, shadow difference reports</td><td>Gate correctness 100% on the evaluation set; a shadow report is readable by a non-engineer</td></tr>
+            <tr><td class="id">P7</td><td>Model layer — soft criteria with evidence, rate-limited client, overnight window, review queue, evaluation harness in continuous integration</td><td>Agreement with human labels above the agreed threshold <strong>and</strong> shared-host latency unchanged during a full batch</td></tr>
+            <tr><td class="id">P8</td><td>Retrieval and shortlist — profile summaries, vector index, hybrid retrieval, ranking, employer diversity cap, source reporting</td><td>A recruiter obtains a ranked shortlist for a live requisition</td></tr>
+            <tr><td class="id">P9</td><td>Outreach — consent model, guards, drafting, human-approved sending, contact logging, internal calendar scheduling</td><td>Every disallowed case is provably blocked in tests; a full cycle from shortlist to booked interview completes</td></tr>
+            <tr><td class="id">P10</td><td>Transition — parallel running, capability-by-capability decommissioning, spreadsheet frozen and archived, criteria performance reporting</td><td>One complete hiring cycle runs on the platform alone; the legacy system is retired</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note">
+        <span class="lbl">Pilot before general release</span>
+        <p>Before P9, the platform runs in shadow for one brand and one department: it scores, humans decide, and the two are compared. A full hiring cycle completed in shadow — with the comparison reported — is the precondition for enabling outbound contact.</p>
+      </div>
+    </section>
+
+    <!-- ============ 13 ============ -->
+    <section id="s13">
+      <div class="sec-head"><span class="n">13</span><h2>Open decisions</h2></div>
+      <p>Each item names who decides and what it blocks. Nothing here will be resolved by assumption.</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th>ID</th><th>Question</th><th>Decides</th><th>Blocks</th></tr></thead>
+          <tbody>
+            <tr><td class="id">OPN-01</td><td><strong>How is the consent gap remedied for the 5,140 migrated candidates?</strong> Re-permission campaign, restriction to newly consented candidates, or an alternative documented lawful basis</td><td>Legal + CPO</td><td><strong>All of P9</strong></td></tr>
+            <tr><td class="id">OPN-02</td><td>Are age bands defensible as hard disqualifiers, and is inferring age from graduation year acceptable?</td><td>Legal + Criteria owner</td><td>Activation of the first criteria version</td></tr>
+            <tr><td class="id">OPN-03</td><td>Two candidates list their employer as exactly "The Address" and were excluded as own staff. Confirm or reverse</td><td>Criteria owner</td><td>P2 migration sign-off</td></tr>
+            <tr><td class="id">OPN-04</td><td>How is tenured-track acquisition replaced now that automated sourcing is withdrawn — referrals, paid job boards, a contracted data provider, or manual sourcing only?</td><td>TA leadership</td><td>Tenured-track volume from P4 onward</td></tr>
+            <tr><td class="id">OPN-05</td><td>Is the proposed adjacent-industry crossover cohort — premium retail, banking, insurance, telecom — approved as a scored source, and at what weighting?</td><td>Criteria owner</td><td>Criteria version covering the tenured track</td></tr>
+            <tr><td class="id">OPN-06</td><td>Which brands and departments are in the initial pilot?</td><td>CPO + TA leadership</td><td>P7 pilot start</td></tr>
+            <tr><td class="id">OPN-07</td><td>What are the retention periods for candidate records, by outcome — hired, rejected, never contacted?</td><td>Legal</td><td>CR-03 implementation</td></tr>
+            <tr><td class="id">OPN-08</td><td>Which job boards have, or can obtain, employer API access on commercial terms?</td><td>TA leadership + Procurement</td><td>BR-105 connectors</td></tr>
+            <tr><td class="id">OPN-09</td><td>Is the drafted referral campaign approved to run on the platform, and against which candidate populations?</td><td>Criteria owner + TA leadership</td><td>A referral source in P9</td></tr>
+            <tr><td class="id">OPN-10</td><td><strong>1,200 migrated candidates have never been scored.</strong> Score them under the current criteria version, or migrate them as archive only?</td><td>Criteria owner</td><td>P2 migration sign-off</td></tr>
+            <tr><td class="id">OPN-11</td><td>Historic candidates with no phone or email &mdash; are they pipeline or archive? This determines whether the working pipeline is ~5,100 people or a few hundred</td><td>TA leadership</td><td>P2 and all volume planning</td></tr>
+            <tr><td class="id">OPN-12</td><td>The three backup workbooks recording pre-re-scale scores are absent from the handover. Can they be recovered?</td><td>Criteria owner</td><td>Golden-replay triage in P1</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 14 ============ -->
+    <section id="s14">
+      <div class="sec-head"><span class="n">14</span><h2>Acceptance &amp; sign-off</h2></div>
+      <h3>14.1 Programme acceptance</h3>
+      <p>The programme is accepted when all six objectives in section 3 are met and verified by their stated methods; every <em>Must</em> requirement is delivered and demonstrated; all compliance requirements in section 9 are satisfied with legal confirmation; one complete hiring cycle has run on the platform alone; and the legacy system is decommissioned with its data archived.</p>
+
+      <h3>14.2 Document sign-off</h3>
+      <p>This document is a draft for review. It becomes the baseline once the roles below have accepted it. Changes after baselining are made by adding requirements, not by renumbering — a superseded requirement is marked withdrawn and its replacement references it.</p>
+      <div class="tw">
+        <table>
+          <thead><tr><th>Role</th><th>Accepting</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Criteria owner &mdash; HRIS Lead</td><td>Sections 2, 6, 7 and the criteria rulings</td><td>Pending</td></tr>
+            <tr><td>Executive sponsor &mdash; CPO</td><td>Objectives, scope and delivery phases</td><td>Pending</td></tr>
+            <tr><td>Legal / compliance</td><td>Section 9 and open decisions OPN-01, OPN-02, OPN-07</td><td>Pending</td></tr>
+            <tr><td>AI/ML delivery lead</td><td>Requirements as buildable and phases as achievable</td><td>Pending</td></tr>
+            <tr><td>CRM team lead</td><td>DEP-02 and the requirements marked shared with CRM</td><td>Pending</td></tr>
+            <tr><td>Website team lead</td><td>DEP-03 and BR-101, BR-102</td><td>Pending</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note blocker">
+        <span class="lbl">Before work begins</span>
+        <p>OPN-01 does not block the start of delivery, but it blocks phase P9 entirely, and P9 is where the business value of outreach sits. Open it with legal now rather than at phase P8.</p>
+      </div>
+    </section>
+
+    <!-- ============ 15 ============ -->
+    <section id="s15">
+      <div class="sec-head"><span class="n">15</span><h2>Glossary</h2></div>
+      <div class="tw">
+        <table>
+          <thead><tr><th>Term</th><th>Meaning in this document</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Entry-level track</strong></td><td>The inbound motion targeting recent graduates and junior sales staff. Scored to 100 across location, sales fit, entry level, education and contact. Tiers P1 to P4</td></tr>
+            <tr><td><strong>Tenured track</strong></td><td>The headhunting motion targeting supervisors, team leaders and sales managers with tenure at competitor firms. Scored to 100 across title fit, employer, tenure, location and move signal. Tiers T1 to T4</td></tr>
+            <tr><td><strong>Hard gate</strong></td><td>A deterministic pass-or-fail condition evaluated before any model is called. Failing one ends the evaluation</td></tr>
+            <tr><td><strong>Criteria version</strong></td><td>An immutable, numbered set of gates, weights and thresholds. Every evaluation records the version that produced it</td></tr>
+            <tr><td><strong>Shadow report</strong></td><td>The difference produced by re-running a proposed criteria version over already-decided candidates, showing exactly who would change tier</td></tr>
+            <tr><td><strong>Golden replay</strong></td><td>Re-running the migrated scoring implementation over every existing record and asserting identical results</td></tr>
+            <tr><td><strong>Provenance</strong></td><td>The source, verification state and verification time recorded against an individual candidate field</td></tr>
+            <tr><td><strong>Borderline</strong></td><td>A first-class verdict for candidates near a threshold, surfaced for human review rather than rounded away</td></tr>
+            <tr><td><strong>Review queue</strong></td><td>The human work list holding borderline verdicts, flagged documents, unverified candidates and unresolved ambiguities</td></tr>
+            <tr><td><strong>Crossover candidate</strong></td><td>A candidate from a client-facing, sales-trained background outside real estate — premium retail, banking, insurance, telecom — proposed as a scored source. Pending OPN-05</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <span>BRD v0.1 &mdash; Draft</span>
+    <span>13 September 2026</span>
+    <span>The Address Investments &mdash; Talent Acquisition</span>
+    <span>Review copy &mdash; not baselined</span>
+  </footer>
+
+</div>
+
+</body></html>

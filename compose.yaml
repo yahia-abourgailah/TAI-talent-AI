@@ -1,0 +1,92 @@
+# Local development stack. One port is published, the API, and only on loopback.
+# Database, cache and object storage are reachable from inside this network only.
+#
+#   cp .env.example .env    # fill in the passwords
+#   docker compose up --build
+
+name: talent
+
+x-app-image: &app-image
+  image: talent-platform:dev
+  build: .
+
+x-app-environment: &app-environment
+  TALENT_DB_DSN: postgresql+psycopg://talent_app:${TALENT_DB_APP_PASSWORD:?set TALENT_DB_APP_PASSWORD in .env}@postgres:5432/talent
+  TALENT_REDIS_URL: redis://redis:6379/0
+  TALENT_BLOB_ENDPOINT: http://object-storage:9000
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: talent_owner
+      POSTGRES_PASSWORD: ${TALENT_DB_OWNER_PASSWORD:?set TALENT_DB_OWNER_PASSWORD in .env}
+      POSTGRES_DB: talent
+      TALENT_DB_APP_PASSWORD: ${TALENT_DB_APP_PASSWORD:?set TALENT_DB_APP_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/roles.sql:/talent/roles.sql:ro
+      - ./docker/postgres/10-roles.sh:/docker-entrypoint-initdb.d/10-roles.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U talent_owner -d talent"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  object-storage:
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z.hotfix.7aa24e772
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: ${TALENT_BLOB_ACCESS_KEY:?set TALENT_BLOB_ACCESS_KEY in .env}
+      MINIO_ROOT_PASSWORD: ${TALENT_BLOB_SECRET_KEY:?set TALENT_BLOB_SECRET_KEY in .env}
+    volumes:
+      - blobdata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    <<: *app-image
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      TALENT_DB_MIGRATION_DSN: postgresql+psycopg://talent_owner:${TALENT_DB_OWNER_PASSWORD}@postgres:5432/talent
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  storage-init:
+    <<: *app-image
+    command: ["python", "-m", "infra.dev_storage"]
+    env_file: .env
+    environment: *app-environment
+    depends_on:
+      object-storage:
+        condition: service_healthy
+
+  api:
+    <<: *app-image
+    env_file: .env
+    environment: *app-environment
+    ports:
+      - "127.0.0.1:${TALENT_API_PORT:-8090}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      storage-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  blobdata:
