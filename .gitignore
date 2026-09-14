@@ -1,0 +1,65 @@
+# ─────────────────────────────────────────────────────────────
+# CANDIDATE DATA — NEVER COMMITTED
+# This repository contains code only. Candidate records, CVs and
+# exports live outside it and are referenced by configured paths.
+# See docs/DATA_HANDLING.md before adding any new pattern here.
+# ─────────────────────────────────────────────────────────────
+*.xlsx
+*.xls
+*.xlsm
+*.csv
+*.pdf
+*.docx
+*.jsonl
+*_batch*.json
+new_batch*.json
+linkedin_batch*.json
+fb_batch*.json
+**/data/
+**/runs/
+**/exports/
+**/cv_archive/
+**/parsed/
+**/backups/
+
+# Secrets and credentials
+.env
+.env.*
+!.env.example
+*service_account*.json
+*credentials*.json
+*oauth*.json
+*token*.json
+*.pem
+*.key
+*.p12
+secrets/
+config/local/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+.coverage
+htmlcov/
+
+# Tooling
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Local runtime
+logs/
+*.log
+*.lock
+!poetry.lock
+!uv.lock

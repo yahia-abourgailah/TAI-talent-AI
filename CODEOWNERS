@@ -1,0 +1,22 @@
+# Every PR needs an owner from this file.
+# Paths are matched last-to-first: the last matching line wins.
+
+*                           @ai-ml-team
+
+# ── Hiring criteria — requires the criteria owner ──────────────
+# Criteria versions are immutable. A change here may only ADD a
+# version, never edit one. A shadow-diff report (BR-304) must be
+# attached to the PR before review.
+/src/scoring/                @ai-ml-team @karim-alakkad
+/src/scoring/rulesets/       @karim-alakkad
+/docs/criteria/              @karim-alakkad
+
+# ── Consent, retention and outreach guards ─────────────────────
+# Changes here carry PDPL exposure (CR-01..CR-07).
+/src/outreach/guards/        @ai-ml-team @compliance
+/src/consent/                @ai-ml-team @compliance
+
+# ── Repository governance ──────────────────────────────────────
+/.github/                    @ai-ml-team
+/CODEOWNERS                  @ai-ml-team
+/.gitignore                  @ai-ml-team @compliance
