@@ -16,6 +16,7 @@ import argparse
 import json
 import os
 import sys
+from collections.abc import Sequence
 from dataclasses import asdict
 from datetime import date
 from pathlib import Path
@@ -24,7 +25,8 @@ from typing import Any
 from replay.clock import pinned_today
 from replay.mapping import map_row, number, split_items, text
 from replay.report import likely_cause, render_report, summarise
-from replay.results import Outcome, RowResult
+from replay.results import Outcome, RowResult, apply_rulings
+from replay.rulings import RULINGS, Ruling
 from replay.workbook import MasterSheet, WorkbookError, read_master
 from scoring.rulesets import v2026_08_04 as ruleset
 
@@ -84,7 +86,6 @@ def _write_private(path: Path, content: str) -> None:
 
 
 def _row_record(result: RowResult) -> dict[str, Any]:
-    differs = result.has_stored_score and not result.score_match
     return {
         "sheet_row": result.sheet_row,
         "track": result.track,
@@ -95,12 +96,17 @@ def _row_record(result: RowResult) -> dict[str, Any]:
         "replayed_disqualified": result.replayed_disqualified,
         "score_match": result.score_match,
         "tier_match": result.tier_match,
-        "likely_cause": likely_cause(result) if differs else None,
+        "ruling": None if result.ruling is None else asdict(result.ruling),
+        "likely_cause": likely_cause(result) if result.unexplained_difference else None,
     }
 
 
 def write_outputs(
-    out_dir: Path, sheet: MasterSheet, run_date: date, results: list[RowResult]
+    out_dir: Path,
+    sheet: MasterSheet,
+    run_date: date,
+    results: list[RowResult],
+    stale_rulings: Sequence[Ruling] = (),
 ) -> tuple[dict[str, Path], dict[str, Any], str]:
     out_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     meta: dict[str, Any] = {
@@ -117,7 +123,8 @@ def write_outputs(
         "blank_rows_skipped": sheet.blank_rows_skipped,
         "python_hash_seed": os.environ.get("PYTHONHASHSEED"),
     }
-    summary = summarise(results, [text(row.values.get("Profile URL")) for row in sheet.rows])
+    urls = [text(row.values.get("Profile URL")) for row in sheet.rows]
+    summary = summarise(results, urls, stale_rulings)
     report = render_report(meta, summary)
 
     day = run_date.isoformat()
@@ -162,6 +169,11 @@ def _parser() -> argparse.ArgumentParser:
         type=Path,
         help="also write the aggregate report here; it holds counts only, so it may be committed",
     )
+    parser.add_argument(
+        "--require-parity",
+        action="store_true",
+        help="exit with status 1 unless every difference is covered by a ruling (for CI)",
+    )
     return parser
 
 
@@ -194,8 +206,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
-    results = run_baseline(sheet, args.run_date)
-    paths, summary, report = write_outputs(out_dir, sheet, args.run_date, results)
+    results, stale = apply_rulings(run_baseline(sheet, args.run_date), sheet.sha256, RULINGS)
+    paths, summary, report = write_outputs(out_dir, sheet, args.run_date, results, stale)
     if args.report_copy is not None:
         args.report_copy.parent.mkdir(parents=True, exist_ok=True)
         args.report_copy.write_text(report, encoding="utf-8")
@@ -204,10 +216,18 @@ def main(argv: list[str] | None = None) -> int:
     print(
         f"Replayed {summary['rows']:,} rows with criteria {RULESET_VERSION} as of "
         f"{args.run_date.isoformat()}. Exact score match {summary['score_matches']:,}/{scored:,}, "
-        f"tier match {summary['tier_matches']:,}/{scored:,}."
+        f"tier match {summary['tier_matches']:,}/{scored:,}. "
+        f"Ruled {summary['ruled_differences']:,}, "
+        f"unexplained {summary['unexplained_differences']:,}."
     )
     for label, path in paths.items():
         print(f"  {label:<8} {path}")
+    if args.require_parity and not summary["parity"]:
+        print(
+            "error: parity not reached; the report lists each unexplained difference.",
+            file=sys.stderr,
+        )
+        return 1
     return 0
 
 

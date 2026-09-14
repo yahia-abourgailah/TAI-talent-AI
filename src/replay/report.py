@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from replay.results import Outcome, RowResult
+from replay.rulings import Ruling
 
 MIN_CATEGORY_ROWS = 10
 
@@ -100,13 +101,18 @@ def _pooled(counter: Counter[str]) -> dict[str, int]:
     return pooled
 
 
-def summarise(results: Sequence[RowResult], profile_urls: Sequence[str]) -> dict[str, Any]:
+def summarise(
+    results: Sequence[RowResult],
+    profile_urls: Sequence[str],
+    stale_rulings: Sequence[Ruling] = (),
+) -> dict[str, Any]:
     scored = [r for r in results if r.has_stored_score]
-    differing = [r for r in scored if not r.score_match]
+    unexplained = [r for r in scored if r.unexplained_difference]
+    rulings = [r.ruling for r in scored if r.ruling is not None]
 
     missing: Counter[str] = Counter()
     added: Counter[str] = Counter()
-    for result in differing:
+    for result in unexplained:
         stored = Counter(_categories(result.stored))
         replayed = Counter(_categories(result.replayed))
         missing.update(set(stored - replayed))
@@ -124,9 +130,27 @@ def summarise(results: Sequence[RowResult], profile_urls: Sequence[str]) -> dict
         "stored_scores": len(scored),
         "score_matches": sum(r.score_match for r in scored),
         "tier_matches": sum(r.tier_match for r in scored),
+        "ruled_differences": len(rulings),
+        "unexplained_differences": len(unexplained),
+        "parity": not unexplained,
+        "ruled_exceptions": [
+            {
+                "sheet_row": ruling.sheet_row,
+                "stored": f"{ruling.stored_score} {ruling.stored_tier}",
+                "replayed": f"{ruling.replayed_score} {ruling.replayed_tier}",
+                "decision": ruling.decision,
+                "reason": ruling.reason,
+                "recorded_on": ruling.recorded_on,
+            }
+            for ruling in rulings
+        ],
+        "stale_rulings": [
+            {"sheet_row": ruling.sheet_row, "recorded_on": ruling.recorded_on}
+            for ruling in stale_rulings
+        ],
         "score_difference": {band: bands[band] for band in DELTA_BANDS},
         "tier_changes": {tier: _ranked(counter) for tier, counter in sorted(changes.items())},
-        "likely_causes": _ranked(Counter(likely_cause(r) for r in differing)),
+        "likely_causes": _ranked(Counter(likely_cause(r) for r in unexplained)),
         "categories_missing_from_replay": _pooled(missing),
         "categories_new_in_replay": _pooled(added),
         "never_scored_replay_tiers": _ranked(
@@ -153,7 +177,7 @@ def _table(header: tuple[str, ...], rows: list[tuple[Any, ...]]) -> list[str]:
 
 def render_report(meta: dict[str, Any], summary: dict[str, Any]) -> str:
     scored, rows = summary["stored_scores"], summary["rows"]
-    differing = scored - summary["score_matches"]
+    unexplained = summary["unexplained_differences"]
     never = summary["never_scored_replay_tiers"]
     workbook = meta["workbook"]
 
@@ -184,11 +208,24 @@ def render_report(meta: dict[str, Any], summary: dict[str, Any]) -> str:
         f"- Tier match: **{summary['tier_matches']:,}** ({_pct(summary['tier_matches'], scored)})",
         f"- Rows never scored: **{rows - scored:,}**. Replayed tiers: "
         + (", ".join(f"{tier} {count:,}" for tier, count in never.items()) or "none"),
+        f"- Differences covered by a ruling: **{summary['ruled_differences']:,}**",
+        f"- Unexplained differences: **{unexplained:,}**",
         "",
-        "Each difference is listed below with its likely cause, and each needs a ruling from "
-        "the criteria owner before the week 2 gate (BR-702).",
+        (
+            "**Parity reached.** Every stored score is reproduced or covered by a ruling (BR-702)."
+            if summary["parity"]
+            else "**Parity not reached.** Each unexplained difference needs a ruling from the "
+            "criteria owner (BR-702)."
+        ),
         "",
     ]
+    if summary["stale_rulings"]:
+        stale = ", ".join(f"sheet row {s['sheet_row']}" for s in summary["stale_rulings"])
+        out += [
+            f"**Rulings that no longer apply:** {stale}. The workbook, the rules or the outcome "
+            "changed since the ruling; rule on these rows again.",
+            "",
+        ]
 
     out += ["## Score difference (replayed minus stored)", ""]
     out += _table(
@@ -204,23 +241,39 @@ def render_report(meta: dict[str, Any], summary: dict[str, Any]) -> str:
         [(s, *(f"{changes[s].get(t, 0):,}" for t in tiers)) for s in tiers if s in changes],
     )
 
+    out += ["## Ruled exceptions", ""]
+    out += _table(
+        ("Sheet row", "Stored", "Replayed", "Decision", "Reason", "Recorded"),
+        [
+            (
+                e["sheet_row"],
+                e["stored"],
+                e["replayed"],
+                e["decision"],
+                e["reason"],
+                e["recorded_on"],
+            )
+            for e in summary["ruled_exceptions"]
+        ],
+    )
+
     out += [
-        "## Likely cause of each score difference",
+        "## Likely cause of each unexplained difference",
         "",
-        "Each differing row is counted once, under the first recorded difference that can move "
+        "Each unexplained row is counted once, under the first recorded difference that can move "
         "its score.",
         "",
     ]
     out += _table(
-        ("Cause", "Rows", "Share of differing rows"),
-        [(cause, f"{n:,}", _pct(n, differing)) for cause, n in summary["likely_causes"].items()],
+        ("Cause", "Rows", "Share of unexplained rows"),
+        [(cause, f"{n:,}", _pct(n, unexplained)) for cause, n in summary["likely_causes"].items()],
     )
 
     for key, title in (
         ("categories_missing_from_replay", "Stored but not replayed"),
         ("categories_new_in_replay", "Replayed but not stored"),
     ):
-        out += [f"## {title} (rows with a score difference)", ""]
+        out += [f"## {title} (unexplained rows)", ""]
         out += _table(("Signal or flag", "Rows"), [(k, f"{n:,}") for k, n in summary[key].items()])
 
     urls = summary["profile_urls"]

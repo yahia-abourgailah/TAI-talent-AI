@@ -15,7 +15,9 @@ import pytest
 from replay.baseline import main, run_baseline
 from replay.clock import pinned_today
 from replay.mapping import map_row
-from replay.report import category
+from replay.report import category, summarise
+from replay.results import apply_rulings
+from replay.rulings import KEEP_STORED, RULINGS, Ruling
 from replay.workbook import REQUIRED_COLUMNS, WorkbookError, read_master
 from scoring.rulesets.v2026_08_04 import Candidate, score_candidate
 
@@ -200,6 +202,7 @@ def test_summary_counts(master, tmp_path):
     summary = json.loads((tmp_path / "out" / f"baseline-{DAY}.json").read_text())["summary"]
     assert (summary["rows"], summary["stored_scores"], summary["score_matches"]) == (3, 2, 1)
     assert summary["unreadable_numbers"] == {"Years Exp": 1}
+    assert (summary["unexplained_differences"], summary["parity"]) == (1, False)
 
 
 def test_row_file_is_owner_only_and_the_report_holds_no_candidate_values(master, tmp_path, capsys):
@@ -232,3 +235,73 @@ def test_refuses_to_read_candidate_data_from_inside_a_git_repository(master, tmp
 def test_missing_workbook_is_a_clear_error(tmp_path, capsys):
     assert _run(tmp_path / "missing.xlsx", tmp_path / "out") == 2
     assert "No workbook" in capsys.readouterr().err
+
+
+def _ruling_for_the_differing_row(sheet, **changes) -> Ruling:
+    differing = run_baseline(sheet, RUN_DATE)[1]
+    values = {
+        "workbook_sha256": sheet.sha256,
+        "sheet_row": differing.sheet_row,
+        "stored_score": differing.stored.score,
+        "stored_tier": differing.stored.tier,
+        "replayed_score": differing.replayed.score,
+        "replayed_tier": differing.replayed.tier,
+        "decision": KEEP_STORED,
+        "reason": "Fabricated ruling for a test",
+        "recorded_on": DAY,
+    }
+    values.update(changes)
+    return Ruling(**values)
+
+
+def _summary_with(sheet, rulings):
+    results, stale = apply_rulings(run_baseline(sheet, RUN_DATE), sheet.sha256, rulings)
+    return summarise(results, [], stale)
+
+
+def test_a_matching_ruling_explains_the_difference(master):
+    sheet = read_master(master)
+    summary = _summary_with(sheet, [_ruling_for_the_differing_row(sheet)])
+    assert (summary["ruled_differences"], summary["unexplained_differences"]) == (1, 0)
+    assert summary["parity"]
+    assert summary["stale_rulings"] == []
+
+
+def test_a_ruling_stops_applying_when_the_outcome_changes(master):
+    sheet = read_master(master)
+    summary = _summary_with(sheet, [_ruling_for_the_differing_row(sheet, replayed_score=-1)])
+    assert (summary["unexplained_differences"], summary["parity"]) == (1, False)
+    assert [stale["sheet_row"] for stale in summary["stale_rulings"]] == [3]
+
+
+def test_a_ruling_for_another_workbook_is_ignored(master):
+    sheet = read_master(master)
+    other = _ruling_for_the_differing_row(sheet, workbook_sha256="0" * 64)
+    summary = _summary_with(sheet, [other])
+    assert (summary["unexplained_differences"], summary["stale_rulings"]) == (1, [])
+
+
+def test_two_rulings_for_one_row_are_refused(master):
+    sheet = read_master(master)
+    ruling = _ruling_for_the_differing_row(sheet)
+    with pytest.raises(ValueError, match="sheet row 3"):
+        apply_rulings(run_baseline(sheet, RUN_DATE), sheet.sha256, [ruling, ruling])
+
+
+def test_require_parity_fails_until_every_difference_is_ruled(master, tmp_path, monkeypatch):
+    assert _run(master, tmp_path / "before", "--require-parity") == 1
+
+    ruling = _ruling_for_the_differing_row(read_master(master))
+    monkeypatch.setattr("replay.baseline.RULINGS", (ruling,))
+    assert _run(master, tmp_path / "after", "--require-parity") == 0
+    report = (tmp_path / "after" / f"report-{DAY}.md").read_text()
+    assert "Parity reached" in report
+    assert "Fabricated ruling for a test" in report
+
+
+def test_recorded_rulings_name_rows_not_people():
+    for ruling in RULINGS:
+        assert len(ruling.workbook_sha256) == 64
+        assert ruling.sheet_row > 1
+        assert "@" not in ruling.reason
+        assert "http" not in ruling.reason
