@@ -501,6 +501,8 @@ The result is a hard gate. BRD section 9 flags age bands, and guessing age from 
 1. Pending legal: may age be guessed at all? Options: (a) stated age only; (b) stated age and graduation year; (c) all four methods, as coded.
 2. If guessing stays, should the degree keywords read only education fields, not summary and raw text?
 
+**Ruling (14 September 2026):** Legal and Karim allow age limits as hard gates, and allow age to be guessed from graduation year (OPN-02). The question above narrows to how the guess is made: which words may change it, and whether a guess from years of experience is also allowed. Which bands apply is still D-01 and D-02. Record this ruling against each criteria version (CR-07).
+
 **Related:** CR-07, OPN-02, CR-04, BRD section 9 "Flagged for legal review", D-01, D-02, D-11.
 
 ---

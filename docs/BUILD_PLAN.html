@@ -456,7 +456,7 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
         <tr><td class="id">CR-04</td><td>A candidate can ask why, and we can answer from saved data</td><td class="wk">Week 2</td></tr>
         <tr><td class="id">CR-05</td><td>No final decision without a human</td><td class="wk">Week 3</td></tr>
         <tr><td class="id">CR-06</td><td>No forbidden copying, no hiding from detection</td><td class="wk">Week 8 <span class="chip lo">By design</span> we build none of it</td></tr>
-        <tr><td class="id">CR-07</td><td>Legal checks the rules for discrimination before they go live</td><td class="wk">Week 2 <span class="chip hi">Urgent &mdash; OPN-02, age bands</span></td></tr>
+        <tr><td class="id">CR-07</td><td>Legal checks the rules for discrimination before they go live</td><td class="wk">Week 2 <span class="chip lo">OPN-02 answered</span></td></tr>
       </tbody>
     </table>
   </div>
@@ -496,7 +496,7 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
     <p><b>1.</b> Decide where the OCR runs. <b>2.</b> Get the server, database and storage. <b>3.</b> Get
     read access to employee data, for the own-staff check. <b>4.</b> Book a weekly hour with Karim for
     rulings. <b>5.</b> Send the API plan to the CRM team and the website team. <b>6.</b> Ask legal about
-    OPN-02 (age) &mdash; it is needed in week 2, not later.</p>
+    OPN-02 (age) &mdash; it is needed in week 2, not later. <span class="chip lo">Answered 14 Sep</span></p>
   </div>
 
   <div class="phase"><span class="r">Same scores, same data</span><span class="w">Weeks 1&ndash;2 &middot; BRD P0, P1, P2</span></div>
@@ -506,7 +506,7 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
     <div class="lanes">
       <div class="lane A"><p class="who">Person A</p><ul>
         <li><span class="st done">Done</span>Run today's scorer over all <b>5,140</b> rows. Save the answers &mdash; score, tier, flags, signals. <b>This file is the truth we compare against.</b> <span class="r">BR-702</span>
-          <span class="sn">3,938 of 3,940 stored scores reproduced exactly (99.95%). The old runs never used the last-active date, and CRITERIA.md has no recency either. The baseline file sits outside the repo, and any run with the same workbook and date produces an identical file. 2 rows stored as disqualified pass the gates on replay and need a ruling.</span></li>
+          <span class="sn">3,938 of 3,940 stored scores reproduced exactly (99.95%). The old runs never used the last-active date, and CRITERIA.md has no recency either. The baseline file sits outside the repo, and any run with the same workbook and date produces an identical file. The 2 rows disqualified by hand stay disqualified (ruled 14 Sep), so parity is reached: 0 unexplained differences.</span></li>
         <li><span class="st done">Done</span>Write the map: each of the 47 sheet columns &rarr; where it goes in the new database. List every column with no home and ask Karim. <span class="r">BR-701</span>
           <span class="sn">27 questions for Karim: 6 existing decisions, 21 new.</span></li>
         <li><span class="st done">Done</span>Compare <code>CLAUDE.md</code>, <code>CRITERIA.md</code> and the code. Where they disagree, <b>the code wins</b>. Write the differences down as questions. Do not fix them yet.
@@ -529,11 +529,16 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
     </div>
     <div class="check"><b>End of week</b> <span class="st done">Yes</span>The baseline file exists. <span class="st done">Yes</span>The system starts clean and asks for a login. <span class="st todo">Open</span>The OCR decision is made.</div>
     <div class="status"><span class="h">Before week 2 starts</span><ul>
-      <li><b>Karim:</b> rule on the 2 rows that differ, and send <code>CLAUDE.md</code>.</li>
-      <li><b>Send:</b> the API plan to the CRM and website teams.</li>
-      <li><b>TA:</b> decide which of the 5,140 migrated candidates are still in the process (OPN-11); every one of them counts toward the 95% until it has a stage or is closed.</li>
-      <li><b>Set up:</b> a self-hosted parity runner. Any change to scoring fails CI until it exists.</li>
-      <li><b>Code:</b> on <code>feature/p0-foundation</code>, not yet pushed.</li>
+      <li><span class="st done">Ruled</span><b>Karim:</b> the 2 rows disqualified by hand (sheet rows 5355 and 5384) stay disqualified. Recorded as exceptions in the replay: <b>parity reached, 0 unexplained differences.</b></li>
+      <li><span class="st done">Answered</span><b>Legal + Karim:</b> age limits are allowed, and age may be guessed from graduation year (OPN-02). Still open: which bands apply and how the guess is made (differences D-01, D-02, D-15).</li>
+      <li><span class="st block">Week 2</span><b>Infrastructure:</b> a self-hosted parity runner. Until it exists, any change to scoring fails CI, including this branch's PR.</li>
+      <li><span class="st done">Done</span><b>Us:</b> week 1 code committed, pushed and merged into <code>dev</code>.</li>
+      <li><span class="st part">Week 3</span><b>TA:</b> the stage list, the allowed moves and the rejection reasons. Also: which of the 5,140 migrated candidates are still in the process (OPN-11)? Every one counts toward the 95% until it has a stage or is closed.</li>
+      <li><span class="st part">Week 3</span><b>Karim:</b> send <code>CLAUDE.md</code> to finish the three-way comparison, and rule on the 18 differences. Rulings go into a new rules version, not version 1.</li>
+      <li><span class="st part">Week 4</span><b>Send:</b> the API plan to the CRM and website teams. They need it early to build against the frozen API.</li>
+      <li><span class="st part">Week 4</span><b>IT:</b> identity provider details (issuer and client ID) so staging signs in with company accounts.</li>
+      <li><span class="st part">Week 4</span><b>Infrastructure:</b> a test server, so CI can deploy and the CRM team can test against it.</li>
+      <li><span class="st todo">Week 5</span><b>AI/ML + Legal:</b> where the OCR runs. If outside the company, every CV leaves it (CR-01).</li>
     </ul></div>
   </div>
 
@@ -684,7 +689,7 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
       <thead><tr><th>ID</th><th>Question</th><th>Who answers</th><th>Stops</th></tr></thead>
       <tbody>
         <tr><td class="id">&mdash;</td><td><b>Where does the OCR API run?</b> Inside our network, or outside?</td><td>AI/ML + Legal</td><td><b>Week 5</b>, and CR-01</td></tr>
-        <tr><td class="id">OPN-02</td><td><b>Are age limits allowed?</b> And can we guess age from graduation year?</td><td>Legal + Karim</td><td><b>Week 2.</b> Rules version 1 cannot go live without this</td></tr>
+        <tr><td class="id">OPN-02</td><td><b>Are age limits allowed?</b> And can we guess age from graduation year?</td><td>Legal + Karim</td><td><span class="chip lo">Answered 14 Sep</span> Yes: age limits are allowed, and age may be guessed from graduation year</td></tr>
         <tr><td class="id">&mdash;</td><td>What are the steps, and what moves are allowed between them? What are the rejection reasons?</td><td>TA leadership</td><td>Week 3</td></tr>
         <tr><td class="id">OPN-03</td><td>Two candidates say their employer is "The Address". Keep them out, or bring them back?</td><td>Karim</td><td>Week 3 sign-off</td></tr>
         <tr><td class="id">&mdash;</td><td>How close to the line is <b>borderline</b>? Give a number</td><td>Karim</td><td>Week 7</td></tr>

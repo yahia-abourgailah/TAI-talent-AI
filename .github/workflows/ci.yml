@@ -97,7 +97,10 @@ jobs:
       - name: Replay every record against the ported scorer
         env:
           TALENT_MASTER_PATH: ${{ secrets.TALENT_MASTER_PATH }}
-        run: pytest tests/parity -q --tb=short
+        # Fails when any difference has no matching ruling in src/replay/rulings.py (BR-702).
+        run: >-
+          python -m replay.baseline --out "$RUNNER_TEMP/baseline" --run-date 2026-09-14
+          --report-copy artifacts/shadow_diff.md --require-parity
       - name: Publish shadow diff
         if: always()
         uses: actions/upload-artifact@v4

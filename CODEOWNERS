@@ -10,6 +10,7 @@
 /src/scoring/                @ai-ml-team @karim-alakkad
 /src/scoring/rulesets/       @karim-alakkad
 /docs/criteria/              @karim-alakkad
+/src/replay/rulings.py       @karim-alakkad
 
 # ── Consent, retention and outreach guards ─────────────────────
 # Changes here carry PDPL exposure (CR-01..CR-07).
