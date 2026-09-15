@@ -28,8 +28,22 @@
 | Set the repository variable `PARITY_RUNNER_READY=true` | Repository admin | |
 | Open a pull request that touches `src/scoring/` and see **Golden replay parity** green | Person A | |
 
+## Import runs on the real workbook, 15 September 2026
+
+Workbook SHA-256 `c9c7607e8f77…`. Counts only; the full report is [RECONCILIATION_REPORT.md](RECONCILIATION_REPORT.md).
+
+| Check | Result |
+|---|---|
+| Job 4, first import | 5,140 rows read, 5,140 candidates, 5,140 raw captures, 66,820 fields, 3,940 evaluations under 2026-08-04; 1,200 rows with no stored score |
+| Job 5, second import | Nothing new written: every capture, candidate, field and evaluation already existed |
+| Unresolved in both runs | 1: sheet row 1496, Platform "Test", waiting on Q-13 (not archived) |
+| Replay of 2026-08-04 | 3,938 of 3,940 exact, 2 ruled, 0 unexplained: parity reached |
+| Reconciliation | All counts match the sheet; tool comparison of the 200-row sample found 0 disagreements |
+
 ## B5: 200-row sample sign-off
+
+The tool's comparison is not the sign-off. A person opens the sample CSV (kept outside the repository) beside the workbook and checks it by hand.
 
 | Workbook SHA-256 (first 12) | Sample seed | Rows checked | Disagreements | Checked by, date |
 |---|---|---|---|---|
-| | 20260914 | | | |
+| c9c7607e8f77 | 20260914 | | | |
