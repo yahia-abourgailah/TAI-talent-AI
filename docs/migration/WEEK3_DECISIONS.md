@@ -25,7 +25,7 @@ The criteria exclude a candidate whose current employer or title names The Addre
 
 | Decision | Asked | Answer | Given by, date |
 |---|---|---|---|
-| OPN-03: keep or reverse the exclusion of sheet rows 53 and 1478 (employer exactly "The Address") | Karim | | |
+| OPN-03: keep or reverse the exclusion of sheet rows 53 and 1478 (employer exactly "The Address") | Karim | **Keep both excluded.** An employer of exactly "The Address" means The Address Investments. Rows 53 and 1478 stay own staff at 0 / P4 (row 53 would otherwise score 76 / P1). No ruling or scoring change needed | Yasmin, 15 Sep 2026 |
 
 ## Requests waiting on another team
 

@@ -326,6 +326,8 @@ Nothing about own staff, rehires or the Track A competitor bonus.
 3. Should own-staff and rehire signals include Arabic names?
 4. Should the Track A competitor bonus look at current employer?
 
+**Answer to question 2 (15 September 2026):** yes. A current employer of exactly "The Address" means The Address Investments, so sheet rows 53 and 1478 stay excluded as own staff (OPN-03). Questions 1, 3 and 4 are still open.
+
 **Related:** BR-301, OPN-03, NFR-07, BRD 2.3 ("Own staff are never sourced"), D-10.
 
 ---
