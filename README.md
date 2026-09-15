@@ -76,6 +76,20 @@ set -a; . ./.env; set +a
   --report-copy docs/migration/BASELINE_REPORT.md
 ```
 
+### Week 3 checks
+
+Both hold candidate data only in their per-row files, which go outside the repository; the committed reports hold counts and sheet rows only. Neither changes a score or a record.
+
+```bash
+set -a; . ./.env; set +a
+# BR-704: rows the 3 August 2026 fixes could have changed, stored result vs today's rules
+.venv/bin/python -m replay.rescore --run-date 2026-09-14 --report-copy docs/migration/RESCORE_REPORT.md
+# BR-301: own-staff exclusions against the HRIS roster (TALENT_EMPLOYEES_PATH)
+.venv/bin/python -m staff.check --out ~/TAI-data/own-staff --report-copy docs/migration/OWN_STAFF_REPORT.md
+```
+
+Decisions waiting on these reports are in [docs/migration/WEEK3_DECISIONS.md](docs/migration/WEEK3_DECISIONS.md).
+
 ### Database areas
 
 | Schema | Holds | The API may |
@@ -95,6 +109,7 @@ set -a; . ./.env; set +a
 | `src/db/` | Database engine for the app role |
 | `src/infra/` | Readiness checks, dev storage bootstrap |
 | `src/replay/` | Golden replay: re-runs a criteria version over the master workbook |
+| `src/staff/` | Own-staff check: matches candidates to the HRIS employee roster |
 | `src/scoring/` | Candidate scoring. `rulesets/` holds one immutable module per criteria version |
 | `migrations/` | Database migrations, run as the schema owner |
 | `docker/` | Database role setup |
