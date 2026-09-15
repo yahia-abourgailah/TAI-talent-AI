@@ -80,7 +80,10 @@ def test_me_rejects_expired_sign_in(client, issue_token):
     token = issue_token(exp=1)
     response = client.get("/v1/me", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 401
-    assert response.json()["detail"] == "Your sign-in is invalid or has expired. Sign in again."
+    assert (
+        response.json()["error"]["message"]
+        == "Your sign-in is invalid or has expired. Sign in again."
+    )
 
 
 def test_identity_provider_outage_is_503(make_settings, issue_token):
@@ -122,7 +125,7 @@ def test_dev_mode_still_requires_a_token(dev_client):
 def test_unknown_dev_account_says_which_exist(dev_client):
     response = dev_client.post("/dev/token", json={"account": "root"})
     assert response.status_code == 404
-    assert "recruiter-a" in response.json()["detail"]
+    assert "recruiter-a" in response.json()["error"]["message"]
 
 
 def test_dev_sign_in_routes_do_not_exist_with_company_sign_in(client):

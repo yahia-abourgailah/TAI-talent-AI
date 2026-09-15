@@ -13,16 +13,17 @@ from pipeline.access import Actor, NotPermitted, actor_from_principal
 
 SRC = Path(__file__).resolve().parents[2] / "src"
 ROUTES = (
-    ("get", "/v1/pipeline/steps"),
-    ("post", "/v1/openings"),
-    ("get", "/v1/openings"),
-    ("get", "/v1/openings/1"),
-    ("post", "/v1/openings/1/close"),
+    ("get", "/v1/reference/stages"),
+    ("get", "/v1/reference/reasons"),
+    ("post", "/v1/requisitions"),
+    ("get", "/v1/requisitions"),
+    ("get", "/v1/requisitions/req_1"),
+    ("post", "/v1/requisitions/req_1/close"),
     ("post", "/v1/applications"),
     ("get", "/v1/applications"),
-    ("get", "/v1/applications/1"),
-    ("post", "/v1/applications/1/moves"),
-    ("get", "/v1/applications/1/moves"),
+    ("get", "/v1/applications/app_1"),
+    ("post", "/v1/applications/app_1/transitions"),
+    ("get", "/v1/applications/app_1/transitions"),
 )
 
 
@@ -61,28 +62,32 @@ def test_other_roles_do_not_work_in_the_pipeline(roles):
 def test_every_pipeline_route_needs_sign_in(client, method, path):
     response = getattr(client, method)(path)
     assert response.status_code == 401
+    assert response.json()["error"]["code"] == "unauthenticated"
 
 
 def test_a_role_outside_the_pipeline_is_forbidden(client):
     response = client.get("/v1/applications", headers=_sign_in(client, "criteria-owner"))
     assert response.status_code == 403
+    assert response.json()["error"]["code"] == "forbidden"
 
 
 def test_a_rejected_request_body_does_not_echo_what_was_sent(client):
-    sent = {"opening_id": "Fake Person Name", "candidate_id": -1}
+    sent = {"requisition_id": {"name": "Fake Person Name"}, "candidate_id": -1}
     response = client.post("/v1/applications", json=sent, headers=_sign_in(client, "recruiter-a"))
-    assert response.status_code == 422
+    assert response.status_code == 400
     assert "Fake Person Name" not in response.text
-    assert all(set(error) == {"loc", "msg", "type"} for error in response.json()["detail"])
+    fields = response.json()["error"]["details"]["fields"]
+    assert all(set(error) == {"loc", "msg", "type"} for error in fields)
 
 
-def test_a_free_text_step_is_refused_before_it_reaches_the_database(client):
+def test_a_free_text_stage_is_refused_before_it_reaches_the_database(client):
     response = client.post(
-        "/v1/applications/1/moves",
-        json={"from_step": "new", "to_step": "Moved to offer by hand!"},
+        "/v1/applications/app_1/transitions",
+        json={"from_stage": "new", "to_stage": "Moved to offer by hand!"},
         headers=_sign_in(client, "recruiter-a"),
     )
-    assert response.status_code == 422
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "invalid_request"
 
 
 def test_no_code_path_moves_an_application_as_anything_but_a_person():

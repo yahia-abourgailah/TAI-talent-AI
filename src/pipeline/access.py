@@ -22,20 +22,39 @@ RECRUITER = "recruiter"
 TA_LEAD = "ta_lead"
 
 
+NO_SUCH_RECORD = "No such requisition, candidate or application."
+
+
 class PipelineError(Exception):
-    """A request the pipeline will not carry out. The message is safe to show."""
+    """A request the pipeline will not carry out. The message is safe to show.
+
+    `code` is stable for API callers; `details` holds ids and codes that help them recover.
+    """
+
+    status = 409
+    default_code = "refused"
+
+    def __init__(
+        self, message: str, *, code: str | None = None, details: Mapping[str, Any] | None = None
+    ) -> None:
+        super().__init__(message)
+        self.code = code or self.default_code
+        self.details = dict(details) if details else None
 
 
 class NotFound(PipelineError):
-    pass
+    status = 404
+    default_code = "not_found"
 
 
 class Refused(PipelineError):
-    pass
+    status = 409
+    default_code = "refused"
 
 
 class NotPermitted(PipelineError):
-    pass
+    status = 403
+    default_code = "forbidden"
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,17 +77,42 @@ def actor_from_principal(principal: Principal) -> Actor:
 # Our own trigger and check messages: ids, step codes and reason codes only.
 _SAFE_STATES = {"23514", "42501"}
 
+# Each of migration 0005's refusal messages, by a phrase only it contains, to a stable API code.
+# Checked in order; the last one is the most general.
+_CODES = (
+    ("nothing moves out of it", "stage_is_final"),
+    ("no move may leave it", "stage_is_final"),
+    ("nothing to review", "stage_is_final"),
+    ("is not an allowed move", "transition_not_allowed"),
+    ("the first move is to", "first_stage_required"),
+    ("is not on the active step list", "unknown_stage"),
+    ("moves follow the active step list", "step_list_changed"),
+    ("needs a reason from the list", "rejection_reason_required"),
+    ("only a rejection carries a reason", "reason_not_allowed"),
+    ("only a person rejects", "person_required"),
+    ("migrated candidates get no applications", "candidate_not_eligible"),
+    ("closed, so it takes no applications", "requisition_closed"),
+    ("a closed opening is final", "requisition_closed"),
+    (" is at ", "stage_changed"),
+)
+
+
+def _code_for(message: str) -> str:
+    return next((code for phrase, code in _CODES if phrase in message), "refused")
+
 
 def _translate(exc: DBAPIError) -> Exception:
     state = getattr(exc.orig, "sqlstate", None)
     if state == "23503":
-        return NotFound("No such opening, candidate or application.")
+        return NotFound(NO_SUCH_RECORD)
     if state == "23505":
-        return Refused("That already exists.")
+        return Refused("That already exists.", code="already_exists")
     if state in _SAFE_STATES:
         diag = getattr(exc.orig, "diag", None)
         message = getattr(diag, "message_primary", None)
-        return Refused(str(message) if message else "The database refused the change.")
+        if not message:
+            return Refused("The database refused the change.")
+        return Refused(str(message), code=_code_for(str(message)))
     return exc
 
 

@@ -70,6 +70,14 @@ def active_step_list(conn: Connection) -> dict[str, Any]:
     return header
 
 
+def allowed_moves(conn: Connection) -> dict[str, list[str]]:
+    """Each step of the list in force, and the steps it may move to, in list order."""
+    allowed: dict[str, list[str]] = {}
+    for move in active_step_list(conn)["moves"]:
+        allowed.setdefault(move["from_step"], []).append(move["to_step"])
+    return allowed
+
+
 def _rejected_step(conn: Connection) -> str:
     (row,) = run(
         conn,
@@ -98,7 +106,7 @@ def create_opening(
 ) -> dict[str, Any]:
     owner = owner_recruiter or actor.subject
     if not actor.sees_all and owner != actor.subject:
-        raise NotPermitted("A recruiter creates openings they own.")
+        raise NotPermitted("A recruiter creates requisitions they own.")
     rows = run(
         conn,
         text(
@@ -139,19 +147,45 @@ def get_opening(conn: Connection, actor: Actor, opening_id: int) -> dict[str, An
         {"id": opening_id, **actor.scope()},
     )
     if not rows:
-        raise NotFound("Opening not found.")
+        raise NotFound("Requisition not found.")
     return rows[0]
 
 
-def list_openings(conn: Connection, actor: Actor, limit: int, offset: int) -> list[dict[str, Any]]:
+def list_openings(
+    conn: Connection,
+    actor: Actor,
+    *,
+    limit: int,
+    before: int | None = None,
+    status: str | None = None,
+    brand: str | None = None,
+    track: str | None = None,
+    owner: str | None = None,
+) -> list[dict[str, Any]]:
+    """Newest first, ids below `before`: a cursor page, not an offset that shifts under inserts."""
     return run(
         conn,
         text(
-            f"SELECT {_OPENING} FROM pipeline.opening "
-            "WHERE (:sees_all OR owner_recruiter = :subject) "
-            "ORDER BY id DESC LIMIT :limit OFFSET :offset"
+            f"""
+            SELECT {_OPENING} FROM pipeline.opening
+            WHERE (:sees_all OR owner_recruiter = :subject)
+              AND (CAST(:before AS bigint) IS NULL OR id < :before)
+              AND (CAST(:status AS text) IS NULL OR status = :status)
+              AND (CAST(:brand AS text) IS NULL OR brand = :brand)
+              AND (CAST(:track AS text) IS NULL OR track = :track)
+              AND (CAST(:owner AS text) IS NULL OR owner_recruiter = :owner)
+            ORDER BY id DESC LIMIT :limit
+            """
         ),
-        {"limit": limit, "offset": offset, **actor.scope()},
+        {
+            "limit": limit,
+            "before": before,
+            "status": status,
+            "brand": brand,
+            "track": track,
+            "owner": owner,
+            **actor.scope(),
+        },
     )
 
 
@@ -230,19 +264,37 @@ def get_application(conn: Connection, actor: Actor, application_id: int) -> dict
 
 
 def list_applications(
-    conn: Connection, actor: Actor, limit: int, offset: int, opening_id: int | None = None
+    conn: Connection,
+    actor: Actor,
+    *,
+    limit: int,
+    before: int | None = None,
+    opening_id: int | None = None,
+    stage: str | None = None,
+    owner: str | None = None,
 ) -> list[dict[str, Any]]:
+    """Newest first, ids below `before`, filtered by opening, current step or owner."""
     return run(
         conn,
         text(
             f"""
             SELECT {_APPLICATION} FROM pipeline.application_state
             WHERE (:sees_all OR owner_recruiter = :subject)
+              AND (CAST(:before AS bigint) IS NULL OR id < :before)
               AND (CAST(:opening AS bigint) IS NULL OR opening_id = :opening)
-            ORDER BY id DESC LIMIT :limit OFFSET :offset
+              AND (CAST(:stage AS text) IS NULL OR current_step = :stage)
+              AND (CAST(:owner AS text) IS NULL OR owner_recruiter = :owner)
+            ORDER BY id DESC LIMIT :limit
             """
         ),
-        {"limit": limit, "offset": offset, "opening": opening_id, **actor.scope()},
+        {
+            "limit": limit,
+            "before": before,
+            "opening": opening_id,
+            "stage": stage,
+            "owner": owner,
+            **actor.scope(),
+        },
     )
 
 
