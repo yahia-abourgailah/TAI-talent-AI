@@ -1,3 +1,5 @@
-from candidates.archive import ArchiveError, archive_candidate
+"""Candidate records: archiving now, more from week 3.
 
-__all__ = ["ArchiveError", "archive_candidate"]
+Import from the modules directly (candidates.archive), so `python -m candidates.archive` runs
+without importing itself twice.
+"""

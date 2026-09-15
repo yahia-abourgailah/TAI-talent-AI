@@ -33,8 +33,8 @@ def _candidate(conn) -> int:
     return int(
         conn.execute(
             text(
-                "INSERT INTO core.candidate (capture_id, source_key, created_by) "
-                "VALUES (:c, :k, 'integration-test') RETURNING id"
+                "INSERT INTO core.candidate (capture_id, source_key, created_by, pipeline_state) "
+                "VALUES (:c, :k, 'integration-test', 'not_recorded') RETURNING id"
             ),
             {"c": capture_id, "k": f"test:{uuid.uuid4().hex}"},
         ).scalar_one()
@@ -80,14 +80,19 @@ def test_archiving_twice_is_refused(app_engine):
             archive_candidate(conn, candidate_id, "Another reason", "reviewer-b")
 
 
-def test_the_database_refuses_an_archive_without_a_reason(app_engine):
+@pytest.mark.parametrize(
+    "statement",
+    [
+        "UPDATE core.candidate SET archived_at = now() WHERE id = :id",
+        "UPDATE core.candidate SET archived_at = now(), archived_reason = E'\\t', "
+        "archived_by = 'reviewer-a' WHERE id = :id",
+    ],
+)
+def test_the_database_refuses_an_archive_without_a_real_reason(app_engine, statement):
     with app_engine.connect() as conn:
         candidate_id = _candidate(conn)
         with pytest.raises(DBAPIError) as error:
-            conn.execute(
-                text("UPDATE core.candidate SET archived_at = now() WHERE id = :id"),
-                {"id": candidate_id},
-            )
+            conn.execute(text(statement), {"id": candidate_id})
     assert _sqlstate(error) == "23514"
 
 

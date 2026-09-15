@@ -10,12 +10,11 @@ from sqlalchemy.exc import DBAPIError
 
 from importer.blobs import MemoryBlobStore
 from importer.reconcile import reconcile, sample_rows
-from importer.rows import PLATFORM_TEST_ROW, SCORE_NOT_A_WHOLE_NUMBER
-from importer.tai_master import import_workbook
-from jobs.queue import RunLog, claim, enqueue, find_runs, run_job
-from replay.workbook import REQUIRED_COLUMNS, read_master
+from importer.rows import IMPORT_COLUMNS, PLATFORM_TEST_ROW, SCORE_NOT_A_WHOLE_NUMBER
+from importer.tai_master import ImportRefused, import_workbook
+from jobs.queue import ReportableError, RunLog, claim, enqueue, find_runs, run_job
+from replay.workbook import read_master
 
-COLUMNS = (*REQUIRED_COLUMNS, "Last Active", "Call Priority", "Stage", "HR Feedback")
 ROWS = (
     {
         "Name": "Fake Person One",
@@ -44,17 +43,27 @@ ROWS = (
 ACTOR = "integration-test"
 
 
-@pytest.fixture
-def master(tmp_path: Path) -> Path:
+def _save(
+    path: Path,
+    rows: tuple[dict[str, object], ...] = ROWS,
+    columns: tuple[str, ...] = IMPORT_COLUMNS,
+    title: str | None = None,
+) -> Path:
     workbook = openpyxl.Workbook()
+    if title is not None:
+        workbook.properties.title = title
     sheet = workbook.active
-    sheet.append(list(COLUMNS))
-    for row in ROWS:
-        sheet.append([row.get(column) for column in COLUMNS])
-    path = tmp_path / "data" / "TAI_Master.xlsx"
-    path.parent.mkdir()
+    sheet.append(list(columns))
+    for row in rows:
+        sheet.append([row.get(column) for column in columns])
+    path.parent.mkdir(parents=True, exist_ok=True)
     workbook.save(path)
     return path
+
+
+@pytest.fixture
+def master(tmp_path: Path) -> Path:
+    return _save(tmp_path / "data" / "TAI_Master.xlsx")
 
 
 @pytest.fixture
@@ -77,8 +86,8 @@ def _snapshot(conn, source: str):
         text(
             """
             SELECT c.source_key, c.capture_id, c.pipeline_state, f.field, f.value,
-                   f.verification_status, f.inference, f.source_ref,
-                   e.score, e.tier, e.recommendation, e.signals, e.call_priority
+                   f.verification_status, f.inference, f.source_ref, f.recorded_at,
+                   e.score, e.tier, e.recommendation, e.signals, e.signals_text, e.call_priority
             FROM core.candidate c
             JOIN core.candidate_field f ON f.candidate_id = c.id
             LEFT JOIN core.evaluation e ON e.candidate_id = c.id
@@ -90,11 +99,19 @@ def _snapshot(conn, source: str):
     ).all()
 
 
+def _captures(conn, source: str) -> int:
+    return int(
+        conn.execute(
+            text("SELECT count(*) FROM raw.capture WHERE source = :source"), {"source": source}
+        ).scalar_one()
+    )
+
+
 def _field(conn, source: str, sheet_row: int, field: str):
     return conn.execute(
         text(
-            "SELECT f.value, f.verification_status, f.inference, f.source_ref "
-            "FROM core.candidate_field f JOIN core.candidate c ON c.id = f.candidate_id "
+            "SELECT f.value, f.verification_status, f.inference, f.source_ref, f.recorded_by "
+            "FROM core.candidate_field_current f JOIN core.candidate c ON c.id = f.candidate_id "
             "WHERE c.source_key = :key AND f.field = :field"
         ),
         {"key": f"{source}:row:{sheet_row}", "field": field},
@@ -111,30 +128,73 @@ def test_importing_twice_changes_nothing(app_engine, master, source):
 
         assert _snapshot(conn, source) == before
         assert blobs.objects == stored_blobs
-        assert (first.counts["candidates_new"], first.counts["raw_captures_new"]) == (3, 3)
-        assert (second.counts["candidates_existing"], second.counts["raw_captures_existing"]) == (
-            3,
-            3,
-        )
-        assert "candidates_new" not in second.counts
-        assert "fields_new" not in second.counts
-        assert "evaluations_new" not in second.counts
-        count = conn.execute(
-            text("SELECT count(*) FROM core.candidate WHERE left(source_key, length(:p)) = :p"),
-            {"p": f"{source}:row:"},
-        ).scalar_one()
-        assert count == 3
+        assert _captures(conn, source) == 4  # three rows and the workbook file
+    assert (first.counts["candidates_new"], first.counts["raw_captures_new"]) == (3, 3)
+    assert first.counts["workbook_captures_new"] == 1
+    assert (second.counts["candidates_existing"], second.counts["raw_captures_existing"]) == (3, 3)
+    assert second.counts["workbook_captures_existing"] == 1
+    assert not {"candidates_new", "raw_captures_new", "fields_new", "evaluations_new"} & set(
+        second.counts
+    )
+
+
+def test_a_re_saved_workbook_writes_no_new_row_captures(app_engine, tmp_path, source):
+    original = _save(tmp_path / "a" / "TAI_Master.xlsx", title="first save")
+    resaved = _save(tmp_path / "b" / "TAI_Master.xlsx", title="second save")
+    assert read_master(original).sha256 != read_master(resaved).sha256
+
+    blobs = MemoryBlobStore()
+    with app_engine.connect() as conn:
+        _import(conn, original, source, blobs)
+        before = _snapshot(conn, source)
+        second = _import(conn, resaved, source, blobs)
+        assert _snapshot(conn, source) == before
+        assert _captures(conn, source) == 5  # three rows and two workbook files
+
+    assert "raw_captures_new" not in second.counts
+    assert second.counts["candidates_existing"] == 3
+    assert second.counts["workbook_captures_new"] == 1
+    assert not [u for u in second.unresolved if u["code"] == "row_differs_from_earlier_import"]
+
+
+def test_a_changed_row_is_listed_and_nothing_is_written_for_it(
+    app_engine, tmp_path, master, source
+):
+    changed = _save(
+        tmp_path / "b" / "TAI_Master.xlsx",
+        rows=(dict(ROWS[0], Title="Senior Sales Rep"), *ROWS[1:]),
+    )
+    with app_engine.connect() as conn:
+        _import(conn, master, source)
+        second = _import(conn, changed, source)
+        assert _field(conn, source, 2, "current_title").value == "Sales Rep"
+        assert _captures(conn, source) == 5  # three rows and two workbook files, nothing more
+
+    assert second.counts["rows_differing_from_earlier_import"] == 1
+    assert "raw_captures_new" not in second.counts
+    assert {"code": "row_differs_from_earlier_import", "sheet_row": 2} in second.unresolved
+
+
+def test_a_sheet_missing_a_column_is_refused(app_engine, tmp_path, source):
+    columns = tuple(c for c in IMPORT_COLUMNS if c != "Stage")
+    partial = _save(tmp_path / "p" / "TAI_Master.xlsx", columns=columns)
+    with app_engine.connect() as conn, pytest.raises(ImportRefused, match="Stage"):
+        _import(conn, partial, source)
 
 
 def test_fields_keep_their_source_and_nothing_is_guessed(app_engine, master, source):
     with app_engine.connect() as conn:
         _import(conn, master, source)
-        value, status, inference, ref = _field(conn, source, 2, "age")
-        assert (value, status, inference) == ("27", "unverified", "unknown")
+        value, status, inference, ref, recorded_by = _field(conn, source, 2, "age")
+        assert (value, status, inference, recorded_by) == ("27", "unverified", "unknown", ACTOR)
         assert ref.startswith("raw.capture:") and ref.endswith("#Age")
-        assert _field(conn, source, 3, "age")[:3] == (None, "not_recorded", None)
-        assert _field(conn, source, 2, "phone")[:3] == (None, "not_recorded", None)
-        assert _field(conn, source, 2, "current_title")[:3] == ("Sales Rep", "unverified", None)
+        assert tuple(_field(conn, source, 3, "age")[:3]) == (None, "not_recorded", None)
+        assert tuple(_field(conn, source, 2, "phone")[:3]) == (None, "not_recorded", None)
+        assert tuple(_field(conn, source, 2, "current_title")[:3]) == (
+            "Sales Rep",
+            "unverified",
+            None,
+        )
 
 
 def test_stored_score_is_saved_as_an_evaluation_under_2026_08_04(app_engine, master, source):
@@ -143,7 +203,8 @@ def test_stored_score_is_saved_as_an_evaluation_under_2026_08_04(app_engine, mas
         rows = conn.execute(
             text(
                 "SELECT c.source_key, e.criteria_version_id, e.origin, e.score, e.tier, "
-                "e.recommendation, e.signals, e.flags, e.call_priority "
+                "e.recommendation, e.signals, e.signals_text, e.flags, e.flags_text, "
+                "e.call_priority "
                 "FROM core.evaluation e JOIN core.candidate c ON c.id = e.candidate_id "
                 "WHERE left(c.source_key, length(:p)) = :p"
             ),
@@ -157,8 +218,8 @@ def test_stored_score_is_saved_as_an_evaluation_under_2026_08_04(app_engine, mas
         72,
         "P2",
     )
-    assert row.signals == ["Near New Cairo", "Sales"]
-    assert row.flags is None
+    assert (row.signals, row.signals_text) == (["Near New Cairo", "Sales"], "Near New Cairo; Sales")
+    assert (row.flags, row.flags_text) == (None, None)
     assert row.call_priority == "Call This Week"
     assert {"code": SCORE_NOT_A_WHOLE_NUMBER, "sheet_row": 4} in log.unresolved
     assert {"code": PLATFORM_TEST_ROW, "sheet_row": 4} in log.unresolved
@@ -213,7 +274,7 @@ def test_a_failed_run_is_rolled_back_and_still_recorded(app_engine, master, sour
     def handler(conn, params, actor, log):
         sheet = read_master(master)
         import_workbook(conn, sheet, master.read_bytes(), MemoryBlobStore(), actor, log, source)
-        raise RuntimeError("stopped on purpose")
+        raise ReportableError("stopped on purpose")
 
     with app_engine.connect() as conn:
         job_id = enqueue(conn, "test_import", {}, ACTOR)
@@ -225,6 +286,28 @@ def test_a_failed_run_is_rolled_back_and_still_recorded(app_engine, master, sour
 
     assert run["outcome"] == "failed"
     assert "stopped on purpose" in run["error"]
+
+
+def test_a_database_error_never_puts_row_values_in_the_run_record(app_engine):
+    def handler(conn, params, actor, log):
+        conn.execute(
+            text(
+                "INSERT INTO core.candidate_field "
+                "(candidate_id, field, value, source, verification_status) "
+                "VALUES (-1, 'full_name', 'Fake Secret Person', 'test', 'not_recorded')"
+            )
+        )
+
+    with app_engine.connect() as conn:
+        job_id = enqueue(conn, "test_import", {}, ACTOR)
+        job = claim(conn, job_id)
+        assert job is not None
+        run_job(conn, job, {"test_import": handler})
+        (run,) = find_runs(conn, job_id=job_id)
+
+    assert run["outcome"] == "failed"
+    assert "SQLSTATE" in run["error"]
+    assert "Fake Secret Person" not in run["error"]
 
 
 def test_the_app_cannot_change_a_recorded_run(app_engine):
@@ -244,28 +327,76 @@ def test_the_app_cannot_change_a_recorded_run(app_engine):
             assert error.value.orig.sqlstate == "42501"  # type: ignore[union-attr]
 
 
-def test_reconciliation_counts_match_and_the_sample_agrees(app_engine, master, source):
+def test_reconciliation_compares_the_database_with_the_sheet(app_engine, master, source):
     sheet = read_master(master)
+    blobs = MemoryBlobStore()
     with app_engine.connect() as conn:
-        _import(conn, master, source)
-        summary = reconcile(conn, sheet, source)
+        _import(conn, master, source, blobs)
+        summary = reconcile(conn, sheet, blobs, source)
         lines = sample_rows(conn, sheet, size=2, seed=1, source=source)
 
     assert summary["rows"] == {"sheet": 3, "candidates": 3, "match": True}
+    assert summary["workbook_capture"]["match"]
     assert summary["raw_captures"]["match"]
     assert all(field["match"] for field in summary["fields"]), summary["fields"]
     age = next(f for f in summary["fields"] if f["column"] == "Age")
-    assert (age["sheet_filled"], age["sheet_question_marks"], age["stored_values"]) == (2, 1, 1)
+    assert (age["sheet_filled"], age["sheet_no_value_markers"], age["stored_values"]) == (2, 1, 1)
     assert summary["evaluations"]["match"]
-    assert summary["replay"]["reads_the_same_stored_scores"]
+    assert summary["replay"]["reads_the_same_scores_as_the_database"]
     assert summary["counts_match"]
     assert len({line["sheet_row"] for line in lines}) == 2
-    assert {line["agrees"] for line in lines} == {"yes"}
+    assert {line["tool_agrees"] for line in lines} == {"yes"}
 
 
 def test_reconciliation_notices_a_missing_candidate(app_engine, master, source):
     sheet = read_master(master)
     with app_engine.connect() as conn:
-        summary = reconcile(conn, sheet, source)
+        summary = reconcile(conn, sheet, MemoryBlobStore(), source)
     assert summary["rows"]["match"] is False
+    assert summary["counts_match"] is False
+
+
+def test_reconciliation_notices_a_later_correction(app_engine, master, source):
+    sheet = read_master(master)
+    blobs = MemoryBlobStore()
+    with app_engine.connect() as conn:
+        _import(conn, master, source, blobs)
+        candidate_id = conn.execute(
+            text("SELECT id FROM core.candidate WHERE source_key = :key"),
+            {"key": f"{source}:row:2"},
+        ).scalar_one()
+        conn.execute(
+            text(
+                "INSERT INTO core.candidate_field "
+                "(candidate_id, field, value, source, recorded_by) "
+                "VALUES (:c, 'current_title', 'Corrected Title', 'correction', :by)"
+            ),
+            {"c": candidate_id, "by": ACTOR},
+        )
+        summary = reconcile(conn, sheet, blobs, source)
+    title = next(f for f in summary["fields"] if f["column"] == "Title")
+    assert (title["match"], title["rows_equal_to_sheet"]) == (False, 2)
+    assert summary["counts_match"] is False
+
+
+def test_reconciliation_notices_a_raw_capture_that_does_not_hold_the_row(
+    app_engine, master, source
+):
+    sheet = read_master(master)
+    blobs = MemoryBlobStore()
+    with app_engine.connect() as conn:
+        _import(conn, master, source, blobs)
+        blob_key = conn.execute(
+            text(
+                "SELECT r.blob_key FROM core.candidate c JOIN raw.capture r ON r.id = c.capture_id "
+                "WHERE c.source_key = :key"
+            ),
+            {"key": f"{source}:row:2"},
+        ).scalar_one()
+        blobs.objects[blob_key] = b'{"sheet_row": 2, "cells": []}'
+        summary = reconcile(conn, sheet, blobs, source)
+    assert (summary["raw_captures"]["equal_to_sheet"], summary["raw_captures"]["match"]) == (
+        2,
+        False,
+    )
     assert summary["counts_match"] is False

@@ -1,5 +1,5 @@
-"""Where raw captures are kept byte for byte (BR-107). Keys carry a content hash, so the same bytes
-are stored once and an object is never overwritten."""
+"""Where raw captures and the workbook files are kept (BR-107). Keys carry a content hash, so the
+same bytes are stored once and an object is never overwritten."""
 
 import base64
 import hashlib
@@ -19,6 +19,10 @@ class BlobStore(Protocol):
         """Stores the bytes unless the key exists. True when it wrote."""
         ...
 
+    def get(self, key: str) -> bytes | None:
+        """The stored bytes, or None when the key does not exist."""
+        ...
+
 
 class S3BlobStore:
     def __init__(self, client: Any, bucket: str) -> None:
@@ -26,6 +30,7 @@ class S3BlobStore:
         self._bucket = bucket
 
     def put_if_absent(self, key: str, body: bytes, media_type: str) -> bool:
+        # Keys are content hashes, so two writers racing on one key write the same bytes.
         try:
             self._client.head_object(Bucket=self._bucket, Key=key)
         except ClientError as exc:
@@ -44,6 +49,15 @@ class S3BlobStore:
         )
         return True
 
+    def get(self, key: str) -> bytes | None:
+        try:
+            response = self._client.get_object(Bucket=self._bucket, Key=key)
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") in _MISSING:
+                return None
+            raise
+        return bytes(response["Body"].read())
+
 
 class MemoryBlobStore:
     """For tests."""
@@ -56,6 +70,9 @@ class MemoryBlobStore:
             return False
         self.objects[key] = body
         return True
+
+    def get(self, key: str) -> bytes | None:
+        return self.objects.get(key)
 
 
 def s3_store() -> S3BlobStore:

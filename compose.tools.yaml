@@ -11,12 +11,18 @@ services:
   jobs:
     image: talent-platform:dev
     build: .
+    # Your own user, so the tools can use private (chmod 700) data folders.
+    user: "${TALENT_UID:-1000}:${TALENT_GID:-1000}"
     env_file: .env
     environment:
       TALENT_DB_DSN: postgresql+psycopg://talent_app:${TALENT_DB_APP_PASSWORD:?set TALENT_DB_APP_PASSWORD in .env}@postgres:5432/talent
       TALENT_REDIS_URL: redis://redis:6379/0
       TALENT_BLOB_ENDPOINT: http://object-storage:9000
       TALENT_MASTER_PATH: /data/master/TAI_Master.xlsx
+      # Host paths, so the tools can refuse data folders inside the repository (DATA_HANDLING.md).
+      TALENT_HOST_REPO: ${PWD}
+      TALENT_HOST_MASTER_PATH: ${TALENT_MASTER_PATH}
+      TALENT_HOST_RECONCILE_DIR: ${TALENT_RECONCILE_DIR}
     volumes:
       - ${TALENT_MASTER_PATH:?set TALENT_MASTER_PATH in .env}:/data/master/TAI_Master.xlsx:ro
       - ${TALENT_RECONCILE_DIR:?set TALENT_RECONCILE_DIR in .env}:/data/out

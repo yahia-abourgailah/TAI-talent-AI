@@ -75,7 +75,13 @@ def run_baseline(sheet: MasterSheet, run_date: date) -> list[RowResult]:
 
 def inside_git_repository(path: Path) -> bool:
     resolved = path.expanduser().resolve()
-    return any((parent / ".git").exists() for parent in (resolved, *resolved.parents))
+    for parent in (resolved, *resolved.parents):
+        try:
+            if (parent / ".git").exists():
+                return True
+        except OSError:  # a folder this user cannot look inside cannot be checked; keep going
+            continue
+    return False
 
 
 def _write_private(path: Path, content: str) -> None:

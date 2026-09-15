@@ -3,51 +3,61 @@
     python -m importer.reconcile --out DIR [--master PATH] [--sample 200] [--seed 20260914]
         [--report-copy docs/migration/RECONCILIATION_REPORT.md]
 
-Checks:
+Every check compares the database, and the raw captures read back from object storage, with the
+workbook's cells. It does not reuse the importer's row preparation, so a mistake in the import
+cannot confirm itself.
+
   rows         non-blank sheet rows = candidates imported from them
-  raw          every row has a raw capture holding exactly the bytes the row gives today
-  fields       per column: filled cells = values stored + "?" cells stored as not recorded
-  evaluations  every stored score is an evaluation under 2026-08-04 with the same score, tier and
-               recommendation, and the replay of 2026-08-04 reads the same stored scores (A2)
-  sample       random rows, sheet beside database, written for a person to check by hand
+  workbook     the workbook file is kept as a raw capture under its SHA-256
+  raw          each candidate's raw capture, read back, holds exactly the row's cells today
+  fields       per column and row: the current stored value equals the cell, and a blank or a
+               "no value" marker is stored as not recorded
+  evaluations  per scored row: score, tier, recommendation, call priority and the original Signals
+               and Flags text equal the sheet, under 2026-08-04
+  replay       the replay of 2026-08-04 reaches parity and reads the scores the database holds
+  sample       random rows, sheet beside database, for a person to check by hand. The report never
+               says the sample was checked; the person who checks it records that.
 
 The sample holds candidate data, so it goes outside the repository and is written owner-only.
 """
 
 import argparse
 import csv
+import hashlib
 import io
 import json
 import os
 import random
 import sys
-from datetime import date
+from datetime import date, datetime, time
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
+from importer.blobs import BlobStore, s3_store
+from importer.paths import check_outside_repository, master_path
 from importer.rows import (
+    CALL_PRIORITY,
     CRITERIA_VERSION,
     FIELD_COLUMNS,
-    QUESTION_MARK_COLUMNS,
+    FLAGS,
+    NO_VALUE_MARKERS,
     RAW_ONLY_COLUMNS,
     RECOMMENDATION,
     SCORE,
+    SIGNALS,
     SOURCE,
     TIER,
-    PreparedRow,
-    cell_text,
-    is_blank,
-    prepare_row,
+    missing_columns,
 )
-from importer.tai_master import master_path
-from jobs.queue import engine_from_environment
-from replay.baseline import inside_git_repository, run_baseline
+from jobs.queue import ReportableError, engine_from_environment
+from replay.baseline import run_baseline
 from replay.results import apply_rulings
 from replay.rulings import RULINGS
-from replay.workbook import MasterSheet, WorkbookError, read_master
+from replay.workbook import MasterRow, MasterSheet, WorkbookError, read_master
 
 # The date CI's parity job pins, so both read the same replay.
 REPLAY_RUN_DATE = date(2026, 9, 14)
@@ -55,53 +65,140 @@ SAMPLE_COLUMNS = (
     "sheet_row",
     "column",
     "sheet_value",
+    "expected_value",
+    "expected_status",
     "stored_value",
     "stored_status",
     "inference",
-    "agrees",
+    "tool_agrees",
     "checked_by",
     "note",
 )
+_OWN_ROWS = "left(c.source_key, length(:prefix)) = :prefix"
 
 
 def _prefix(source: str) -> dict[str, str]:
     return {"prefix": f"{source}:row:"}
 
 
-_OWN_ROWS = "left(c.source_key, length(:prefix)) = :prefix"
+def _blank(value: Any) -> bool:
+    return value is None or (isinstance(value, str) and not value.strip())
 
 
-def reconcile(conn: Connection, sheet: MasterSheet, source: str = SOURCE) -> dict[str, Any]:
-    prepared = [prepare_row(sheet, row, source) for row in sheet.rows]
-    total = len(prepared)
+def _shown(value: Any) -> str:
+    """How a cell reads as text, written here independently of the importer."""
+    if isinstance(value, datetime | date | time):
+        return value.isoformat()
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value)
 
-    candidates = conn.execute(
-        text(f"SELECT count(*) FROM core.candidate c WHERE {_OWN_ROWS}"), _prefix(source)
-    ).scalar_one()
 
-    captures = {
-        (row.external_id, bytes(row.content_sha256))
-        for row in conn.execute(
-            text(
-                "SELECT external_id, content_sha256 FROM raw.capture "
-                "WHERE source = :source AND left(external_id, 65) = :workbook"
-            ),
-            {"source": source, "workbook": f"{sheet.sha256}:"},
-        )
-    }
-    raw_matching = sum((p.external_id, p.payload_sha256) in captures for p in prepared)
+def expected_field(column: str, value: Any) -> tuple[str | None, str]:
+    """What the database should hold for this cell: (value, verification status)."""
+    if _blank(value):
+        return None, "not_recorded"
+    shown = _shown(value)
+    if shown.strip().lower() in NO_VALUE_MARKERS.get(column, frozenset()):
+        return None, "not_recorded"
+    return shown, "unverified"
 
-    stored_fields = {
-        row.field: (row.stored_values, row.not_recorded)
-        for row in conn.execute(
+
+def _expected_text(value: Any) -> str | None:
+    return None if _blank(value) else _shown(value)
+
+
+def _whole_score(value: Any) -> int | None:
+    """A stored score the import should have kept: a whole number from 0 to 100."""
+    if _blank(value) or isinstance(value, bool):
+        return None
+    try:
+        parsed = Decimal(str(value).strip())
+    except ArithmeticError:
+        return None
+    if not parsed.is_finite() or parsed != parsed.to_integral_value() or not 0 <= parsed <= 100:
+        return None
+    return int(parsed)
+
+
+def _decode(typed: dict[str, Any] | None) -> Any:
+    if typed is None:
+        return None
+    kind, value = typed["type"], typed["value"]
+    if kind == "float":
+        return float(value)
+    if kind == "datetime":
+        return datetime.fromisoformat(value)
+    if kind == "date":
+        return date.fromisoformat(value)
+    if kind == "time":
+        return time.fromisoformat(value)
+    return value  # bool, int and str keep their JSON types
+
+
+def _cells_match(row: MasterRow, payload: bytes) -> bool:
+    try:
+        body = json.loads(payload)
+        cells = [(column, _decode(typed)) for column, typed in body["cells"]]
+    except (ValueError, KeyError, TypeError):
+        return False
+    return bool(body.get("sheet_row") == row.sheet_row and cells == list(row.values.items()))
+
+
+def reconcile(
+    conn: Connection, sheet: MasterSheet, blobs: BlobStore, source: str = SOURCE
+) -> dict[str, Any]:
+    total = len(sheet.rows)
+    rows_by_key = {f"{source}:row:{row.sheet_row}": row for row in sheet.rows}
+
+    captured = {
+        found.source_key: found
+        for found in conn.execute(
             text(
                 f"""
-                SELECT f.field, count(f.value) AS stored_values,
-                       count(*) FILTER (WHERE f.verification_status = 'not_recorded')
-                         AS not_recorded
-                FROM core.candidate_field f JOIN core.candidate c ON c.id = f.candidate_id
+                SELECT c.source_key, r.content_sha256, r.blob_key
+                FROM core.candidate c JOIN raw.capture r ON r.id = c.capture_id
                 WHERE {_OWN_ROWS}
-                GROUP BY f.field
+                """
+            ),
+            _prefix(source),
+        )
+    }
+    raw_equal = 0
+    for key, row in rows_by_key.items():
+        found = captured.get(key)
+        if found is None:
+            continue
+        payload = blobs.get(found.blob_key)
+        if (
+            payload is not None
+            and hashlib.sha256(payload).digest() == bytes(found.content_sha256)
+            and _cells_match(row, payload)
+        ):
+            raw_equal += 1
+    workbook_captured = (
+        conn.execute(
+            text(
+                "SELECT count(*) FROM raw.capture "
+                "WHERE source = :source AND external_id = :external_id AND content_sha256 = :sha"
+            ),
+            {
+                "source": source,
+                "external_id": f"workbook:{sheet.sha256}",
+                "sha": bytes.fromhex(sheet.sha256),
+            },
+        ).scalar_one()
+        == 1
+    )
+
+    stored_fields = {
+        (found.source_key, found.field): (found.value, found.verification_status)
+        for found in conn.execute(
+            text(
+                f"""
+                SELECT c.source_key, f.field, f.value, f.verification_status
+                FROM core.candidate_field_current f JOIN core.candidate c ON c.id = f.candidate_id
+                WHERE {_OWN_ROWS}
                 """
             ),
             _prefix(source),
@@ -109,75 +206,109 @@ def reconcile(conn: Connection, sheet: MasterSheet, source: str = SOURCE) -> dic
     }
     fields = []
     for column, field, _inference in FIELD_COLUMNS:
-        cells = [row.values.get(column) for row in sheet.rows]
-        filled = sum(not is_blank(value) for value in cells)
-        question_marks = (
-            sum(not is_blank(v) and cell_text(v).strip() == "?" for v in cells)
-            if column in QUESTION_MARK_COLUMNS
-            else 0
-        )
-        values, not_recorded = stored_fields.get(field, (0, 0))
+        filled = markers = stored_values = not_recorded = equal = 0
+        for key, row in rows_by_key.items():
+            cell = row.values.get(column)
+            expected = expected_field(column, cell)
+            if not _blank(cell):
+                filled += 1
+                markers += expected[1] == "not_recorded"
+            got = stored_fields.get((key, field))
+            if got is not None:
+                stored_values += got[0] is not None
+                not_recorded += got[1] == "not_recorded"
+            equal += got == expected
         fields.append(
             {
                 "column": column,
                 "field": field,
                 "sheet_filled": filled,
-                "sheet_question_marks": question_marks,
-                "stored_values": values,
+                "sheet_no_value_markers": markers,
+                "stored_values": stored_values,
                 "stored_not_recorded": not_recorded,
-                "match": values == filled - question_marks and values + not_recorded == total,
+                "rows_equal_to_sheet": equal,
+                "match": equal == total,
             }
         )
     raw_only = [
         {
             "column": column,
-            "sheet_filled": sum(not is_blank(row.values.get(column)) for row in sheet.rows),
+            "sheet_filled": sum(not _blank(row.values.get(column)) for row in sheet.rows),
             "waiting_on": waiting_on,
         }
         for column, waiting_on in RAW_ONLY_COLUMNS.items()
     ]
 
-    expected = {p.source_key: p.evaluation for p in prepared if p.evaluation is not None}
-    stored_evaluations = conn.execute(
-        text(
-            f"""
-            SELECT c.source_key, e.score, e.tier, e.recommendation
-            FROM core.evaluation e JOIN core.candidate c ON c.id = e.candidate_id
-            WHERE e.criteria_version_id = :version AND e.origin = 'stored' AND {_OWN_ROWS}
-            """
-        ),
-        {"version": CRITERIA_VERSION, **_prefix(source)},
-    ).all()
-    same_as_sheet = 0
-    for row in stored_evaluations:
-        wanted = expected.get(row.source_key)
+    scored = {
+        key: score
+        for key, row in rows_by_key.items()
+        if (score := _whole_score(row.values.get(SCORE))) is not None
+    }
+    evaluations = {
+        found.source_key: found
+        for found in conn.execute(
+            text(
+                f"""
+                SELECT c.source_key, e.score, e.tier, e.recommendation, e.call_priority,
+                       e.signals_text, e.flags_text
+                FROM core.evaluation e JOIN core.candidate c ON c.id = e.candidate_id
+                WHERE e.criteria_version_id = :version AND e.origin = 'stored' AND {_OWN_ROWS}
+                """
+            ),
+            {"version": CRITERIA_VERSION, **_prefix(source)},
+        )
+    }
+    equal_evaluations = 0
+    for key, score in scored.items():
+        found = evaluations.get(key)
+        values = rows_by_key[key].values
         if (
-            wanted is not None
-            and row.score == wanted.score
-            and (row.tier, row.recommendation) == (wanted.tier, wanted.recommendation)
+            found is not None
+            and found.score is not None
+            and Decimal(found.score) == score
+            and (
+                found.tier,
+                found.recommendation,
+                found.call_priority,
+                found.signals_text,
+                found.flags_text,
+            )
+            == tuple(
+                _expected_text(values.get(column))
+                for column in (TIER, RECOMMENDATION, CALL_PRIORITY, SIGNALS, FLAGS)
+            )
         ):
-            same_as_sheet += 1
-    sheet_scores = sum(not is_blank(row.values.get(SCORE)) for row in sheet.rows)
+            equal_evaluations += 1
+    not_in_sheet = len(set(evaluations) - set(scored))
 
     results, _stale = apply_rulings(run_baseline(sheet, REPLAY_RUN_DATE), sheet.sha256, RULINGS)
     replay_scores = {
         f"{source}:row:{r.sheet_row}": r.stored.score for r in results if r.has_stored_score
     }
-    replay_reads_the_same = replay_scores == {k: e.score for k, e in expected.items()}
+    database_scores = {
+        key: int(found.score) for key, found in evaluations.items() if found.score is not None
+    }
     unexplained = sum(r.unexplained_difference for r in results)
 
     summary: dict[str, Any] = {
         "workbook_sha256": sheet.sha256,
-        "rows": {"sheet": total, "candidates": candidates, "match": candidates == total},
-        "raw_captures": {"rows": total, "matching": raw_matching, "match": raw_matching == total},
+        "missing_columns": missing_columns(sheet),
+        "rows": {
+            "sheet": total,
+            "candidates": len(captured),
+            "match": set(captured) == set(rows_by_key),
+        },
+        "workbook_capture": {"match": workbook_captured},
+        "raw_captures": {"rows": total, "equal_to_sheet": raw_equal, "match": raw_equal == total},
         "fields": fields,
         "raw_only_columns": raw_only,
         "evaluations": {
-            "sheet_scores": sheet_scores,
-            "whole_number_scores": len(expected),
-            "stored": len(stored_evaluations),
-            "same_as_sheet": same_as_sheet,
-            "match": len(stored_evaluations) == len(expected) == same_as_sheet,
+            "sheet_scores": sum(not _blank(row.values.get(SCORE)) for row in sheet.rows),
+            "whole_number_scores": len(scored),
+            "stored": len(evaluations),
+            "equal_to_sheet": equal_evaluations,
+            "not_in_sheet": not_in_sheet,
+            "match": len(evaluations) == len(scored) == equal_evaluations and not not_in_sheet,
         },
         "replay": {
             "criteria_version": CRITERIA_VERSION,
@@ -186,32 +317,41 @@ def reconcile(conn: Connection, sheet: MasterSheet, source: str = SOURCE) -> dic
             "score_matches": sum(r.score_match for r in results),
             "ruled_differences": sum(r.ruling is not None for r in results),
             "unexplained_differences": unexplained,
-            "reads_the_same_stored_scores": replay_reads_the_same,
+            "reads_the_same_scores_as_the_database": replay_scores == database_scores,
             "parity": unexplained == 0,
         },
     }
-    summary["counts_match"] = (
-        summary["rows"]["match"]
+    summary["counts_match"] = bool(
+        not summary["missing_columns"]
+        and summary["rows"]["match"]
+        and workbook_captured
         and summary["raw_captures"]["match"]
         and all(f["match"] for f in fields)
         and summary["evaluations"]["match"]
-        and replay_reads_the_same
+        and summary["replay"]["reads_the_same_scores_as_the_database"]
     )
     return summary
 
 
-def _sample_line(
-    row: PreparedRow, column: str, sheet: str, stored: tuple[Any, ...] | None
+def _line(
+    row: MasterRow,
+    column: str,
+    cell: Any,
+    expected: tuple[str | None, str],
+    stored: tuple[Any, str, str | None],
+    agrees: bool,
 ) -> dict[str, Any]:
-    value, status, inference = stored if stored is not None else ("", "missing", "")
+    stored_value, stored_status, inference = stored
     return {
         "sheet_row": row.sheet_row,
         "column": column,
-        "sheet_value": sheet,
-        "stored_value": "" if value is None else str(value),
-        "stored_status": status,
+        "sheet_value": "" if _blank(cell) else _shown(cell),
+        "expected_value": expected[0] or "",
+        "expected_status": expected[1],
+        "stored_value": "" if stored_value is None else str(stored_value),
+        "stored_status": stored_status,
         "inference": inference or "",
-        "agrees": "",
+        "tool_agrees": "yes" if agrees else "no",
         "checked_by": "",
         "note": "",
     }
@@ -220,26 +360,26 @@ def _sample_line(
 def sample_rows(
     conn: Connection, sheet: MasterSheet, size: int, seed: int, source: str = SOURCE
 ) -> list[dict[str, Any]]:
-    """Sheet beside database for random rows. "agrees" is what the tool expects; check by hand."""
-    chosen = random.Random(seed).sample(list(sheet.rows), min(size, len(sheet.rows)))
-    prepared = sorted(
-        (prepare_row(sheet, row, source) for row in chosen), key=lambda p: p.sheet_row
+    """Sheet beside database for random rows, for a person to check by hand."""
+    chosen = sorted(
+        random.Random(seed).sample(list(sheet.rows), min(size, len(sheet.rows))),
+        key=lambda row: row.sheet_row,
     )
-    keys = [p.source_key for p in prepared]
+    keys = [f"{source}:row:{row.sheet_row}" for row in chosen]
     fields = {
-        (row.source_key, row.field): (row.value, row.verification_status, row.inference)
-        for row in conn.execute(
+        (found.source_key, found.field): found
+        for found in conn.execute(
             text(
                 "SELECT c.source_key, f.field, f.value, f.verification_status, f.inference "
-                "FROM core.candidate_field f JOIN core.candidate c ON c.id = f.candidate_id "
-                "WHERE c.source_key = ANY(:keys)"
+                "FROM core.candidate_field_current f "
+                "JOIN core.candidate c ON c.id = f.candidate_id WHERE c.source_key = ANY(:keys)"
             ),
             {"keys": keys},
         )
     }
     evaluations = {
-        row.source_key: row
-        for row in conn.execute(
+        found.source_key: found
+        for found in conn.execute(
             text(
                 "SELECT c.source_key, e.score, e.tier, e.recommendation "
                 "FROM core.evaluation e JOIN core.candidate c ON c.id = e.candidate_id "
@@ -249,35 +389,42 @@ def sample_rows(
             {"version": CRITERIA_VERSION, "keys": keys},
         )
     }
-    by_row = {row.sheet_row: row for row in chosen}
 
     lines: list[dict[str, Any]] = []
-    for row in prepared:
-        values = by_row[row.sheet_row].values
-        for field in row.fields:
-            sheet_value = (
-                "" if is_blank(values.get(field.column)) else cell_text(values[field.column])
+    for row, key in zip(chosen, keys, strict=True):
+        for column, field, _inference in FIELD_COLUMNS:
+            cell = row.values.get(column)
+            expected = expected_field(column, cell)
+            got = fields.get((key, field))
+            stored = (
+                (None, "missing", None)
+                if got is None
+                else (got.value, got.verification_status, got.inference)
             )
-            stored = fields.get((row.source_key, field.field))
-            line = _sample_line(row, field.column, sheet_value, stored)
-            line["agrees"] = (
-                "yes" if stored == (field.value, field.status, field.inference) else "no"
-            )
-            lines.append(line)
-        found = evaluations.get(row.source_key)
-        wanted = row.evaluation
+            agrees = got is not None and (got.value, got.verification_status) == expected
+            lines.append(_line(row, column, cell, expected, stored, agrees))
+
+        whole = _whole_score(row.values.get(SCORE))
+        found = evaluations.get(key)
         for column, attribute in (
             (SCORE, "score"),
             (TIER, "tier"),
             (RECOMMENDATION, "recommendation"),
         ):
-            sheet_value = "" if is_blank(values.get(column)) else cell_text(values[column])
-            stored_value = None if found is None else getattr(found, attribute)
-            status = "missing" if found is None else "stored evaluation"
-            line = _sample_line(row, column, sheet_value, (stored_value, status, ""))
-            expected = None if wanted is None else getattr(wanted, attribute)
-            line["agrees"] = "yes" if stored_value == expected else "no"
-            lines.append(line)
+            cell = row.values.get(column)
+            if whole is None:
+                expected = (None, "no evaluation")
+            else:
+                wanted = str(whole) if column == SCORE else _expected_text(cell)
+                expected = (wanted, "stored evaluation")
+            value = None if found is None else getattr(found, attribute)
+            if isinstance(value, Decimal):
+                value = str(int(value)) if value == value.to_integral_value() else str(value)
+            stored = (value, "no evaluation" if found is None else "stored evaluation", None)
+            agrees = (
+                (found is None) if whole is None else (found is not None and value == expected[0])
+            )
+            lines.append(_line(row, column, cell, expected, stored, agrees))
     return lines
 
 
@@ -291,31 +438,42 @@ def render_report(summary: dict[str, Any], sample_size: int, seed: int) -> str:
         summary["evaluations"],
         summary["replay"],
     )
+    workbook_ok = summary["workbook_capture"]["match"]
     lines = [
         "# TAI_Master import reconciliation",
         "",
         f"Workbook SHA-256 `{summary['workbook_sha256']}`. Counts only; no candidate values.",
         "",
-        f"**Counts match: {mark(summary['counts_match'])}.** "
-        f"The {sample_size}-row sample (seed {seed}) is signed off by hand, outside this report.",
+        f"**Counts match: {mark(summary['counts_match'])}.** Every check below compares the "
+        "database, and the raw captures read back from storage, with the workbook's cells.",
         "",
+        f"The {sample_size}-row sample (seed {seed}) is written outside the repository for a "
+        "person to check by hand. This report does not record that check; whoever does it "
+        "records it in docs/migration/WEEK2_DECISIONS.md.",
+        "",
+    ]
+    if summary["missing_columns"]:
+        lines += [f"**Missing columns:** {', '.join(summary['missing_columns'])}.", ""]
+    lines += [
         "## Rows, raw captures and evaluations",
         "",
         "| Check | Sheet | Database | Match |",
         "|---|---:|---:|---|",
         f"| Non-blank rows vs candidates | {rows['sheet']:,} | {rows['candidates']:,} "
         f"| {mark(rows['match'])} |",
-        f"| Rows vs raw captures with identical bytes | {raw['rows']:,} | {raw['matching']:,} "
-        f"| {mark(raw['match'])} |",
-        f"| Whole-number stored scores vs evaluations under {replay['criteria_version']} "
+        f"| Workbook file kept as a raw capture | 1 | {1 if workbook_ok else 0} "
+        f"| {mark(workbook_ok)} |",
+        f"| Rows whose raw capture, read back, holds the row's cells | {raw['rows']:,} "
+        f"| {raw['equal_to_sheet']:,} | {mark(raw['match'])} |",
+        f"| Whole-number scores from 0 to 100 vs evaluations under {replay['criteria_version']} "
         f"| {evaluations['whole_number_scores']:,} | {evaluations['stored']:,} "
         f"| {mark(evaluations['match'])} |",
-        f"| Evaluations identical to the sheet (score, tier, recommendation) "
-        f"| {evaluations['whole_number_scores']:,} | {evaluations['same_as_sheet']:,} "
-        f"| {mark(evaluations['match'])} |",
+        "| Evaluations equal to the sheet (score, tier, recommendation, call priority, "
+        f"Signals and Flags text) | {evaluations['whole_number_scores']:,} "
+        f"| {evaluations['equal_to_sheet']:,} | {mark(evaluations['match'])} |",
         "",
-        f"Score cells in the sheet: {evaluations['sheet_scores']:,}. Any that are not whole "
-        "numbers are listed as unresolved in the import run, not imported.",
+        f"Score cells in the sheet: {evaluations['sheet_scores']:,}. A score that is not a whole "
+        "number from 0 to 100 is listed as unresolved by the import, not imported.",
         "",
         "## Replay",
         "",
@@ -324,25 +482,27 @@ def render_report(summary: dict[str, Any], sample_size: int, seed: int) -> str:
         f"{replay['ruled_differences']:,} differences are ruled, "
         f"{replay['unexplained_differences']:,} unexplained. "
         f"Parity: {mark(replay['parity'])}. "
-        f"The replay reads the same stored scores as the database holds: "
-        f"{mark(replay['reads_the_same_stored_scores'])}.",
+        "The replay reads the same stored scores the database holds: "
+        f"{mark(replay['reads_the_same_scores_as_the_database'])}.",
         "",
         "## Fields",
         "",
-        '| Column | Field | Filled in sheet | "?" cells | Stored values | Not recorded | Match |',
-        "|---|---|---:|---:|---:|---:|---|",
+        '| Column | Field | Filled in sheet | "No value" markers | Stored values | Not recorded '
+        "| Rows equal to sheet | Match |",
+        "|---|---|---:|---:|---:|---:|---:|---|",
     ]
     for f in summary["fields"]:
         lines.append(
             f"| {f['column']} | `{f['field']}` | {f['sheet_filled']:,} "
-            f"| {f['sheet_question_marks']:,} | {f['stored_values']:,} "
-            f"| {f['stored_not_recorded']:,} | {mark(f['match'])} |"
+            f"| {f['sheet_no_value_markers']:,} | {f['stored_values']:,} "
+            f"| {f['stored_not_recorded']:,} | {f['rows_equal_to_sheet']:,} | {mark(f['match'])} |"
         )
     lines += [
         "",
         "## Kept in the raw capture only",
         "",
-        "Every cell of these columns is in the raw capture, which matched byte for byte above.",
+        "These columns have no structured home yet. Every cell of them is in each row's raw "
+        "capture, which is checked above.",
         "",
         "| Column | Filled in sheet | Waiting on |",
         "|---|---:|---|",
@@ -372,21 +532,20 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     out_dir = args.out.expanduser()
-    if inside_git_repository(out_dir):
-        print(
-            "error: --out is inside a git repository; the sample holds candidate data.",
-            file=sys.stderr,
-        )
-        return 2
     try:
+        check_outside_repository(out_dir, os.environ.get("TALENT_HOST_RECONCILE_DIR"), "--out")
         master = master_path(args.master)
         sheet = read_master(master, sheet=args.sheet)
-    except (ValueError, WorkbookError) as exc:
+    except (ReportableError, WorkbookError) as exc:
         print(f"error: {exc}", file=sys.stderr)
+        return 2
+    missing = missing_columns(sheet)
+    if missing:
+        print(f"error: the sheet is missing columns: {', '.join(missing)}.", file=sys.stderr)
         return 2
 
     with engine_from_environment().connect() as conn:
-        summary = reconcile(conn, sheet)
+        summary = reconcile(conn, sheet, s3_store())
         lines = sample_rows(conn, sheet, args.sample, args.seed)
 
     out_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -403,11 +562,12 @@ def main(argv: list[str] | None = None) -> int:
         args.report_copy.parent.mkdir(parents=True, exist_ok=True)
         args.report_copy.write_text(report, encoding="utf-8")
 
-    disagreements = sum(line["agrees"] == "no" for line in lines)
+    disagreements = sum(line["tool_agrees"] == "no" for line in lines)
     print(f"Counts match: {'yes' if summary['counts_match'] else 'NO'}.")
     print(f"Replay parity: {'yes' if summary['replay']['parity'] else 'no'}.")
     print(
-        f"Sample: {len({line['sheet_row'] for line in lines})} rows, {disagreements} disagreements."
+        f"Sample: {len({line['sheet_row'] for line in lines})} rows, "
+        f"{disagreements} disagreements found by the tool. Still to check by hand."
     )
     print(f"  report  {out_dir / (stem + '.md')}")
     print(f"  sample  {out_dir / (stem + '-sample.csv')}  (candidate data, never commit)")

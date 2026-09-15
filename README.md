@@ -51,7 +51,7 @@ docker compose -f compose.yaml -f compose.test.yaml run --rm migrate
 
 ### Import TAI_Master
 
-Set `TALENT_MASTER_PATH` (the workbook) and `TALENT_RECONCILE_DIR` (an output folder) in `.env`, both outside the repository.
+Set `TALENT_MASTER_PATH` (the workbook) and `TALENT_RECONCILE_DIR` (an output folder) in `.env`, both outside the repository, and set `TALENT_UID` and `TALENT_GID` to the output of `id -u` and `id -g`, so the tools can use private (`chmod 700`) data folders.
 
 ```bash
 docker compose up -d --build
@@ -60,7 +60,11 @@ docker compose -f compose.yaml -f compose.tools.yaml run --rm jobs python -m job
 docker compose -f compose.yaml -f compose.tools.yaml run --rm jobs python -m importer.reconcile --out /data/out
 ```
 
-Running the import again writes nothing new. Each run is recorded in `audit.job_run` with its counts, skips and unresolved rows. The reconciliation writes a counts-only report and a 200-row sample to check by hand; the sample holds candidate data and never goes in the repository. Archive a record with `python -m candidates.archive --candidate-id N --reason "..." --by "<your name>"`.
+Running the import again writes nothing new, even from a re-saved or re-exported copy of the workbook. A row whose cells changed since it was imported is never overwritten: nothing is written for it and it is listed as unresolved. Each run is recorded in `audit.job_run` with its counts, skips and unresolved rows, and never with candidate values. If an import is stopped part-way, nothing from it is kept; the next import, or `python -m jobs recover`, records the stopped run and queues it again.
+
+The reconciliation compares the database and the raw captures with the workbook's cells, and writes a counts-only report and a 200-row sample. The sample holds candidate data and never goes in the repository. Whoever checks it by hand records that in `docs/migration/WEEK2_DECISIONS.md`.
+
+A local database loaded before migration 0004 holds rows in the old capture format: reset it with `docker compose down -v` and import again. Archive a record with `python -m candidates.archive --candidate-id N --reason "..." --by "<your name>"`.
 
 ### Baseline replay
 

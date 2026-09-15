@@ -2,14 +2,18 @@
 
 Follows docs/migration/COLUMN_MAP.md:
 
-  RAW        the whole row, every cell typed, is kept as one raw capture
+  RAW        every cell of the row, typed, is kept as one raw capture. It is keyed by sheet row and
+             a hash of the cells alone, so re-saving the workbook without changing a cell gives the
+             same capture. The workbook file itself is kept as its own capture.
   M-PROV     profile columns become candidate fields: source, source_ref, unverified
-  INF?       Age and Years Exp may have been derived, so their inference is "unknown" (A4)
-  HIST-EVAL  a stored score becomes an evaluation under 2026-08-04, copied, never recomputed (A2)
-  NR         a blank cell is "not recorded"; nothing is filled in
+  INF?       Age and Years Exp may have been derived, so their inference is "unknown" (A4): the
+             workbook cannot show whether a value was stated or guessed
+  HIST-EVAL  a stored score becomes an evaluation under 2026-08-04, copied, never recomputed (A2).
+             The original Signals and Flags text is kept beside the split lists.
+  NR         a blank cell, or a "no value" marker in a column that has them, is "not recorded"
 
 Pipeline and outreach columns have no table until week 3, and most wait on a ruling, so they stay
-in the raw capture only.
+in the raw capture only. So does any cell outside the named columns.
 """
 
 import hashlib
@@ -47,8 +51,15 @@ FIELD_COLUMNS: tuple[tuple[str, str, str | None], ...] = (
     ("Date Added", "date_added", None),
 )
 
-# "?" is not a value in these columns (COLUMN_MAP F-05).
-QUESTION_MARK_COLUMNS = frozenset({"Age", "Last Active"})
+# Cell text that means "no value" in these columns (COLUMN_MAP F-05), compared ignoring case and
+# surrounding spaces. The number columns use the replay's markers plus the Arabic question mark.
+_ARABIC_QUESTION_MARK = "؟"
+_NUMBER_MARKERS = frozenset({"?", _ARABIC_QUESTION_MARK, "-", "—", "n/a", "na", "none", "unknown"})
+NO_VALUE_MARKERS: dict[str, frozenset[str]] = {
+    "Age": _NUMBER_MARKERS,
+    "Years Exp": _NUMBER_MARKERS,
+    "Last Active": frozenset({"?", _ARABIC_QUESTION_MARK}),
+}
 
 SCORE = "Score"
 TIER = "Tier"
@@ -56,6 +67,7 @@ RECOMMENDATION = "Recommendation"
 SIGNALS = "Signals (Reasons to call)"
 FLAGS = "Flags (reasons of disqualification)"
 CALL_PRIORITY = "Call Priority"
+EVALUATION_COLUMNS = (SCORE, TIER, RECOMMENDATION, SIGNALS, FLAGS, CALL_PRIORITY)
 
 # Column: what it waits on before it gets a structured home.
 RAW_ONLY_COLUMNS: dict[str, str] = {
@@ -89,7 +101,16 @@ RAW_ONLY_COLUMNS: dict[str, str] = {
     "Notion Page ID": "Q-05",
 }
 
+# Every column the import reads. A sheet missing any of them is refused, never read as blank.
+IMPORT_COLUMNS: tuple[str, ...] = (
+    *(column for column, _, _ in FIELD_COLUMNS),
+    *EVALUATION_COLUMNS,
+    *RAW_ONLY_COLUMNS,
+)
+UNNAMED_COLUMN_PREFIX = "(column "
+
 SCORE_NOT_A_WHOLE_NUMBER = "stored_score_not_a_whole_number"
+SCORE_OUT_OF_RANGE = "stored_score_outside_0_to_100"
 PLATFORM_TEST_ROW = "platform_test_row_awaiting_q13"
 
 
@@ -108,7 +129,9 @@ class StoredEvaluation:
     tier: str | None
     recommendation: str | None
     signals: tuple[str, ...] | None
+    signals_text: str | None
     flags: tuple[str, ...] | None
+    flags_text: str | None
     call_priority: str | None
 
 
@@ -122,7 +145,12 @@ class PreparedRow:
     fields: tuple[FieldValue, ...]
     evaluation: StoredEvaluation | None
     raw_only_filled: tuple[str, ...]
+    unnamed_filled: tuple[str, ...]
     unresolved: tuple[str, ...]
+
+
+def missing_columns(sheet: MasterSheet) -> list[str]:
+    return [column for column in IMPORT_COLUMNS if column not in sheet.columns]
 
 
 def is_blank(value: Any) -> bool:
@@ -136,6 +164,11 @@ def cell_text(value: Any) -> str:
     if isinstance(value, float) and value.is_integer():
         return str(int(value))
     return str(value)
+
+
+def is_no_value(column: str, value: Any) -> bool:
+    markers = NO_VALUE_MARKERS.get(column)
+    return markers is not None and cell_text(value).strip().lower() in markers
 
 
 def _typed(value: Any) -> dict[str, Any] | None:
@@ -156,11 +189,12 @@ def _typed(value: Any) -> dict[str, Any] | None:
     return {"type": "str", "value": str(value)}
 
 
-def raw_payload(sheet: MasterSheet, row: MasterRow) -> bytes:
-    """Every cell of the row in workbook order, blanks included. Same row, same bytes."""
+def raw_payload(row: MasterRow) -> bytes:
+    """Every cell of the row in workbook order, blanks included, and nothing about the file.
+
+    The same cells give the same bytes however often the workbook is re-saved or re-exported.
+    """
     body = {
-        "source_file_sha256": sheet.sha256,
-        "sheet": sheet.sheet_name,
         "sheet_row": row.sheet_row,
         "cells": [[column, _typed(value)] for column, value in row.values.items()],
     }
@@ -170,8 +204,7 @@ def raw_payload(sheet: MasterSheet, row: MasterRow) -> bytes:
 
 def _field(values: dict[str, Any], column: str, name: str, inference: str | None) -> FieldValue:
     value = values.get(column)
-    question_mark = column in QUESTION_MARK_COLUMNS and cell_text(value).strip() == "?"
-    if is_blank(value) or question_mark:
+    if is_blank(value) or is_no_value(column, value):
         return FieldValue(name, column, None, NOT_RECORDED, None)
     return FieldValue(name, column, cell_text(value), UNVERIFIED, inference)
 
@@ -191,20 +224,24 @@ def _stored_evaluation(values: dict[str, Any]) -> tuple[StoredEvaluation | None,
     score = number(values.get(SCORE), SCORE, [])
     if score is None or not score.is_integer():
         return None, SCORE_NOT_A_WHOLE_NUMBER
+    if not 0 <= score <= 100:
+        return None, SCORE_OUT_OF_RANGE
     evaluation = StoredEvaluation(
         score=int(score),
         tier=_optional_text(values.get(TIER)),
         recommendation=_optional_text(values.get(RECOMMENDATION)),
         signals=_items(values.get(SIGNALS)),
+        signals_text=_optional_text(values.get(SIGNALS)),
         flags=_items(values.get(FLAGS)),
+        flags_text=_optional_text(values.get(FLAGS)),
         call_priority=_optional_text(values.get(CALL_PRIORITY)),
     )
     return evaluation, None
 
 
-def prepare_row(sheet: MasterSheet, row: MasterRow, source: str = SOURCE) -> PreparedRow:
+def prepare_row(row: MasterRow, source: str = SOURCE) -> PreparedRow:
     values = row.values
-    payload = raw_payload(sheet, row)
+    payload = raw_payload(row)
     evaluation, problem = _stored_evaluation(values)
     unresolved = [problem] if problem else []
     if cell_text(values.get("Platform")).strip() == "Test":
@@ -212,11 +249,14 @@ def prepare_row(sheet: MasterSheet, row: MasterRow, source: str = SOURCE) -> Pre
     return PreparedRow(
         sheet_row=row.sheet_row,
         source_key=f"{source}:row:{row.sheet_row}",
-        external_id=f"{sheet.sha256}:{row.sheet_row}",
+        external_id=f"row:{row.sheet_row}",
         payload=payload,
         payload_sha256=hashlib.sha256(payload).digest(),
         fields=tuple(_field(values, column, name, inf) for column, name, inf in FIELD_COLUMNS),
         evaluation=evaluation,
         raw_only_filled=tuple(c for c in RAW_ONLY_COLUMNS if not is_blank(values.get(c))),
+        unnamed_filled=tuple(
+            c for c in values if c.startswith(UNNAMED_COLUMN_PREFIX) and not is_blank(values[c])
+        ),
         unresolved=tuple(unresolved),
     )

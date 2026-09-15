@@ -46,6 +46,7 @@ class MasterSheet:
     sheet_names: tuple[str, ...]
     rows: tuple[MasterRow, ...]
     blank_rows_skipped: int
+    columns: tuple[str, ...] = ()
 
 
 def file_sha256(path: Path) -> str:
@@ -100,6 +101,10 @@ def read_master(path: Path, sheet: str | None = None) -> MasterSheet:
                 for index, name in enumerate(columns)
                 if name
             }
+            # A cell under a blank header, or past the last header, is kept, named by position.
+            for index, value in enumerate(values):
+                if (index >= len(columns) or not columns[index]) and not _is_blank(value):
+                    record[f"(column {index + 1})"] = value
             rows.append(MasterRow(sheet_row, record))
 
         return MasterSheet(
@@ -109,6 +114,7 @@ def read_master(path: Path, sheet: str | None = None) -> MasterSheet:
             sheet_names=tuple(workbook.sheetnames),
             rows=tuple(rows),
             blank_rows_skipped=blank,
+            columns=tuple(name for name in columns if name),
         )
     finally:
         workbook.close()
