@@ -53,25 +53,44 @@ For the CRM team and the website team at The Address Investments.
 
 ## 2. What exists today
 
-These endpoints are running now. Nothing else exists yet.
+The `/v1` surface below is **built and frozen** (week 4). From here on it changes only additively (section 1). The machine-readable contract is recorded in `docs/api/openapi-v1.json`, and `/openapi.json` on dev and staging serves the same document.
 
-| Method | Path | Auth | What it does |
-|---|---|---|---|
-| GET | `/health` | None | Liveness. Returns `{"status": "ok"}` while the process is up. It does not check dependencies. |
-| GET | `/ready` | None | Readiness. Checks each dependency and returns `{"status": "ready" \| "not ready", "checks": {"<dependency>": "ok" \| "unavailable"}}` with status 200 or 503. It names the failing dependency but never includes the error text. |
-| GET | `/v1/me` | Bearer token | The signed-in user: `{"subject", "email", "name", "roles"}`. `roles` is a sorted list. |
-| GET | `/dev/accounts` | None | **Dev only.** Lists the fake accounts: `recruiter-a`, `recruiter-b`, `ta-lead`, `criteria-owner`, `admin`. |
-| POST | `/dev/token` | None | **Dev only.** Body `{"account": "recruiter-a"}`. Returns `{"access_token", "token_type": "bearer", "expires_in", "account"}`. |
+| Method | Path | What it does |
+|---|---|---|
+| GET | `/health` | Liveness: `{"status": "ok"}` while the process is up. No dependency checks |
+| GET | `/ready` | Readiness of each dependency, 200 or 503. Names a failing dependency, never the error text |
+| GET | `/v1/me` | The signed-in user: `subject`, `email`, `name`, `roles` (sorted) |
+| GET | `/v1/reference/stages` | Stages in order, and the transitions allowed between them |
+| GET | `/v1/reference/reasons` | Rejection reasons from the list in force |
+| GET, POST | `/v1/requisitions` | List requisitions in scope; open one |
+| GET | `/v1/requisitions/{requisition_id}` | One requisition, with its criteria version |
+| POST | `/v1/requisitions/{requisition_id}/close` | Close with a reason. A closed requisition is final |
+| GET, POST | `/v1/applications` | List applications in scope; attach a candidate to a requisition |
+| GET | `/v1/applications/{application_id}` | One application, with the transitions allowed from its stage |
+| GET, POST | `/v1/applications/{application_id}/transitions` | The move history; move a stage |
+| POST | `/v1/applications/{application_id}/reversal` | Reverse a rejection, with a reason |
+| GET | `/v1/review-items`, `/v1/review-items/{review_item_id}` | The review queue |
+| POST | `/v1/review-items/{review_item_id}/resolution` | Confirm or dismiss a review item |
+| GET | `/v1/candidates`, `/v1/candidates/{candidate_id}` | Candidates in scope; one candidate with where each field came from |
+| POST | `/v1/candidates/search` | Find candidates by name, email or phone, sent in the body |
+| GET | `/v1/candidates/{candidate_id}/evaluations`, `/v1/evaluations/{evaluation_id}` | Evaluations and the reasons behind them |
+| GET | `/v1/events` | The event feed (section 7) |
+| GET, POST | `/dev/accounts`, `/dev/token` | **Dev only.** Fake accounts `recruiter-a`, `recruiter-b`, `ta-lead`, `criteria-owner`, `admin`, and tokens for them. Absent in staging and production |
 
-**How it behaves today:**
+**Still to come:** `GET /v1/reports/funnel` later in week 4. CV upload, manual candidate entry and documents in week 5, the public website endpoints in weeks 5–6 (section 8).
 
-- **Errors** use FastAPI's default body, `{"detail": ...}`. That is a message string, or a list for request-validation errors. Examples:
-  - 401 `{"detail": "Sign in with your company account."}` when the token is missing, with a `WWW-Authenticate: Bearer` header.
-  - 401 `{"detail": "Your sign-in is invalid or has expired. Sign in again."}` when the token is invalid or expired.
-  - 503 `{"detail": "Sign-in is unavailable. Try again shortly."}` when the identity provider cannot be reached.
-  - Before the freeze these move to the error envelope in section 5.
-- **Request IDs.** Every response carries `X-Request-ID`. If you send one, we echo it back (cut to 64 characters). If you do not, we generate one. Quote it when you report a problem.
-- **Dev routes.** The `/dev` routes exist only in dev. They are absent in staging and production.
+**Where the build differs from the first proposal:**
+
+- **Requisitions change only by closing:** `POST /v1/requisitions/{id}/close` with a reason. There is no PATCH; headcount and owner are set when the requisition is opened.
+- **Transitions:** the history returns `{"items": [...]}`, oldest first. A transition carries `sequence`, `list_version` and `actor: {"id", "kind"}`. There is no `override` field yet.
+- **Review resolution** takes `{"decision": "confirm" | "dismiss", "reason": "..."}`. Dismissing needs a written reason rather than a reason code. The only kind so far is `negative_verdict`.
+- **Reversal is new:** reversing a rejection opens a linked application at the first stage, and the rejected one stays rejected.
+- **Candidate lists return summaries** (`id`, `source`, `created_at`, `archived`). Fetch one candidate for its fields. List filters: `requisition_id`, `owner_id`.
+- **Evaluations** carry `origin`, `outcome`, `track`, `score`, `tier`, `recommendation`, `call_priority`, `signals` and `flags`. Per-gate and per-component detail will be added, additively, once new applications are scored when they arrive.
+- **Override reasons:** `GET /v1/reference/reasons?kind=override` returns an empty list. Reversals and dismissals take a written reason.
+- **Validation errors are 400**, not 422, in the error envelope (section 5).
+
+**Request IDs.** Every response carries `X-Request-ID`. Send your own to trace a call across systems (cut to 64 characters); otherwise we generate one. Every error body repeats it. Quote it when you report a problem.
 
 ---
 
@@ -130,22 +149,24 @@ When the token expires (`expires_in` seconds), request a new one.
 
 ---
 
-## 4. Roles and what each can see (proposed)
+## 4. Roles and what each can see
 
 The role names match the dev accounts. The final names in the identity provider will be agreed with IT.
 
 | Role | Sees | Can do |
 |---|---|---|
-| recruiter | Only candidates and applications assigned to them or sourced by them (BR-108, BR-408) | Move stages, enter candidates by hand, resolve review items in scope |
-| ta-lead | Candidates within their organisational scope | Everything a recruiter can, plus create and edit requisitions and view reports |
-| criteria-owner | Evaluations and review items | Read only. No stage moves |
-| admin | Everything | Everything. Every action is attributed (NFR-09) |
+| recruiter | Applications they own, and the candidates, evaluations, review items and events of those applications (BR-108, BR-408) | Open requisitions and applications they own, move stages, resolve review items, reverse rejections |
+| ta-lead | Everything | Everything a recruiter can, on any recruiter's work |
+| criteria-owner | Every evaluation and every review item | Read only. No moves, no resolutions |
+| admin | Everything | Everything. Every action records who did it (NFR-09) |
 
-**Out of scope means not found.** If a candidate is outside your scope, the API returns **404**, not 403. This avoids revealing that the record exists.
+A TA lead's scope will narrow to their organisational scope once HRIS organisation data is available.
+
+**Out of scope means not found.** If a record is outside your scope, the API returns **404**, exactly as for a record that does not exist or an id that is malformed. This avoids revealing that the record exists.
 
 ---
 
-## 5. Conventions (proposed, stable after freeze)
+## 5. Conventions (frozen in week 4)
 
 | Topic | Rule |
 |---|---|
@@ -162,13 +183,13 @@ The role names match the dev accounts. The final names in the identity provider 
 
 ### Error envelope
 
-Current endpoints return `{"detail": ...}`. We will align them to this envelope before the freeze.
+Every error has this body:
 
 ```json
 {
   "error": {
     "code": "transition_not_allowed",
-    "message": "An application cannot move from new to offer.",
+    "message": "application 41: new to offer is not an allowed move",
     "request_id": "7f3c2a9e0b1d4e6f",
     "details": {"from_stage": "new", "to_stage": "offer", "allowed": ["contacted", "rejected"]}
   }
@@ -178,217 +199,211 @@ Current endpoints return `{"detail": ...}`. We will align them to this envelope 
 - `code` is stable and meant for your code.
 - `message` is for people and may change.
 - `details` is optional and depends on `code`.
+- No error ever repeats a value you sent or a stored candidate value. Validation errors name the fields, never their contents.
 
 | Status | When |
 |---|---|
-| 400 | Malformed request or failed validation (`details` lists the fields) |
+| 400 | Malformed request or failed validation (`details.fields` lists each problem) |
 | 401 | Missing, invalid or expired token |
 | 403 | Signed in, but your role cannot do this |
-| 404 | Does not exist, or is outside your scope |
-| 409 | Stage changed since you loaded it, move not allowed, or `Idempotency-Key` reused with a different body |
-| 413 / 415 | Upload too large / file type not accepted |
-| 429 | Rate limited. Respect `Retry-After`. |
-| 503 | A dependency is down, such as the identity provider. Safe to retry with backoff. |
+| 404 | Does not exist, the id is malformed, or it is outside your scope |
+| 409 | The record's state does not allow it (codes below) |
+| 413 / 415 | Upload too large / file type not accepted (week 5) |
+| 429 | Rate limited. Respect `Retry-After` (week 5) |
+| 500 | Our failure. Quote the request ID |
+| 503 | A dependency is down, such as the identity provider. Safe to retry with backoff |
+
+| Code | Status | Meaning |
+|---|---|---|
+| `invalid_request` | 400 | The body, a parameter or a filter is not valid |
+| `invalid_cursor` | 400 | Pass `next_cursor` from the previous page unchanged |
+| `invalid_idempotency_key` | 400 | `Idempotency-Key` must be a UUID |
+| `unauthenticated` | 401 | Sign in again |
+| `forbidden` | 403 | Your role cannot do this |
+| `not_found` | 404 | Not found, malformed, or out of scope |
+| `stage_changed` | 409 | The application moved since you loaded it. `details.current_stage` says where it is |
+| `transition_not_allowed` | 409 | Not an allowed move. `details.allowed` lists the moves from `from_stage` |
+| `stage_is_final` | 409 | Hired and rejected are final |
+| `rejection_reason_required` | 409 | A rejection needs a `reason_code` from the list |
+| `reason_not_allowed` | 409 | Only a rejection carries a reason code |
+| `requisition_closed` | 409 | A closed requisition takes no applications and cannot close again |
+| `candidate_not_eligible` | 409 | This candidate cannot receive applications yet |
+| `review_item_resolved` | 409 | The review item was already confirmed or dismissed |
+| `not_a_rejection` | 409 | Only an application's rejection, as its latest move, can be reversed |
+| `already_exists` | 409 | For example, the candidate already has an application on this requisition |
+| `idempotency_key_reused` | 409 | The key was used for a different request. Generate a new key |
+| `internal_error` | 500 | Our failure |
+| `unavailable` | 503 | A dependency is down |
+
+Retried POSTs with the same `Idempotency-Key` and body return the first response with the header `Idempotent-Replayed: true`.
 
 ---
 
-## 6. CRM surface (proposed)
+## 6. CRM surface
 
-All endpoints need a bearer token. Results are filtered to the caller's scope (section 4). "Week" is the build-plan week in which the endpoint becomes available.
+All endpoints need a bearer token, and results are filtered to the caller's scope (section 4). Lists are cursor pages, newest first (section 5). Typed ids: `req_`, `app_`, `cand_`, `trn_`, `rvw_`, `evl_`, `evt_`.
 
 ### Requisitions (job openings)
 
-| Method | Path | Purpose | Requirements | Week |
-|---|---|---|---|---|
-| GET | `/v1/requisitions` | List. Filter by `status`, `brand`, `track`, `owner_id` | BR-401 | 3 |
-| POST | `/v1/requisitions` | Create: brand, department, track, headcount, owning recruiter. The criteria version in force is set by the platform, not by the caller | BR-401, BR-303 | 3 |
-| GET | `/v1/requisitions/{requisition_id}` | One requisition, including its criteria version | BR-401 | 3 |
-| PATCH | `/v1/requisitions/{requisition_id}` | Change status, headcount or owner. Attributed | BR-401, NFR-09 | 3 |
+- `POST /v1/requisitions` with `brand`, `department`, `track` (`A` or `B`), `headcount`, `team`, and optionally `owner_id` (a TA lead may open one for a recruiter). The criteria version in force is set by the platform (BR-303) and returned as `criteria_version`.
+- `GET /v1/requisitions` filters: `status` (`open`, `closed`), `brand`, `track`, `owner_id`.
+- `POST /v1/requisitions/{id}/close` with `{"reason": "..."}`. It records who closed it and when. A closed requisition is final.
 
 ### Candidates
 
-| Method | Path | Purpose | Requirements | Week |
-|---|---|---|---|---|
-| GET | `/v1/candidates` | List in scope. Filter by `requisition_id`, `verification`, `owner_id`, `updated_after` | BR-108, BR-408 | 3 |
-| POST | `/v1/candidates/search` | Search by name, email or phone in the body, never in the URL | BR-408 | 4 |
-| POST | `/v1/candidates` | Recruiter enters a candidate by hand. The source is recorded as manual and the candidate starts unverified | BR-103, BR-202 | 5 |
-| GET | `/v1/candidates/{candidate_id}` | One candidate. Every field carries its source, verification state and verification time. Includes the sourcing recruiter and team | BR-201, BR-202, BR-108 | 3 |
-| GET | `/v1/candidates/{candidate_id}/documents` | Original files, with any hidden-content findings so the recruiter can see what was found | BR-107, BR-308 | 5 |
-| GET | `/v1/documents/{document_id}/file` | Download the original file, unchanged. Access is logged | BR-107 | 5 |
+- `GET /v1/candidates` returns summaries. Filters: `requisition_id`, `owner_id`.
+- `GET /v1/candidates/{candidate_id}` returns every field with its source and verification (BR-201, BR-202). A field nobody recorded is `{"value": null, "state": "not_recorded"}`; the API never fills in a guess (BR-703).
+- `POST /v1/candidates/search` with any of `full_name`, `email`, `phone` (and `limit`, up to 50). Values go in the body, never the URL. Every value you send must match. Matching is exact once case, spacing and phone formats are tidied (`+20 100…`, `0020 100…`, `0100…` and Arabic-Indic digits are the same number). It is not a fuzzy or duplicate search. The answer is summaries only.
+- `POST /v1/candidates` (manual entry) and documents arrive in week 5.
 
-Example `GET /v1/candidates/cand_01J9Q4TESTC4ND` (trimmed; values are fabricated):
+Example `GET /v1/candidates/cand_1042` (fabricated values):
 
 ```json
 {
-  "id": "cand_01J9Q4TESTC4ND",
-  "verification": "unverified",
-  "source": {"channel": "careers_page", "tracking_code": "tt-sales-0921", "sourcing_recruiter_id": "usr_01J8TESTRECA", "team": "team_sales_east"},
-  "fields": {
-    "full_name": {"value": "Test Candidate", "source": "cv_extraction", "verification": "confirmed_by_candidate", "verified_at": "2026-10-19T08:41:07Z"},
-    "email": {"value": "test.candidate@example.com", "source": "candidate_entered", "verification": "unverified", "verified_at": null},
-    "current_employer": {"value": null, "state": "not_recorded"}
-  },
+  "id": "cand_1042",
+  "source": "careers_page",
   "created_at": "2026-10-19T08:41:09Z",
-  "updated_at": "2026-10-19T08:41:12Z"
+  "archived_at": null,
+  "archived_reason": null,
+  "fields": {
+    "full_name": {"value": "Test Candidate", "source": "cv_extraction", "verification": "verified", "verified_at": "2026-10-19T08:41:07+00:00"},
+    "age": {"value": "24", "source": "cv_extraction", "verification": "unverified", "verified_at": null, "inference": "inferred"},
+    "current_employer": {"value": null, "state": "not_recorded"}
+  }
 }
 ```
 
 ### Evaluations (scores and reasons)
 
-| Method | Path | Purpose | Requirements | Week |
-|---|---|---|---|---|
-| GET | `/v1/candidates/{candidate_id}/evaluations` | All evaluations for a candidate, newest first | BR-303, BR-307 | 4 |
-| GET | `/v1/evaluations/{evaluation_id}` | One evaluation (see the fields below) | BR-303, BR-307, CR-04 | 4 |
-
-An evaluation contains:
-
-- the criteria version, plus model and prompt versions (null until AI scoring exists);
-- the track;
-- the outcome: `passed`, `failed_gate` or `needs_review`;
-- the score out of 100 and the tier;
-- each gate with its result;
-- each component score with its reason;
-- flags with their reasons.
-
-It contains everything needed to explain a decision without re-running anything (BR-307, CR-04). A failed gate is never a rejection; a person confirms (BR-405, CR-05).
-
-Example (trimmed; gate and component names are illustrative):
+`GET /v1/candidates/{candidate_id}/evaluations` (newest first) and `GET /v1/evaluations/{evaluation_id}` return:
 
 ```json
 {
-  "id": "evl_01J9Q4TESTEVL",
-  "candidate_id": "cand_01J9Q4TESTC4ND",
+  "id": "evl_88",
+  "candidate_id": "cand_1042",
   "criteria_version": "2026-08-04",
+  "origin": "computed",
   "model_version": null,
   "prompt_version": null,
   "track": "entry",
   "outcome": "passed",
-  "score": 72,
+  "score": 72.0,
   "tier": "P2",
-  "gates": [{"code": "location", "result": "pass", "reason": "Lives in Cairo"}],
-  "components": [{"code": "sales_experience", "points": 24, "max_points": 30, "reason": "2 years in field sales"}],
-  "flags": [{"code": "hidden_content_removed", "reason": "White-on-white text found and removed"}],
-  "evaluated_at": "2026-10-19T08:41:11Z"
+  "recommendation": "Good Match - Call",
+  "call_priority": null,
+  "signals": ["Near New Cairo"],
+  "flags": [],
+  "evaluated_at": "2026-10-19T08:41:11Z",
+  "recorded_at": "2026-10-19T08:41:11Z"
 }
 ```
 
+- `origin` is `stored` for a score carried over from the old system, `computed` for one the platform produced.
+- `outcome` is `passed` or `failed_gate`. **A failed gate is never a rejection:** a person confirms it through the review queue (BR-405, CR-05).
+
 ### Applications and stage moves
 
-A stage can only change by **POSTing a transition**. There is no field you can set, and no other way (BR-402, BR-403).
+A stage changes only by **POSTing a transition**. There is no field you can set, and no other way (BR-402, BR-403). The stage list is served by `GET /v1/reference/stages` and may change when TA confirms it; do not hard-code it.
 
-Stages, subject to TA confirming the list: `new`, `contacted`, `replied`, `phone_screen`, `hr_interview`, `aptitude_test`, `technical_interview`, `offer`, `hired`, `rejected`.
+- `POST /v1/applications` with `requisition_id`, `candidate_id`, and optionally `owner_id`. It starts at the first stage, and that start is itself a transition.
+- `GET /v1/applications` filters: `requisition_id`, `stage`, `owner_id`. Each application carries `current_stage`, `outcome` (`hired`, `rejected` or null), `stage_since`, `transitions` and `allowed_transitions`.
 
-| Method | Path | Purpose | Requirements | Week |
-|---|---|---|---|---|
-| GET | `/v1/applications` | List in scope. Filter by `requisition_id`, `stage`, `owner_id`, `updated_after` | BR-408 | 3 |
-| POST | `/v1/applications` | Attach a candidate to a requisition (recruiter-sourced). Starts at `new` | BR-108, BR-402 | 3 |
-| GET | `/v1/applications/{application_id}` | One application: current stage, owner, and the moves allowed from here | BR-402 | 3 |
-| GET | `/v1/applications/{application_id}/transitions` | Full move history: who, when, from, to, reason | BR-403 | 3 |
-| POST | `/v1/applications/{application_id}/transitions` | Move a stage (rules below) | BR-402–BR-406, CR-05 | 3 |
-| GET | `/v1/reference/stages` | Stage codes and allowed moves | BR-402 | 3 |
-| GET | `/v1/reference/reasons` | Rejection reasons and override reasons (`?kind=rejection` or `?kind=override`) | BR-404, BR-406 | 3 |
+**Transition rules** (checked by the database):
 
-**Transition rules** (checked on the server):
-
-- `from_stage` must equal the current stage, or you get 409 `stage_changed`.
-- The move must be allowed, or you get 409 `transition_not_allowed` with the allowed moves in `details`.
-- Moving to `rejected` needs a `reason_code` from the rejection list. The stage at which it happened is recorded from `from_stage` (BR-404).
-- A move that goes against the system's verdict needs an `override` with a reason code and is kept for criteria review (BR-406). An example is advancing a candidate who failed a gate.
+- `from_stage` must equal the current stage, or you get 409 `stage_changed` with `details.current_stage`.
+- The move must be allowed, or you get 409 `transition_not_allowed` with `details.allowed`.
+- Moving to `rejected` needs a `reason_code` from `GET /v1/reference/reasons` (BR-404). The stage it happened at is the `from_stage`.
+- Only a person rejects. An automated verdict becomes a review item instead (BR-405).
 - The actor comes from the token. You cannot set it.
 
-Example request and response:
-
 ```json
-POST /v1/applications/app_01J9Q4TESTAPP/transitions
+POST /v1/applications/app_77/transitions
 Idempotency-Key: <a new UUID for each distinct request>
 
-{"from_stage": "phone_screen", "to_stage": "rejected", "reason_code": "not_available_for_field_work", "note": null}
+{"from_stage": "phone_screen", "to_stage": "rejected", "reason_code": "salary_expectation_above_range"}
 ```
 
 ```json
 201 Created
 {
-  "id": "trn_01J9Q5TESTTRN",
-  "application_id": "app_01J9Q4TESTAPP",
+  "id": "trn_503",
+  "application_id": "app_77",
+  "sequence": 4,
+  "list_version": "provisional-brd-2026-09",
   "from_stage": "phone_screen",
   "to_stage": "rejected",
-  "reason_code": "not_available_for_field_work",
-  "override": null,
-  "actor": {"id": "usr_01J8TESTRECA", "name": "Recruiter A"},
+  "reason_code": "salary_expectation_above_range",
+  "actor": {"id": "usr-recruiter-a", "kind": "person"},
   "occurred_at": "2026-10-21T11:02:33Z"
 }
 ```
 
+**Reversing a rejection** (BR-406): `POST /v1/applications/{id}/reversal` with `{"reason": "..."}`. The rejected application stays rejected, with its history. A new application for the same candidate and requisition starts at the first stage, and its `reopens_application_id` points to the rejected one. Reversals are kept as labelled signals for criteria reviews.
+
 ### Review queue
 
-| Method | Path | Purpose | Requirements | Week |
-|---|---|---|---|---|
-| GET | `/v1/review-items` | Items waiting for a person, each with its reason and evidence. Filter by `kind`, `requisition_id` | BR-407, BR-405 | 4 (contract), 7 (all kinds) |
-| POST | `/v1/review-items/{review_item_id}/resolution` | Resolve with a decision and a reason code. Attributed | BR-405, BR-406, CR-05 | 4 |
+- `GET /v1/review-items` lists open items by default (`status=resolved` for the others). Filters: `kind`, `requisition_id`.
+- An item carries `kind`, `application_id`, `candidate_id`, `requisition_id`, `at_stage`, `reason_code`, `proposed_by`, `proposed_at`, and `resolution` (null while open).
+- `POST /v1/review-items/{id}/resolution`:
+  - `{"decision": "confirm"}` records the rejection as your own transition, with the proposed reason code;
+  - `{"decision": "dismiss", "reason": "..."}` leaves the application where it is and keeps your reason as a labelled signal (BR-406).
+  - An item is resolved once. The criteria owner can read the queue but not resolve it.
 
-The endpoint shape freezes in week 4. Item kinds fill in as the platform grows:
+Item kinds fill in as the platform grows: `negative_verdict` now; `flagged_document` and `unverified_candidate` in week 5; `possible_duplicate` in week 6; `borderline` in week 7. **Handle kinds you do not recognise without failing.**
 
-- `negative_verdict` — failed gates waiting for human confirmation: week 4.
-- `flagged_document` — hidden content, or CV reading failed: week 5.
-- `unverified_candidate`: week 5.
-- `possible_duplicate` — unclear identity: week 6.
-- `borderline`: week 7.
-
-Handle kinds you do not recognise without failing.
-
-### Reports and event catch-up
+### Reports
 
 | Method | Path | Purpose | Requirements | Week |
 |---|---|---|---|---|
-| GET | `/v1/reports/funnel` | Volume and conversion per stage, computed from saved moves. Parameters: `from`, `to`, `group_by` (`requisition`, `brand`, `recruiter`, `team`, `source`). Includes contactability next to volume | BR-601, BR-109 | 4 |
-| GET | `/v1/events` | The same events we push by webhook, as a cursor feed. Use it to catch up after downtime. Kept 30 days | BR-410 | 4 |
+| GET | `/v1/reports/funnel` | Volume and conversion per stage, computed from saved transitions. Parameters: `from`, `to`, `group_by` (`requisition`, `brand`, `recruiter`, `team`, `source`). Includes contactability next to volume | BR-601, BR-109 | 4 (later) |
 
 ---
 
-## 7. Events to the CRM (proposed, week 4)
+## 7. Events to the CRM
 
-| Event type | Sent when |
-|---|---|
-| `candidate.scored` | An evaluation is saved |
-| `application.stage_changed` | A transition is recorded |
-| `review.item_created` | An item enters the review queue |
+| Event type | Sent when | `data` |
+|---|---|---|
+| `application.stage_changed` | A transition is recorded, including the first stage of a new application (`from_stage` null) | `application_id`, `candidate_id`, `requisition_id`, `transition_id`, `from_stage`, `to_stage` |
+| `review.item_created` | An item enters the review queue | `review_item_id`, `kind`, `candidate_id`, `application_id` |
+| `candidate.scored` | The platform scores a candidate. Scores carried over from the old system are not events | `candidate_id`, `evaluation_id`, `criteria_version`, `outcome`, `tier` |
+
+The database writes an event in the same transaction as the change it describes, so no change can happen without its event.
 
 **Delivery**
 
-- **Webhook.** We POST JSON to an HTTPS endpoint you give us, one event per request. Reply with any 2xx within 10 seconds, and process the event after you reply.
+- **Webhook.** We POST JSON to your HTTPS endpoint, one event per request. Reply with any 2xx within 10 seconds, and process the event after you reply.
 - **At-least-once.** You may receive the same event more than once. De-duplicate on the event `id`.
 - **Order is not guaranteed.** Use `occurred_at`, and fetch current state from the API when order matters.
-- **Signed.** Each request carries these headers:
+- **Signed.** Each request carries:
   - `X-Talent-Event-Id`
-  - `X-Talent-Timestamp`
-  - `X-Talent-Signature: sha256=<hex>`, which is HMAC-SHA256 over `<timestamp>.<raw body>` with a shared secret.
+  - `X-Talent-Timestamp` (seconds since 1970)
+  - `X-Talent-Signature: sha256=<hex>`, which is HMAC-SHA256 over `<timestamp>.<raw body>` with the shared secret.
   - Reject the request if the signature does not match or the timestamp is more than 5 minutes old.
-- **Retries.** If you do not answer 2xx, we retry with growing gaps (about 1 min, 5 min, 30 min, 2 h, 6 h) for up to 24 hours. After that the event is parked and still available from `GET /v1/events`. Nothing is lost while the CRM is down.
-- **No personal data.** Payloads carry IDs and states only: no names, contact details or CV content. When you need details, fetch them through the API with the recruiter's token, which applies scoping and logging. This is data minimisation (CR-01).
+- **Retries.** Without a 2xx we try again after about 1 minute, 5 minutes, 30 minutes, 2 hours, then every 6 hours, for up to 24 hours after the event. After that the event is parked, and it is still in `GET /v1/events`. Nothing is lost while the CRM is down.
+- **No personal data.** Payloads carry ids, stages and codes only. Fetch details through the API with the recruiter's token, which applies scoping (CR-01).
 
 Example:
 
 ```json
 {
-  "id": "evt_01J9Q5TESTEVT",
+  "id": "evt_9120",
   "type": "application.stage_changed",
   "api_version": "v1",
   "occurred_at": "2026-10-21T11:02:33Z",
   "data": {
-    "application_id": "app_01J9Q4TESTAPP",
-    "candidate_id": "cand_01J9Q4TESTC4ND",
-    "requisition_id": "req_01J9Q3TESTREQ",
-    "transition_id": "trn_01J9Q5TESTTRN",
+    "application_id": "app_77",
+    "candidate_id": "cand_1042",
+    "requisition_id": "req_12",
+    "transition_id": "trn_503",
     "from_stage": "phone_screen",
     "to_stage": "rejected"
   }
 }
 ```
 
-The other two event types follow the same shape:
+**Catching up: `GET /v1/events`.** Oldest first, kept 30 days. Resume after the last event you processed with `after=evt_…`, or page with `cursor`. Filter with `type` (repeatable). Events are scoped like applications: a recruiter's token sees the events of their applications, and a TA lead's or admin's token sees all of them, including `candidate.scored`.
 
-- `candidate.scored` carries `candidate_id`, `evaluation_id`, `criteria_version`, `outcome` and `tier`.
-- `review.item_created` carries `review_item_id`, `kind`, `candidate_id` and `application_id`.
+**To switch delivery on** we need your staging and production endpoint URLs (HTTPS), and a shared secret of at least 32 random characters exchanged through a company secret store (D-CRM-4).
 
 ---
 

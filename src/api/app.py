@@ -84,6 +84,7 @@ def create_app(
         return response
 
     errors.install(app)
+    errors.document(app)
 
     app.include_router(router)
     app.include_router(pipeline_router)

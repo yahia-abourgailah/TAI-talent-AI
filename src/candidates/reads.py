@@ -7,8 +7,9 @@ field nobody recorded is not recorded, never a guess (BR-703). Out of scope read
 Evaluations are read with the same scope, except that the criteria owner reads all of them.
 """
 
+from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
+from typing import Any, Self
 
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
@@ -146,3 +147,83 @@ def track(evaluation: dict[str, Any]) -> str:
 def score(evaluation: dict[str, Any]) -> float | None:
     value = evaluation.get("score")
     return float(value) if isinstance(value, Decimal | int | float) else None
+
+
+# --- Search (API plan section 6): values in the body, exact matches, in scope --------------------
+
+# Arabic-Indic and extended Arabic-Indic digits, read as 0-9.
+_OTHER_DIGITS = "".join(chr(0x0660 + i) for i in range(10)) + "".join(
+    chr(0x06F0 + i) for i in range(10)
+)
+_ASCII_DIGITS = "0123456789" * 2
+_DIGITS = str.maketrans(_OTHER_DIGITS, _ASCII_DIGITS)
+PHONE_DIGITS = 10
+
+
+@dataclass(frozen=True, slots=True)
+class SearchCriteria:
+    """What a search matches on, tidied: names and emails lower-cased with single spaces, phones as
+    their last 10 digits, so +20 100..., 0020 100... and 0100... are one number."""
+
+    full_name: str | None
+    email: str | None
+    phone: str | None
+
+    @classmethod
+    def build(cls, *, full_name: str | None, email: str | None, phone: str | None) -> Self:
+        name = " ".join(full_name.split()).lower() if full_name and full_name.strip() else None
+        mail = email.strip().lower() if email and email.strip() else None
+        digits = None
+        if phone and phone.strip():
+            only = "".join(ch for ch in phone.translate(_DIGITS) if ch in "0123456789")
+            if len(only) < PHONE_DIGITS:
+                raise ValueError(f"phone needs at least {PHONE_DIGITS} digits.")
+            digits = only[-PHONE_DIGITS:]
+        if mail is not None and "@" not in mail:
+            raise ValueError("email must contain @.")
+        if name is None and mail is None and digits is None:
+            raise ValueError("Send at least one of full_name, email or phone.")
+        return cls(name, mail, digits)
+
+
+def search_candidates(
+    conn: Connection, actor: Actor, criteria: SearchCriteria, *, limit: int
+) -> list[dict[str, Any]]:
+    """Candidates in scope whose current fields match every value given. Newest first."""
+    return run(
+        conn,
+        text(
+            rf"""
+            SELECT c.id, c.created_at, c.archived_at, r.source
+            FROM core.candidate c JOIN raw.capture r ON r.id = c.capture_id
+            WHERE {_VISIBLE}
+              AND (CAST(:name AS text) IS NULL OR EXISTS (
+                SELECT 1 FROM core.candidate_field_current f
+                WHERE f.candidate_id = c.id AND f.field = 'full_name'
+                  AND lower(regexp_replace(btrim(f.value), '\s+', ' ', 'g')) = :name
+              ))
+              AND (CAST(:email AS text) IS NULL OR EXISTS (
+                SELECT 1 FROM core.candidate_field_current f
+                WHERE f.candidate_id = c.id AND f.field = 'email'
+                  AND lower(btrim(f.value)) = :email
+              ))
+              AND (CAST(:phone AS text) IS NULL OR EXISTS (
+                SELECT 1 FROM core.candidate_field_current f
+                WHERE f.candidate_id = c.id AND f.field = 'phone'
+                  AND right(regexp_replace(translate(f.value, :other_digits, :ascii_digits),
+                                           '[^0-9]', '', 'g'), :phone_digits) = :phone
+              ))
+            ORDER BY c.id DESC LIMIT :limit
+            """
+        ),
+        {
+            "name": criteria.full_name,
+            "email": criteria.email,
+            "phone": criteria.phone,
+            "other_digits": _OTHER_DIGITS,
+            "ascii_digits": _ASCII_DIGITS,
+            "phone_digits": PHONE_DIGITS,
+            "limit": limit,
+            **actor.scope(),
+        },
+    )

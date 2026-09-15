@@ -16,6 +16,7 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
@@ -123,3 +124,48 @@ def install(app: FastAPI) -> None:
             "internal_error",
             "Something went wrong on our side. Quote the request ID when you report it.",
         )
+
+
+ERROR_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "required": ["error"],
+    "properties": {
+        "error": {
+            "type": "object",
+            "required": ["code", "message", "request_id"],
+            "properties": {
+                "code": {"type": "string", "description": "Stable, for your code"},
+                "message": {"type": "string", "description": "For people; may change"},
+                "request_id": {"type": "string"},
+                "details": {"type": "object", "description": "Depends on code"},
+            },
+        }
+    },
+}
+
+
+def document(app: FastAPI) -> None:
+    """The OpenAPI document shows the error body every route really returns, instead of
+    FastAPI's default 422 validation schema."""
+
+    def openapi() -> dict[str, Any]:
+        if app.openapi_schema:
+            return app.openapi_schema
+        schema = get_openapi(title=app.title, version=app.version, routes=app.routes)
+        schemas = schema.setdefault("components", {}).setdefault("schemas", {})
+        schemas.pop("HTTPValidationError", None)
+        schemas.pop("ValidationError", None)
+        schemas["Error"] = ERROR_SCHEMA
+        error = {
+            "description": "Error: see the code (API plan section 5)",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}},
+        }
+        for item in schema.get("paths", {}).values():
+            for operation in item.values():
+                if isinstance(operation, dict) and "responses" in operation:
+                    operation["responses"].pop("422", None)
+                    operation["responses"].setdefault("default", error)
+        app.openapi_schema = schema
+        return schema
+
+    app.openapi = openapi  # type: ignore[method-assign]

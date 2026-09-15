@@ -87,6 +87,20 @@ set -a; . ./.env; set +a
 
 Decisions waiting on it are in [docs/migration/WEEK3_DECISIONS.md](docs/migration/WEEK3_DECISIONS.md).
 
+### API and events
+
+`docker compose up -d api` serves the API on http://127.0.0.1:8090, with interactive docs at `/docs`. The contract, conventions and examples for the CRM and website teams are in [docs/api/API_PLAN.md](docs/api/API_PLAN.md).
+
+```bash
+# The frozen /v1 contract (docs/api/openapi-v1.json). --check fails on a breaking change;
+# --write records an additive one, and the file change goes through review.
+.venv/bin/python -m api.contract --check
+
+# Events to the CRM: set TALENT_CRM_WEBHOOK_URL and TALENT_CRM_WEBHOOK_SECRET in .env, then
+docker compose --profile crm up -d event-delivery
+docker compose run --rm api python -m integrations.webhooks status   # delivered, pending, parked
+```
+
 ### Database areas
 
 | Schema | Holds | The API may |
@@ -95,6 +109,8 @@ Decisions waiting on it are in [docs/migration/WEEK3_DECISIONS.md](docs/migratio
 | `core` | Candidates, field provenance, evaluations, criteria versions | Insert, read, update. No delete (BR-205) |
 | `pipeline` | Requisitions, applications, stage events | Insert, read, update. No delete |
 | `audit` | Attributed actions and job runs | Insert and read |
+| `api` | Kept responses for `Idempotency-Key` retries | Insert and read. Append-only |
+| `integration` | Events for the CRM, and every delivery attempt | Read events (the database writes them); insert and read attempts |
 
 ## Layout
 
@@ -105,6 +121,7 @@ Decisions waiting on it are in [docs/migration/WEEK3_DECISIONS.md](docs/migratio
 | `src/config/` | Settings from `TALENT_*` variables, JSON logging |
 | `src/db/` | Database engine for the app role |
 | `src/infra/` | Readiness checks, dev storage bootstrap |
+| `src/integrations/` | Events for the CRM: the feed and webhook delivery |
 | `src/replay/` | Golden replay: re-runs a criteria version over the master workbook |
 | `src/scoring/` | Candidate scoring. `rulesets/` holds one immutable module per criteria version |
 | `migrations/` | Database migrations, run as the schema owner |

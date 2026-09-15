@@ -12,10 +12,11 @@ from collections.abc import Mapping
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.engine import Connection
 
 from api.deps import current_principal, db_connection
+from api.errors import ApiError
 from api.fields import Timestamp
 from api.ids import decode, decode_filter, encode
 from api.pages import DEFAULT_LIMIT, MAX_LIMIT, decode_cursor, next_cursor
@@ -167,3 +168,35 @@ def get_evaluation(evaluation_id: str, principal: Signed, conn: Db) -> Evaluatio
     """One evaluation, with everything needed to explain it (BR-307, CR-04)."""
     actor = reader_from_principal(principal)
     return _evaluation(reads.get_evaluation(conn, actor, decode("evaluation", evaluation_id)))
+
+
+class CandidateSearchIn(BaseModel):
+    full_name: Annotated[str, Field(min_length=2, max_length=200)] | None = None
+    email: Annotated[str, Field(min_length=3, max_length=254)] | None = None
+    phone: Annotated[str, Field(min_length=10, max_length=40)] | None = None
+    limit: int = Field(default=20, ge=1, le=50)
+
+
+@router.post("/candidates/search", tags=["candidates"])
+def search_candidates(body: CandidateSearchIn, principal: Signed, conn: Db) -> CandidatePage:
+    """Finds candidates in your scope by full name, email or phone, sent in the body and never in
+    the URL. Every value sent must match. Matching is exact once case, spacing and phone formats are
+    tidied; it is not a fuzzy or duplicate search. Returns summaries, newest first."""
+    actor = actor_from_principal(principal)
+    try:
+        criteria = reads.SearchCriteria.build(
+            full_name=body.full_name, email=body.email, phone=body.phone
+        )
+    except ValueError as exc:
+        raise ApiError(400, "invalid_request", str(exc)) from None
+    rows = reads.search_candidates(conn, actor, criteria, limit=body.limit)
+    items = [
+        CandidateSummaryOut(
+            id=encode("candidate", row["id"]),
+            source=row["source"],
+            created_at=row["created_at"],
+            archived=row["archived_at"] is not None,
+        )
+        for row in rows
+    ]
+    return CandidatePage(items=items, next_cursor=None)
