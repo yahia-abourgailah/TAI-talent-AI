@@ -1,11 +1,15 @@
-"""Own-staff check: the migrated candidates against the HRIS roster (BR-301, DEP-04).
+"""Own-staff check: the migrated candidates against the employee roster (BR-301, DEP-04).
 
-    python -m staff.check --out DIR [--roster "$TALENT_EMPLOYEES_PATH"]
+    python -m staff.check --out DIR (--crm | --roster FILE)
         [--master "$TALENT_MASTER_PATH"] [--report-copy docs/migration/OWN_STAFF_REPORT.md]
 
+The roster comes from the company CRM (--crm, TALENT_CRM_BASE_URL and TALENT_CRM_SERVICE_KEY) or
+from a file HRIS sends (--roster, TALENT_EMPLOYEES_PATH). With neither flag, the CRM is used when
+it is configured, then the file.
+
 Criteria version 2026-08-04 excludes a candidate whose current employer or title names The Address.
-This checks those exclusions against the people HRIS lists as active employees, and looks for active
-employees the text missed:
+This checks those exclusions against the active employees, and looks for active employees the text
+missed:
 
   confirmed  the candidate's phone or email equals an active employee's
   possible   only the full name matches, so a person decides (BR-206); nothing is inferred
@@ -30,6 +34,7 @@ from importer.paths import DataLocationError, check_outside_repository, master_p
 from replay.mapping import text
 from replay.workbook import MasterSheet, WorkbookError, read_master
 from scoring.rulesets import v2026_08_04 as ruleset
+from staff.crm import CrmError, fetch_roster
 from staff.identity import email_key, name_key, phone_key
 from staff.roster import Roster, RosterError, read_roster
 
@@ -114,15 +119,21 @@ def check(sheet: MasterSheet, roster: Roster) -> list[RowCheck]:
     return checks
 
 
-def summarise(checks: list[RowCheck], roster: Roster) -> dict[str, Any]:
+def summarise(checks: list[RowCheck], roster: Roster, source: str = "file") -> dict[str, Any]:
     excluded = [c for c in checks if c.excluded_by_text]
     kept = [c for c in checks if not c.excluded_by_text]
     return {
         "rows": len(checks),
         "roster": {
+            "source": source,
             "employees": len(roster.employees),
             "active": len(roster.active),
             "rows_without_id": roster.rows_without_id,
+            # A masked or missing phone or email cannot confirm anyone: say how many can.
+            **{
+                f"with_{key}": sum(getattr(e, key) is not None for e in roster.active)
+                for key in ("phone", "email", "name")
+            },
         },
         "excluded_by_text": {
             "rows": len(excluded),
@@ -146,13 +157,15 @@ def render_report(summary: dict[str, Any], workbook_sha256: str) -> str:
     excluded, kept, roster = summary["excluded_by_text"], summary["not_excluded"], summary["roster"]
     missed = summary["employees_not_excluded"]
     lines = [
-        "# Own-staff check against the HRIS roster (BR-301)",
+        "# Own-staff check against the employee roster (BR-301)",
         "",
         f"Workbook SHA-256 `{workbook_sha256}`. Counts and sheet rows only; "
         "no candidate or employee values. Nothing was excluded or changed by this check.",
         "",
-        f"Roster: {roster['employees']:,} employees, {roster['active']:,} active, "
-        f"{roster['rows_without_id']:,} rows without an employee id (not used).",
+        f"Roster from the {roster['source']}: {roster['employees']:,} employees, "
+        f"{roster['active']:,} active, {roster['rows_without_id']:,} without an employee id "
+        f"(not used). Active employees with a usable mobile: {roster['with_phone']:,}, "
+        f"email: {roster['with_email']:,}, full name: {roster['with_name']:,}.",
         "",
         "## Candidates the criteria excluded as own staff",
         "",
@@ -194,7 +207,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m staff.check", description=__doc__.splitlines()[0]
     )
-    parser.add_argument("--roster", default=os.environ.get("TALENT_EMPLOYEES_PATH"))
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument("--crm", action="store_true", help="read active employees from the CRM")
+    source.add_argument("--roster", help="a roster file (default: $TALENT_EMPLOYEES_PATH)")
     parser.add_argument("--master", help="the workbook (default: $TALENT_MASTER_PATH)")
     parser.add_argument("--out", type=Path, required=True, help="outside any git repository")
     parser.add_argument(
@@ -202,26 +217,31 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    if not args.roster:
+    crm_url = os.environ.get("TALENT_CRM_BASE_URL", "")
+    crm_key = os.environ.get("TALENT_CRM_SERVICE_KEY", "")
+    roster_file = args.roster or os.environ.get("TALENT_EMPLOYEES_PATH")
+    use_crm = args.crm or (not args.roster and bool(crm_url and crm_key))
+    if not use_crm and not roster_file:
         print(
-            "error: no roster yet. HRIS sends the employee roster (DEP-04); set "
-            "TALENT_EMPLOYEES_PATH or pass --roster.",
+            "error: no roster. Set TALENT_CRM_BASE_URL and TALENT_CRM_SERVICE_KEY for the CRM, "
+            "or pass --roster with the file HRIS sends the employee roster in (DEP-04).",
             file=sys.stderr,
         )
         return 2
-    roster_path = Path(args.roster).expanduser()
     out_dir = args.out.expanduser()
     try:
-        check_outside_repository(roster_path, None, roster_path.name)
         check_outside_repository(out_dir, None, "--out")
+        if not use_crm:
+            roster_path = Path(str(roster_file)).expanduser()
+            check_outside_repository(roster_path, None, roster_path.name)
         sheet = read_master(master_path(args.master))
-        roster = read_roster(roster_path)
-    except (DataLocationError, WorkbookError, RosterError) as exc:
+        roster = fetch_roster(crm_url, crm_key) if use_crm else read_roster(roster_path)
+    except (DataLocationError, WorkbookError, RosterError, CrmError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
     checks = check(sheet, roster)
-    summary = summarise(checks, roster)
+    summary = summarise(checks, roster, "CRM" if use_crm else "roster file")
     report = render_report(summary, sheet.sha256)
 
     out_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -255,6 +275,11 @@ def main(argv: list[str] | None = None) -> int:
         f"Active employees not excluded: {len(summary['employees_not_excluded'])}. "
         f"Name-only matches to check: {len(summary['possible_to_check'])}."
     )
+    if roster.active and not (summary["roster"]["with_phone"] or summary["roster"]["with_email"]):
+        print(
+            "warning: no active employee has a mobile or email, so no candidate can be confirmed; "
+            "only full-name matches are possible."
+        )
     print(f"  report  {out_dir / (stem + '.md')}")
     print(f"  rows    {out_dir / (stem + '-rows.csv')}  (employee ids, never commit)")
     return 1 if summary["employees_not_excluded"] else 0
