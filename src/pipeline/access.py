@@ -1,6 +1,8 @@
 """Who is acting, and how a refusal from the database is reported.
 
-A recruiter reaches only applications and openings they own; a TA lead reaches all (BR-408). Team
+A recruiter reaches only applications and openings they own; a TA lead or an admin reaches all
+(BR-408). The criteria owner reads evaluations and review items, all of them, and acts on
+nothing. Team
 scoping waits on HRIS org chart data, so for now ownership is the scope. Something out of scope is
 reported as not found, exactly like something that does not exist.
 
@@ -20,6 +22,8 @@ from auth import Principal
 
 RECRUITER = "recruiter"
 TA_LEAD = "ta_lead"
+ADMIN = "admin"
+CRITERIA_OWNER = "criteria_owner"
 
 
 NO_SUCH_RECORD = "No such requisition, candidate or application."
@@ -67,11 +71,22 @@ class Actor:
 
 
 def actor_from_principal(principal: Principal) -> Actor:
-    if TA_LEAD in principal.roles:
+    """Who works in the pipeline: reads, moves and decides. Every action records the subject."""
+    if principal.roles & {TA_LEAD, ADMIN}:
         return Actor(principal.subject, sees_all=True)
     if RECRUITER in principal.roles:
         return Actor(principal.subject, sees_all=False)
     raise NotPermitted("Your role does not work in the pipeline.")
+
+
+def reader_from_principal(principal: Principal) -> Actor:
+    """Who reads evaluations and review items. The criteria owner reads all of them; routes that
+    act still ask actor_from_principal, which refuses the criteria owner."""
+    if principal.roles & {TA_LEAD, ADMIN, RECRUITER}:
+        return actor_from_principal(principal)
+    if CRITERIA_OWNER in principal.roles:
+        return Actor(principal.subject, sees_all=True)
+    raise NotPermitted("Your role does not read evaluations or review items.")
 
 
 # Our own trigger and check messages: ids, step codes and reason codes only.
@@ -93,6 +108,7 @@ _CODES = (
     ("migrated candidates get no applications", "candidate_not_eligible"),
     ("closed, so it takes no applications", "requisition_closed"),
     ("a closed opening is final", "requisition_closed"),
+    ("as its latest move, is reversed", "not_a_rejection"),
     (" is at ", "stage_changed"),
 )
 

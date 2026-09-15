@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from api.app import create_app
 from auth import Principal
-from pipeline.access import Actor, NotPermitted, actor_from_principal
+from pipeline.access import Actor, NotPermitted, actor_from_principal, reader_from_principal
 
 SRC = Path(__file__).resolve().parents[2] / "src"
 ROUTES = (
@@ -24,6 +24,15 @@ ROUTES = (
     ("get", "/v1/applications/app_1"),
     ("post", "/v1/applications/app_1/transitions"),
     ("get", "/v1/applications/app_1/transitions"),
+    ("post", "/v1/applications/app_1/reversal"),
+    ("get", "/v1/review-items"),
+    ("get", "/v1/review-items/rvw_1"),
+    ("post", "/v1/review-items/rvw_1/resolution"),
+    ("get", "/v1/candidates"),
+    ("get", "/v1/candidates/cand_1"),
+    ("get", "/v1/candidates/cand_1/evaluations"),
+    ("get", "/v1/evaluations/evl_1"),
+    ("get", "/v1/events"),
 )
 
 
@@ -47,15 +56,25 @@ def _principal(*roles: str) -> Principal:
     return Principal(subject="dev|someone", email=None, name=None, roles=frozenset(roles))
 
 
-def test_a_recruiter_is_scoped_and_a_ta_lead_sees_all():
+def test_a_recruiter_is_scoped_and_a_ta_lead_or_admin_sees_all():
     assert actor_from_principal(_principal("recruiter")) == Actor("dev|someone", sees_all=False)
     assert actor_from_principal(_principal("ta_lead")) == Actor("dev|someone", sees_all=True)
+    assert actor_from_principal(_principal("admin")) == Actor("dev|someone", sees_all=True)
 
 
-@pytest.mark.parametrize("roles", [(), ("criteria_owner",), ("admin",)])
+@pytest.mark.parametrize("roles", [(), ("criteria_owner",)])
 def test_other_roles_do_not_work_in_the_pipeline(roles):
     with pytest.raises(NotPermitted):
         actor_from_principal(_principal(*roles))
+
+
+def test_the_criteria_owner_reads_everything_and_nobody_else_is_let_in():
+    assert reader_from_principal(_principal("criteria_owner")) == Actor(
+        "dev|someone", sees_all=True
+    )
+    assert reader_from_principal(_principal("recruiter")) == Actor("dev|someone", sees_all=False)
+    with pytest.raises(NotPermitted):
+        reader_from_principal(_principal())
 
 
 @pytest.mark.parametrize(("method", "path"), ROUTES)

@@ -9,7 +9,7 @@ import re
 from typing import Literal
 
 from api.errors import ApiError
-from pipeline.access import NO_SUCH_RECORD, NotFound
+from pipeline.access import NotFound
 
 Kind = Literal[
     "requisition", "application", "candidate", "transition", "review_item", "evaluation", "event"
@@ -28,7 +28,7 @@ PREFIX: dict[str, str] = {
 NOT_FOUND: dict[str, str] = {
     "requisition": "Requisition not found.",
     "application": "Application not found.",
-    "candidate": NO_SUCH_RECORD,
+    "candidate": "Candidate not found.",
     "transition": "Transition not found.",
     "review_item": "Review item not found.",
     "evaluation": "Evaluation not found.",

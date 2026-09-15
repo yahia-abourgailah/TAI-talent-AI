@@ -14,8 +14,9 @@ import hashlib
 import json
 import uuid
 from collections.abc import Callable
+from typing import Annotated
 
-from fastapi import Request
+from fastapi import Header, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -27,6 +28,16 @@ HEADER = "Idempotency-Key"
 REPLAYED_HEADER = "Idempotent-Replayed"
 KEEP_HOURS = 24
 _LOCK_NAMESPACE = 7302
+
+KeyHeader = Annotated[
+    str | None,
+    Header(
+        alias=HEADER,
+        max_length=100,
+        description="A UUID you generate per distinct request. A retry with it returns the "
+        "first response instead of doing the work again.",
+    ),
+]
 
 
 def _parse(key: str) -> uuid.UUID:

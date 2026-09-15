@@ -461,3 +461,62 @@ def reverse_rejection(
         },
     )
     return _application(conn, int(row["id"]))
+
+
+# --- The review queue (BR-407) ------------------------------------------------------------------
+
+_REVIEW = """
+    SELECT r.id, r.kind, r.application_id, a.candidate_id, a.opening_id, r.at_step, r.reason_code,
+           r.proposed_by, r.proposed_at, x.outcome AS resolution, x.reason AS resolution_reason,
+           x.move_id AS resolution_move_id, x.resolved_by, x.resolved_at
+    FROM pipeline.review_item r
+    JOIN pipeline.application a ON a.id = r.application_id
+    LEFT JOIN pipeline.review_resolution x ON x.review_item_id = r.id
+"""
+
+
+def get_review_item(conn: Connection, actor: Actor, review_item_id: int) -> dict[str, Any]:
+    rows = run(
+        conn,
+        text(_REVIEW + "WHERE r.id = :id AND (:sees_all OR a.owner_recruiter = :subject)"),
+        {"id": review_item_id, **actor.scope()},
+    )
+    if not rows:
+        raise NotFound("Review item not found.")
+    return rows[0]
+
+
+def list_review_items(
+    conn: Connection,
+    actor: Actor,
+    *,
+    limit: int,
+    before: int | None = None,
+    status: str | None = None,
+    kind: str | None = None,
+    opening_id: int | None = None,
+) -> list[dict[str, Any]]:
+    """Newest first. `status` is open (no resolution yet) or resolved."""
+    return run(
+        conn,
+        text(
+            _REVIEW
+            + """
+            WHERE (:sees_all OR a.owner_recruiter = :subject)
+              AND (CAST(:before AS bigint) IS NULL OR r.id < :before)
+              AND (CAST(:status AS text) IS NULL
+                   OR (CAST(:status AS text) = 'open') = (x.id IS NULL))
+              AND (CAST(:kind AS text) IS NULL OR r.kind = :kind)
+              AND (CAST(:opening AS bigint) IS NULL OR a.opening_id = :opening)
+            ORDER BY r.id DESC LIMIT :limit
+            """
+        ),
+        {
+            "limit": limit,
+            "before": before,
+            "status": status,
+            "kind": kind,
+            "opening": opening_id,
+            **actor.scope(),
+        },
+    )

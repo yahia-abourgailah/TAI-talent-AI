@@ -437,3 +437,33 @@ def transition_history(application_id: str, principal: Signed, conn: Db) -> Tran
     number = decode("application", application_id)
     rows = store.move_history(conn, actor, number)
     return TransitionHistory(items=[_transition(number, row) for row in rows])
+
+
+class ReversalIn(BaseModel):
+    reason: Annotated[str, Field(min_length=1, max_length=500, pattern=r"\S")]
+
+
+@router.post(
+    "/applications/{application_id}/reversal",
+    status_code=201,
+    response_model=ApplicationOut,
+    tags=["applications"],
+)
+def reverse_rejection(
+    application_id: str,
+    body: ReversalIn,
+    request: Request,
+    principal: Signed,
+    conn: Db,
+    key: IdempotencyKey = None,
+) -> JSONResponse:
+    """Reverses a rejection, with a reason and your name (BR-406). The rejected application stays
+    rejected; a new application, linked to it, starts again at the first stage."""
+    actor = actor_from_principal(principal)
+    number = decode("application", application_id)
+
+    def reverse() -> ApplicationOut:
+        row = store.reverse_rejection(conn, actor, number, body.reason)
+        return _application(row, store.allowed_moves(conn))
+
+    return idempotency.respond(conn, request, principal.subject, key, body, 201, reverse)
