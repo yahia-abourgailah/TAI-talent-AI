@@ -369,7 +369,7 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
         <tr><td class="id">BR-305</td><td>AI scoring with evidence, one candidate per call</td><td class="wk">&mdash; <span class="chip drop">Later</span></td></tr>
         <tr><td class="id">BR-306</td><td>AI can never change a tier or reverse a gate</td><td class="wk">&mdash; <span class="chip drop">Later</span> true by default: there is no AI</td></tr>
         <tr><td class="id">BR-307</td><td>Any old decision can be explained from saved data alone</td><td class="wk">Week 2</td></tr>
-        <tr><td class="id">BR-308</td><td>Find hidden text in CVs, remove it, send the CV to a human</td><td class="wk">Week 5</td></tr>
+        <tr><td class="id">BR-308</td><td>Find hidden text in CVs, remove it, send the CV to a human</td><td class="wk">Week 5 <span class="chip lo">Done by our OCR API</span></td></tr>
         <tr><td class="id">BR-309</td><td>Read Arabic, English and mixed CVs. Never translate names</td><td class="wk">Week 5</td></tr>
         <tr><td class="id">BR-310</td><td>Borderline is a real answer, not rounded up or down</td><td class="wk">Week 7 <span class="chip ask">Needs a number</span></td></tr>
         <tr><td class="id">BR-311</td><td>A test set of real CVs, with accuracy reported on every change</td><td class="wk">Week 5 <span class="chip med">Part</span> reading and hidden text only</td></tr>
@@ -648,7 +648,6 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
     <div class="wk-h"><span class="no">WEEK 5</span><span class="ti">Reading CVs safely</span></div>
     <div class="lanes">
       <div class="lane A"><p class="who">Person A</p><ul>
-        <li><b>Clean the CV before anything reads it</b>: white text on white, tiny text, text off the page, invisible characters. Remove it, save what was found, send the CV to a human. <span class="r">BR-308</span></li>
         <li>Map the OCR output into fields for <b>Arabic, English and mixed</b> CVs. Never translate names. <span class="r">BR-309, NFR-07</span></li>
         <li>Build the test set: real CVs in both languages, plus CVs with hidden text. Report accuracy on every change. <span class="r">BR-311</span></li>
         <li><span class="chip drop">Drops first</span> loading old CVs from drives and email. <span class="r">BR-104</span></li>
@@ -660,7 +659,7 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
         <li>Recruiters can type in a candidate. Marked as manual, and <b>must be checked before contact</b>. <span class="r">BR-103</span></li>
       </ul></div>
     </div>
-    <div class="check"><b>End of week</b> A real CV is uploaded and the form comes back correct. A CV with hidden instructions is cleaned, flagged and sent to a human &mdash; whatever its score.</div>
+    <div class="check"><b>End of week</b> A real CV is uploaded and the form comes back correct. A CV the OCR API flags for hidden content goes to a human &mdash; whatever its score.</div>
   </div>
 
   <div class="week">
