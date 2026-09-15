@@ -1,4 +1,3 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>Talent Platform Build Plan</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -212,7 +211,7 @@ footer{margin-top:48px; padding-top:20px; border-top:2px solid var(--ink); font-
     <div class="fact"><dt>Candidates moved</dt><dd>5,140</dd></div>
     <div class="fact"><dt>Big gate</dt><dd>Week 2</dd></div>
     <div class="fact"><dt>OCR</dt><dd>On our own host</dd></div>
-    <div class="fact"><dt>Now</dt><dd>Week 2 built &middot; gate waits on CI and a hand check</dd></div>
+    <div class="fact"><dt>Now</dt><dd>Weeks 3&ndash;4 built &middot; waiting on TA, Karim and a test server</dd></div>
   </dl>
 </header>
 
@@ -386,7 +385,7 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
         <tr><td class="id">BR-401</td><td>Job openings with brand, department, track, headcount, owner</td><td class="wk">Week 3</td></tr>
         <tr><td class="id">BR-402</td><td>Fixed list of steps, and only allowed moves between them</td><td class="wk">Week 3 <span class="chip ask">TA must confirm the list</span></td></tr>
         <tr><td class="id">BR-403</td><td>Every move saved with who, when, from, to. <b>No free typing</b></td><td class="wk">Week 3</td></tr>
-        <tr><td class="id">BR-404</td><td>A rejection needs the step and a reason from a list</td><td class="wk">Week 3 <span class="chip ask">TA must give the list</span></td></tr>
+        <tr><td class="id">BR-404</td><td>A rejection needs the step and a reason from a list</td><td class="wk">Week 3 <span class="chip lo">19 reasons in force</span> <span class="chip ask">TA to confirm</span></td></tr>
         <tr><td class="id">BR-405</td><td>The system never rejects anybody. A person confirms</td><td class="wk">Week 3</td></tr>
         <tr><td class="id">BR-406</td><td>Changing a decision needs a reason, and is kept for learning</td><td class="wk">Week 3</td></tr>
         <tr><td class="id">BR-407</td><td>A review list: borderline, flagged, unchecked, unclear</td><td class="wk">Week 7</td></tr>
@@ -565,10 +564,10 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
     <div class="status"><span class="h">Before week 3 starts</span><ul>
       <li><span class="st block">Week 3</span><b>Infrastructure:</b> the self-hosted parity runner. Until it exists, any change to scoring fails CI.</li>
       <li><span class="st block">Week 3</span><b>A person:</b> check the 200-row sample by hand against the workbook, and record it in <code>WEEK2_DECISIONS.md</code>.</li>
-      <li><span class="st block">Week 3</span><b>Us:</b> push the week 2 fixes to <code>dev</code> on both repositories.</li>
-      <li><span class="st part">Week 3</span><b>Karim:</b> the 7 column-map answers, what the 1,200 never-scored rows become (OPN-10), the 2 candidates listed at "The Address" (OPN-03), <code>CLAUDE.md</code>, and rulings on the 18 differences.</li>
-      <li><span class="st part">Week 3</span><b>TA:</b> the stage list, allowed moves and rejection reasons, and whether candidates with no phone or email are still in the process (OPN-11).</li>
-      <li><span class="st part">Week 3</span><b>HRIS:</b> read access to employee data, for the own-staff check.</li>
+      <li><span class="st done">Done</span><b>Us:</b> push the week 2 fixes to <code>dev</code> on both repositories.</li>
+      <li><span class="st part">Partly</span><b>Karim:</b> the 7 column-map answers, what the 1,200 never-scored rows become (OPN-10), the 2 candidates listed at "The Address" (OPN-03, <b>answered</b>), <code>CLAUDE.md</code>, and rulings on the 18 differences.</li>
+      <li><span class="st part">Partly</span><b>TA:</b> the stage list, allowed moves and rejection reasons, and whether candidates with no phone or email are still in the process (OPN-11). <b>Reasons proposed and in force; TA to confirm.</b></li>
+      <li><span class="st todo">Postponed</span><b>HRIS:</b> read access to employee data, for the own-staff check.</li>
       <li><span class="st part">Week 4</span><b>Send:</b> the API plan to the CRM and website teams.</li>
       <li><span class="st part">Week 4</span><b>IT:</b> identity provider details, so staging signs in with company accounts.</li>
       <li><span class="st part">Week 4</span><b>Infrastructure:</b> a test server, so CI can deploy and the CRM team can test.</li>
@@ -578,40 +577,69 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
   <div class="phase"><span class="r">Steps that cannot be skipped</span><span class="w">Weeks 3&ndash;4 &middot; BRD P3</span></div>
 
   <div class="week">
-    <div class="wk-h"><span class="no">WEEK 3</span><span class="ti">The pipeline</span></div>
+    <div class="wk-h"><span class="no">WEEK 3</span><span class="ti">The pipeline</span><span class="prog st done">Built &middot; 15 Sep</span></div>
     <div class="lanes">
       <div class="lane A"><p class="who">Person A</p><ul>
-        <li>Re-score the candidates from before the 3 August fix. <b>Show the tier changes first. Apply only after Karim signs.</b> Last time 1,518 people moved. <span class="r">BR-704</span></li>
-        <li>Own-staff check against live employee data: current employer <b>and</b> current title. Compare with the 38 rows removed by hand. <span class="r">BR-301</span></li>
-        <li>Ask Karim about the two candidates whose employer is exactly "The Address". It blocks sign-off. <span class="r">OPN-03</span></li>
-        <li>Get the rejection reason list from TA and load it. <span class="r">BR-404</span></li>
+        <li><span class="st done">Done</span>Re-score the candidates from before the 3 August fix. <b>Show the tier changes first. Apply only after Karim signs.</b> Last time 1,518 people moved. <span class="r">BR-704</span>
+          <span class="sn">Checked on the real workbook: 9 rows the country fix could have changed and 20 the manager fix. All already match today's rules except the 2 ruled rows, so 0 tier changes are pending. The report is with Karim to sign.</span></li>
+        <li><span class="st todo">Postponed</span>Own-staff check against live employee data: current employer <b>and</b> current title. Compare with the 38 rows removed by hand. <span class="r">BR-301</span>
+          <span class="sn">Postponed on 15 Sep. The company CRM lists 1,473 active employees but no mobile or email, so no candidate can be confirmed. The 38 exclusions by current employer and title stay.</span></li>
+        <li><span class="st done">Answered</span>Ask Karim about the two candidates whose employer is exactly "The Address". It blocks sign-off. <span class="r">OPN-03</span>
+          <span class="sn">Answered 15 Sep: both stay excluded as own staff. An employer of exactly "The Address" means The Address Investments.</span></li>
+        <li><span class="st done">Done</span>Get the rejection reason list from TA and load it. <span class="r">BR-404</span>
+          <span class="sn">TA had not sent a list, so 19 reasons were proposed: 11 the company decided, 8 the candidate decided. In force since migration 0009 and marked provisional until TA confirms. A changed list loads with no code change.</span></li>
       </ul></div>
       <div class="lane B"><p class="who">Person B</p><ul>
-        <li>Job openings and applications. <b>The step machine</b>: new, contacted, replied, phone screen, HR interview, test, technical interview, offer, hired, rejected &mdash; with the allowed moves. <span class="r">BR-401, BR-402</span></li>
-        <li>Every move saved with who, when, from and to. <b>A test proves there is no other way to change a step.</b> <span class="r">BR-403</span></li>
-        <li>Owner, team label, and each recruiter sees only their own people. <span class="r">BR-108, BR-408</span></li>
-        <li>Changing a decision needs a reason and a name. Nobody is rejected by the system. <span class="r">BR-405, BR-406</span></li>
+        <li><span class="st done">Done</span>Job openings and applications. <b>The step machine</b>: new, contacted, replied, phone screen, HR interview, test, technical interview, offer, hired, rejected &mdash; with the allowed moves. <span class="r">BR-401, BR-402</span>
+          <span class="sn">The steps and allowed moves are data, not code. The BRD order is in force until TA confirms it. Hired and rejected are final.</span></li>
+        <li><span class="st done">Done</span>Every move saved with who, when, from and to. <b>A test proves there is no other way to change a step.</b> <span class="r">BR-403</span>
+          <span class="sn">A move is a row no role can change or delete, the database owner included. The current step is always the latest move.</span></li>
+        <li><span class="st done">Done</span>Owner, team label, and each recruiter sees only their own people. <span class="r">BR-108, BR-408</span>
+          <span class="sn">A recruiter sees only their own; a TA lead and an admin see all. Anything out of scope reads as not found. Narrower team scope waits on HRIS organisation data.</span></li>
+        <li><span class="st done">Done</span>Changing a decision needs a reason and a name. Nobody is rejected by the system. <span class="r">BR-405, BR-406</span>
+          <span class="sn">An automated reject only opens a review item, which a person confirms or dismisses with a reason. Reversing a rejection needs a reason and opens a linked application. Both are kept for criteria reviews.</span></li>
       </ul></div>
     </div>
-    <div class="check"><b>End of week</b> A candidate can be moved through every step, and cannot be moved any other way. The re-score report is with Karim. <span class="chip ask">Ask</span> the step list and the reason list come from TA &mdash; ask in week 1, not here.</div>
+    <div class="check"><b>End of week</b> <span class="st done">Yes</span>A candidate can be moved through every step, and cannot be moved any other way. <span class="st done">Yes</span>The re-score report is with Karim. <span class="st todo">Open</span>Karim signs it. <span class="st part">Partly</span>The step list and the reason list from TA: the steps are still the BRD order, and the reasons are proposed.</div>
   </div>
 
   <div class="week">
-    <div class="wk-h"><span class="no">WEEK 4</span><span class="ti">The funnel, and the API others build on</span></div>
+    <div class="wk-h"><span class="no">WEEK 4</span><span class="ti">The funnel, and the API others build on</span><span class="prog st part">Built &middot; 15 Sep &middot; gate open</span></div>
     <div class="lanes">
       <div class="lane A"><p class="who">Person A</p><ul>
-        <li><b>The funnel report</b>, built from the saved moves: how many at each step, by job, brand, recruiter, team and source. <span class="r">BR-601</span></li>
-        <li>Load the real open jobs, so the API is tested with real shapes, not fake data.</li>
-        <li>Time report: applied &rarr; scored &rarr; assigned. It will read seconds, not hours. <span class="r">OBJ-06</span></li>
+        <li><span class="st done">Done</span><b>The funnel report</b>, built from the saved moves: how many at each step, by job, brand, recruiter, team and source. <span class="r">BR-601</span>
+          <span class="sn">Counted only from recorded moves: reached, moved on, rejected by reason, still here, and conversion. By requisition, brand, recruiter or team, with contactability beside it (4.7% of all candidates today). Source waits until applications carry a tracking code. In the API as <code>GET /v1/reports/funnel</code>.</span></li>
+        <li><span class="st part">Tool ready</span>Load the real open jobs, so the API is tested with real shapes, not fake data.
+          <span class="sn">The loader goes through the API, refuses the whole file on one bad line, and adds nothing when run twice. Waiting for TA's list of open jobs.</span></li>
+        <li><span class="st done">Done</span>Time report: applied &rarr; scored &rarr; assigned. It will read seconds, not hours. <span class="r">OBJ-06</span>
+          <span class="sn">Median, 90th percentile and slowest seconds per week, and every application not scored within 12 hours listed as late. Assigned equals applied until public applications arrive in week 6.</span></li>
+        <li><span class="st done">Added</span>Score every new application the moment it arrives. <span class="r">OBJ-06, BR-405</span>
+          <span class="sn">A background worker scores with the replay's own mapping, so the platform and the replay cannot disagree. A disqualification opens a review item with its reason, never a rejection. An age of 0 is read as no age. Two Track B reasons wait for Karim (D-19).</span></li>
       </ul></div>
       <div class="lane B"><p class="who">Person B</p><ul>
-        <li>Finish and <b>freeze</b> the API: candidates, scores, jobs, moves, review list, funnel. <span class="r">BR-410</span></li>
-        <li>Events to the CRM: scored, step changed, review needed &mdash; with retry if the CRM is down.</li>
-        <li>Roles and permissions finished. Every admin action has a name on it. <span class="r">NFR-09</span></li>
-        <li>Written API docs and a test server the CRM team can use <b>without asking us</b>.</li>
+        <li><span class="st done">Done</span>Finish and <b>freeze</b> the API: candidates, scores, jobs, moves, review list, funnel. <span class="r">BR-410</span>
+          <span class="sn">The /v1 contract is recorded, and a check fails any breaking change. It covers requisitions, applications, transitions, the review queue, candidates and search, evaluations, the funnel and events, with one error format, typed ids, cursor pages and safe retries.</span></li>
+        <li><span class="st done">Done</span>Events to the CRM: scored, step changed, review needed &mdash; with retry if the CRM is down.
+          <span class="sn">The database writes an event with every move, review item and new score, so none can be missed. Signed webhooks are retried for 24 hours, and a catch-up feed keeps 30 days. Switched on once the CRM gives its URL and a shared secret.</span></li>
+        <li><span class="st done">Done</span>Roles and permissions finished. Every admin action has a name on it. <span class="r">NFR-09</span>
+          <span class="sn">An admin sees and acts on everything, with their name on each action. The criteria owner reads evaluations and review items and changes nothing.</span></li>
+        <li><span class="st part">Docs done</span>Written API docs and a test server the CRM team can use <b>without asking us</b>.
+          <span class="sn">The API plan now describes what is built, with every error code and examples. The test server is not provisioned yet.</span></li>
       </ul></div>
     </div>
-    <div class="check gate"><b>Gate &mdash; week 4</b> The CRM team is building against a frozen API. <b>The funnel report shows real numbers.</b> <span class="chip ask">Ask</span> if the CRM team cannot commit now, Person B builds a small internal screen in week 7. It costs about 3 days, taken from hardening.</div>
+    <div class="check gate"><b>Gate &mdash; week 4</b> <span class="st done">Yes</span>The API is frozen. <span class="st todo">Open</span>The CRM team is building against it (D-CRM-5). <span class="st todo">Open</span><b>The funnel report shows real numbers:</b> it needs TA's open jobs and real applications on a test server. <span class="chip ask">Ask</span> if the CRM team cannot commit now, Person B builds a small internal screen in week 7. It costs about 3 days, taken from hardening.</div>
+    <div class="status"><span class="h">Checked on 15 Sep</span><ul>
+      <li>All tests pass: 219 unit and 194 against a real database, with strict types and the contract check.</li>
+      <li>The two people's week 4 work was merged and checked together: a new score reaches the CRM event and the evaluation with the same outcome.</li>
+    </ul></div>
+    <div class="status"><span class="h">Before week 5 starts</span><ul>
+      <li><span class="st block">Week 5</span><b>Infrastructure:</b> a test server, so the CRM team can build without asking us and CI can deploy. Still open from week 2: the parity runner.</li>
+      <li><span class="st block">Week 5</span><b>TA:</b> the list of open jobs to load; confirm the stage list and the 19 rejection reasons; OPN-11.</li>
+      <li><span class="st part">Week 5</span><b>Karim:</b> sign the re-score report (BR-704); rule on the Track B reasons with no rejection reason (D-19); OPN-10, the column map, the 18 differences and <code>CLAUDE.md</code>.</li>
+      <li><span class="st part">Week 5</span><b>CRM team:</b> receive the API plan, commit to the frozen API (D-CRM-5), and give the webhook URLs and a way to share the secret (D-CRM-4).</li>
+      <li><span class="st part">Week 5</span><b>IT:</b> identity provider details, so staging signs in with company accounts.</li>
+      <li><span class="st part">Week 5</span><b>A person:</b> the 200-row hand check from week 2.</li>
+    </ul></div>
   </div>
 
   <div class="phase"><span class="r">CVs in, and one record per person</span><span class="w">Weeks 5&ndash;6 &middot; BRD P4, P5</span></div>
@@ -755,5 +783,3 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
 </footer>
 
 </div>
-
-</body></html>
