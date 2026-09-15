@@ -31,5 +31,5 @@ The criteria exclude a candidate whose current employer or title names The Addre
 
 | Request | From | Sent | Received |
 |---|---|---|---|
-| Rejection reasons (BR-404): the list TA uses, one reason per line, with which are shown to the candidate | TA | | |
+| Rejection reasons (BR-404): review the proposed list in [docs/pipeline/lists/proposed-2026-09-15.json](../pipeline/lists/proposed-2026-09-15.json) (19 reasons: 11 we decided, 8 the candidate decided) and send changes | TA | 15 Sep 2026 | |
 | Stage list and allowed moves between stages | TA | | |
