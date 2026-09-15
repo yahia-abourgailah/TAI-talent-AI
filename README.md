@@ -49,6 +49,19 @@ docker compose -f compose.yaml -f compose.test.yaml run --rm migrate
 .venv/bin/pytest tests/integration
 ```
 
+### Import TAI_Master
+
+Set `TALENT_MASTER_PATH` (the workbook) and `TALENT_RECONCILE_DIR` (an output folder) in `.env`, both outside the repository.
+
+```bash
+docker compose up -d --build
+docker compose -f compose.yaml -f compose.tools.yaml run --rm jobs python -m importer.tai_master --by "<your name>"
+docker compose -f compose.yaml -f compose.tools.yaml run --rm jobs python -m jobs show <job id>
+docker compose -f compose.yaml -f compose.tools.yaml run --rm jobs python -m importer.reconcile --out /data/out
+```
+
+Running the import again writes nothing new. Each run is recorded in `audit.job_run` with its counts, skips and unresolved rows. The reconciliation writes a counts-only report and a 200-row sample to check by hand; the sample holds candidate data and never goes in the repository. Archive a record with `python -m candidates.archive --candidate-id N --reason "..." --by "<your name>"`.
+
 ### Baseline replay
 
 Replays criteria version 2026-08-04 over every master row. The per-row output holds candidate data, so it must go outside the repository; the aggregate report holds counts only.

@@ -45,7 +45,9 @@ extend-exclude = ["src/scoring/rulesets/v2026_08_04.py"]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["api", "auth", "config", "db", "infra", "replay", "scoring"]
+known-first-party = [
+  "api", "auth", "candidates", "config", "db", "importer", "infra", "jobs", "replay", "scoring",
+]
 
 [tool.mypy]
 python_version = "3.12"

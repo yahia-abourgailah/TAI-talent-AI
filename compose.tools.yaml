@@ -1,0 +1,30 @@
+# One-off jobs against the local stack: the TAI_Master import and its reconciliation.
+# The workbook and the reconciliation output both stay outside the repository.
+#
+#   docker compose -f compose.yaml -f compose.tools.yaml run --rm jobs \
+#     python -m importer.tai_master --by "<your name>"
+#   docker compose -f compose.yaml -f compose.tools.yaml run --rm jobs \
+#     python -m importer.reconcile --out /data/out --report-copy /data/out/RECONCILIATION_REPORT.md
+#
+# Needs TALENT_MASTER_PATH (the workbook file) and TALENT_RECONCILE_DIR (an output folder) in .env.
+services:
+  jobs:
+    image: talent-platform:dev
+    build: .
+    env_file: .env
+    environment:
+      TALENT_DB_DSN: postgresql+psycopg://talent_app:${TALENT_DB_APP_PASSWORD:?set TALENT_DB_APP_PASSWORD in .env}@postgres:5432/talent
+      TALENT_REDIS_URL: redis://redis:6379/0
+      TALENT_BLOB_ENDPOINT: http://object-storage:9000
+      TALENT_MASTER_PATH: /data/master/TAI_Master.xlsx
+    volumes:
+      - ${TALENT_MASTER_PATH:?set TALENT_MASTER_PATH in .env}:/data/master/TAI_Master.xlsx:ro
+      - ${TALENT_RECONCILE_DIR:?set TALENT_RECONCILE_DIR in .env}:/data/out
+    command: ["python", "-m", "jobs", "history"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      storage-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy

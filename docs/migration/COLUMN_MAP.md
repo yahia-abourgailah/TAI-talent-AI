@@ -146,6 +146,20 @@ Each question needs a short ruling. "Our proposal" is what we would do. It is **
 
 **Open questions: 27 in total.** That is 6 existing OPN items (OPN-01, OPN-02, OPN-03, OPN-10, OPN-11, OPN-12) and 21 new questions (Q-01 to Q-21).
 
+### Questions the week 2 import depends on (A3)
+
+The week 2 import (`python -m importer.tai_master`) moves only columns 1 to 20 into structured tables, and stores them in a form every proposed ruling can still build on: original text, unverified, inference unknown where the value may be derived, blanks and "?" as not recorded. Columns 9 and 21 to 47 stay in the raw capture only until week 3. So the import can run now, but these rulings decide whether what it stored is final. Ask Karim for these in one meeting and write each answer into the table above.
+
+| ID | Why the import needs it | What the import does until it is ruled | Answer (Karim, date) |
+|---|---|---|---|
+| OPN-10 | Whether the 1,200 unscored rows are candidates at all | Imports them as candidates with no evaluation | |
+| Q-20 | Whether any row may be merged or dropped before P5 | Imports every row as its own candidate; merges nothing | |
+| Q-19 | Whether Years Exp is derived | Stores it with inference unknown | |
+| Q-12 | Whether a blank Signals or Flags cell on a scored row means "none" | Stores blank as blank, not as an empty list | |
+| Q-13 | Whether the "Test" row is archived, and how Platform splits | Stores the label as written; lists the Test row as unresolved, archives nothing | |
+| Q-14 | Whether Date Added is the scoring date (`evaluated_at`) | Stores it as a field only; `evaluated_at` stays empty | |
+| Q-10, Q-11 | Whether Call Priority and Recommendation are scorer output | Copies both onto the stored evaluation; parity compares score only | |
+
 ## 3. Categorical value inventory
 
 Only category columns are listed. Recruiter names in Platform are replaced with letters, except Karim AlAkkad.
