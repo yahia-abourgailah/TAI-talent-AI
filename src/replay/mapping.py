@@ -10,8 +10,12 @@
     Profile URL     profile_url
     Education       education_level
     Years Exp       years_experience   a number; unreadable values are recorded and left empty
-    Age             age                a whole number; "?" and blanks are left empty
+    Age             age                a whole number; "?", blanks and 0 are left empty
     Platform        source_platform    lower-cased
+
+An age of 0 means the source had no age: no candidate is 0 years old, and scoring it as a real age
+disqualifies the candidate as under 21. TAI_Master holds no age of 0, so parity is unchanged.
+Years Exp of 0 is a real value (a fresh graduate) and is kept.
 
 Last Active is deliberately not passed. The stored scores were produced without it: replayed
 without it, 3,938 of 3,940 stored scores match exactly; with it, only 1,880 do. Recency is not in
@@ -92,7 +96,7 @@ def map_row(row: MasterRow) -> MappedRow:
         profile_url=text(values.get("Profile URL")),
         education_level=text(values.get("Education")),
         years_experience=years,
-        age=None if age is None else int(age),
+        age=None if age is None or age == 0 else int(age),
         source_platform=text(values.get("Platform")).lower(),
     )
     encoded = json.dumps(asdict(candidate), sort_keys=True, ensure_ascii=False).encode("utf-8")

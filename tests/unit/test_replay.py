@@ -305,3 +305,13 @@ def test_recorded_rulings_name_rows_not_people():
         assert ruling.sheet_row > 1
         assert "@" not in ruling.reason
         assert "http" not in ruling.reason
+
+
+def test_an_age_of_0_is_not_an_age_but_0_years_experience_is_kept():
+    """A source that writes 0 for an unknown age must not disqualify the candidate as under 21."""
+    from replay.workbook import MasterRow
+
+    mapped = map_row(MasterRow(sheet_row=2, values={"Age": "0", "Years Exp": "0"}))
+    assert mapped.candidate.age is None
+    assert mapped.candidate.years_experience == 0.0
+    assert map_row(MasterRow(sheet_row=3, values={"Age": 0})).candidate.age is None

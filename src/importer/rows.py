@@ -56,7 +56,7 @@ FIELD_COLUMNS: tuple[tuple[str, str, str | None], ...] = (
 _ARABIC_QUESTION_MARK = "؟"
 _NUMBER_MARKERS = frozenset({"?", _ARABIC_QUESTION_MARK, "-", "—", "n/a", "na", "none", "unknown"})
 NO_VALUE_MARKERS: dict[str, frozenset[str]] = {
-    "Age": _NUMBER_MARKERS,
+    "Age": _NUMBER_MARKERS | {"0"},  # no candidate is 0 years old: the source had no age
     "Years Exp": _NUMBER_MARKERS,
     "Last Active": frozenset({"?", _ARABIC_QUESTION_MARK}),
 }

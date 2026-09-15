@@ -164,3 +164,11 @@ def test_a_cell_outside_the_named_columns_is_kept_in_raw(tmp_path):
         "type": "str",
         "value": "made-up note",
     }
+
+
+def test_an_age_of_0_is_not_recorded_but_0_years_experience_is():
+    from importer.rows import is_no_value
+
+    assert is_no_value("Age", 0) and is_no_value("Age", "0") and is_no_value("Age", 0.0)
+    assert not is_no_value("Age", 27)
+    assert not is_no_value("Years Exp", 0)
