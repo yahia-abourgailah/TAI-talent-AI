@@ -100,6 +100,20 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  # Runs queued jobs as they arrive: scoring a new application within seconds (OBJ-06).
+  worker:
+    <<: *app-image
+    command: ["python", "-m", "jobs", "work", "--loop"]
+    env_file: .env
+    environment: *app-environment
+    healthcheck:
+      disable: true
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      storage-init:
+        condition: service_completed_successfully
+
 volumes:
   pgdata:
   blobdata:

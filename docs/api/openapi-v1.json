@@ -683,6 +683,18 @@
             "title": "Brand",
             "type": "string"
           },
+          "criteria_version": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9A-Za-z._-]{1,64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Criteria Version"
+          },
           "department": {
             "maxLength": 200,
             "minLength": 1,

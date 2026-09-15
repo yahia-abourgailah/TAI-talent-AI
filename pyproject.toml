@@ -47,7 +47,7 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
 [tool.ruff.lint.isort]
 known-first-party = [
   "api", "auth", "candidates", "config", "db", "importer", "infra", "integrations", "jobs",
-  "pipeline", "replay", "scoring",
+  "pipeline", "replay", "reports", "scoring",
 ]
 
 [tool.mypy]

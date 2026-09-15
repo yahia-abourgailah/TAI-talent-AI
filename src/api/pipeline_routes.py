@@ -20,7 +20,7 @@ from api.ids import decode, decode_filter, encode
 from api.pages import DEFAULT_LIMIT, MAX_LIMIT, decode_cursor, next_cursor
 from auth import Principal
 from pipeline import store
-from pipeline.access import Actor, Refused, actor_from_principal
+from pipeline.access import Actor, NotPermitted, Refused, actor_from_principal
 
 router = APIRouter(prefix="/v1")
 
@@ -123,6 +123,9 @@ class RequisitionIn(BaseModel):
     headcount: int = Field(gt=0, le=10_000)
     team: Text
     owner_id: Text | None = None
+    # A TA lead or an admin may name the version, e.g. from TA's open-jobs file. Otherwise the
+    # version in force is used (BR-303).
+    criteria_version: Annotated[str, Field(pattern=r"^[0-9A-Za-z._-]{1,64}$")] | None = None
 
 
 class CloseRequisitionIn(BaseModel):
@@ -176,6 +179,8 @@ def create_requisition(
 ) -> JSONResponse:
     """Opens a requisition. The criteria version in force is set by the platform (BR-303)."""
     actor = actor_from_principal(principal)
+    if body.criteria_version is not None and not actor.sees_all:
+        raise NotPermitted("Only a TA lead or an admin chooses the criteria version.")
 
     def create() -> RequisitionOut:
         row = store.create_opening(
@@ -187,6 +192,7 @@ def create_requisition(
             headcount=body.headcount,
             team=body.team,
             owner_recruiter=body.owner_id,
+            criteria_version_id=body.criteria_version,
         )
         return _requisition(row)
 

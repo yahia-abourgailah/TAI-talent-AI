@@ -245,7 +245,7 @@ All endpoints need a bearer token, and results are filtered to the caller's scop
 
 ### Requisitions (job openings)
 
-- `POST /v1/requisitions` with `brand`, `department`, `track` (`A` or `B`), `headcount`, `team`, and optionally `owner_id` (a TA lead may open one for a recruiter). The criteria version in force is set by the platform (BR-303) and returned as `criteria_version`.
+- `POST /v1/requisitions` with `brand`, `department`, `track` (`A` or `B`), `headcount`, `team`, and optionally `owner_id` (a TA lead may open one for a recruiter). The criteria version in force is set by the platform (BR-303) and returned as `criteria_version`. A TA lead or an admin may name another `criteria_version`, for example from TA's open-jobs file; a recruiter always gets the version in force.
 - `GET /v1/requisitions` filters: `status` (`open`, `closed`), `brand`, `track`, `owner_id`.
 - `POST /v1/requisitions/{id}/close` with `{"reason": "..."}`. It records who closed it and when. A closed requisition is final.
 
