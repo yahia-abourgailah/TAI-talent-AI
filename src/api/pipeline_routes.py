@@ -6,16 +6,16 @@ A stage changes only by POSTing a transition; the database decides whether it is
 """
 
 from collections.abc import Mapping
-from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Header, Query, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, PlainSerializer
+from pydantic import BaseModel, Field
 from sqlalchemy.engine import Connection
 
 from api import idempotency
 from api.deps import current_principal, db_connection
+from api.fields import Timestamp
 from api.ids import decode, decode_filter, encode
 from api.pages import DEFAULT_LIMIT, MAX_LIMIT, decode_cursor, next_cursor
 from auth import Principal
@@ -25,17 +25,12 @@ from pipeline.access import Actor, Refused, actor_from_principal
 router = APIRouter(prefix="/v1")
 
 
-def _utc(value: datetime) -> str:
-    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
-
-
 Signed = Annotated[Principal, Depends(current_principal)]
 Db = Annotated[Connection, Depends(db_connection)]
 StageCode = Annotated[str, Field(pattern=r"^[a-z][a-z_]{0,39}$")]
 ReasonCode = Annotated[str, Field(pattern=r"^[a-z][a-z_]{0,59}$")]
 Text = Annotated[str, Field(min_length=1, max_length=200, pattern=r"\S")]
 TypedId = Annotated[str, Field(min_length=1, max_length=40)]
-Timestamp = Annotated[datetime, PlainSerializer(_utc, return_type=str, when_used="json")]
 IdempotencyKey = Annotated[
     str | None,
     Header(

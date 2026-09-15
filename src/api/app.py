@@ -15,6 +15,7 @@ from sqlalchemy.engine import Connection
 
 from api import errors
 from api.dev_routes import router as dev_router
+from api.event_routes import router as event_router
 from api.pipeline_routes import router as pipeline_router
 from api.routes import router
 from auth import DevIdentity, TokenVerifier
@@ -84,4 +85,5 @@ def create_app(
 
     app.include_router(router)
     app.include_router(pipeline_router)
+    app.include_router(event_router)
     return app

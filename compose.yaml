@@ -87,6 +87,19 @@ services:
       redis:
         condition: service_healthy
 
+  # Sends events to the CRM and retries while it is down (API plan section 7). Start it with
+  # --profile crm once TALENT_CRM_WEBHOOK_URL and TALENT_CRM_WEBHOOK_SECRET are set in .env.
+  event-delivery:
+    <<: *app-image
+    profiles: ["crm"]
+    env_file: .env
+    environment: *app-environment
+    command: ["python", "-m", "integrations.webhooks", "deliver"]
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
 volumes:
   pgdata:
   blobdata:
