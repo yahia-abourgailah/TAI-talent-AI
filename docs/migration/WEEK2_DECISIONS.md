@@ -30,15 +30,21 @@
 
 ## Import runs on the real workbook, 15 September 2026
 
-Workbook SHA-256 `c9c7607e8f77…`. Counts only; the full report is [RECONCILIATION_REPORT.md](RECONCILIATION_REPORT.md).
+After the week 2 review fixes (migration 0004), on a fresh database. Workbook SHA-256 `c9c7607e8f77…`. Counts only; the full report is [RECONCILIATION_REPORT.md](RECONCILIATION_REPORT.md).
 
 | Check | Result |
 |---|---|
-| Job 4, first import | 5,140 rows read, 5,140 candidates, 5,140 raw captures, 66,820 fields, 3,940 evaluations under 2026-08-04; 1,200 rows with no stored score |
-| Job 5, second import | Nothing new written: every capture, candidate, field and evaluation already existed |
-| Unresolved in both runs | 1: sheet row 1496, Platform "Test", waiting on Q-13 (not archived) |
+| Import stopped part-way (killed after 25 seconds) | Nothing kept. The next import recorded the stopped attempt as a failed run and finished the same job on attempt 2 |
+| First complete import | 5,140 rows read: 5,140 candidates, 5,140 row captures plus the workbook file, 66,820 fields, 3,940 evaluations under 2026-08-04; 1,200 rows with no stored score |
+| Second import of the same file | Nothing written: every table's fingerprint identical, timestamps included |
+| Import of a re-saved copy (same cells, different file) | No new row captures, one new capture for the new file; candidates, fields and evaluations unchanged |
+| Unresolved in every run | 1: sheet row 1496, Platform "Test", waiting on Q-13 (not archived) |
+| Reconciliation | Every check matches: rows, the workbook capture, each raw capture read back cell by cell, every field, every evaluation |
+| Independent check, outside the tools | Every current stored field and every evaluation equals its workbook cell |
 | Replay of 2026-08-04 | 3,938 of 3,940 exact, 2 ruled, 0 unexplained: parity reached |
-| Reconciliation | All counts match the sheet; tool comparison of the 200-row sample found 0 disagreements |
+| Run records | No candidate values; the only error text is the stopped-worker message |
+
+The tool's comparison of the 200-row sample found 0 disagreements. That is not the sign-off: a person still checks the sample by hand (B5 below).
 
 ## B5: 200-row sample sign-off
 

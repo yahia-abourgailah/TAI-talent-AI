@@ -211,7 +211,7 @@ footer{margin-top:48px; padding-top:20px; border-top:2px solid var(--ink); font-
     <div class="fact"><dt>Must rules built</dt><dd>50 of 61</dd></div>
     <div class="fact"><dt>Candidates moved</dt><dd>5,140</dd></div>
     <div class="fact"><dt>Big gate</dt><dd>Week 2</dd></div>
-    <div class="fact"><dt>Decide first</dt><dd>Where OCR runs</dd></div>
+    <div class="fact"><dt>OCR</dt><dd>On our own host</dd></div>
     <div class="fact"><dt>Now</dt><dd>Week 1 built &middot; decisions open</dd></div>
   </dl>
 </header>
@@ -255,14 +255,10 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
   <p><strong>This takes seconds, not hours.</strong> The rules are simple maths. No AI is needed to give a
   tier.</p>
 
-  <div class="note crit">
-    <p class="t">Decide this before we start &mdash; where your OCR runs</p>
-    <p>You have an OCR API to read CVs. We need it in week 5.</p>
-    <p><strong>If it runs outside the company, every CV leaves the company.</strong> That breaks rule
-    <b>CR-01</b> in the BRD, which is a <em>Must</em>. It is also the exact problem we are trying to fix.</p>
-    <p>Choose one: <b>(1)</b> run the OCR inside our own network &mdash; best, and the plan assumes this.
-    <b>(2)</b> Sign a data agreement with the OCR company and get legal to accept it. <b>(3)</b> Find a
-    different OCR we can host &mdash; this costs about one week of Person B.</p>
+  <div class="note">
+    <p class="t">Decided &mdash; the OCR runs on our own host</p>
+    <p>CVs are read inside the company, so no CV leaves it and rule <b>CR-01</b> holds for CV reading. No data agreement and no replacement OCR are needed.</p>
+    <p>Still to settle by week 5: request limits and retries for the OCR service, and whether the on-prem language model turns OCR text into form fields.</p>
   </div>
 </section>
 
@@ -450,7 +446,7 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
         <tr><td class="id">NFR-07</td><td>Arabic and English word lists stay equal</td><td class="wk">Week 5</td></tr>
         <tr><td class="id">NFR-08</td><td>Same input + same rules = same answer, always</td><td class="wk">Week 2</td></tr>
         <tr><td class="id">NFR-09</td><td>Login, roles, and who did what</td><td class="wk">Weeks 1 &amp; 3</td></tr>
-        <tr><td class="id">CR-01</td><td>No candidate data leaves the company</td><td class="wk">Week 8 <span class="chip hi">Depends on the OCR decision</span></td></tr>
+        <tr><td class="id">CR-01</td><td>No candidate data leaves the company</td><td class="wk">Week 8 <span class="chip lo">OCR on our host</span></td></tr>
         <tr><td class="id">CR-02</td><td>Record the legal basis before contacting anyone</td><td class="wk">Week 6</td></tr>
         <tr><td class="id">CR-03</td><td>Delete candidates after their time is up</td><td class="wk">Week 7 <span class="chip ask">Legal must give the periods &mdash; OPN-07</span></td></tr>
         <tr><td class="id">CR-04</td><td>A candidate can ask why, and we can answer from saved data</td><td class="wk">Week 2</td></tr>
@@ -472,7 +468,7 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
       <tbody>
         <tr><td class="id">OBJ-01</td><td>95% of active candidates have a step recorded</td><td><span class="chip lo">Possible</span> The system is ready in week 3. The number is measured 30 days after go-live. <b>It also needs the CPO to tell recruiters to use it</b> &mdash; that part is not engineering</td></tr>
         <tr><td class="id">OBJ-02</td><td>100% same scores on all 5,140</td><td><span class="chip lo">Met in week 2</span> This is the gate</td></tr>
-        <tr><td class="id">OBJ-03</td><td>No candidate data outside the company</td><td><span class="chip lo">Met in week 8</span> Only if the OCR runs inside. Proof is the egress log, not a promise</td></tr>
+        <tr><td class="id">OBJ-03</td><td>No candidate data outside the company</td><td><span class="chip lo">Met in week 8</span> The OCR runs on our host. Proof is the egress log, not a promise</td></tr>
         <tr><td class="id">OBJ-04</td><td>No dependence on one person's machine</td><td><span class="chip lo">Met in week 8</span> We turn that laptop off for a day and nothing stops</td></tr>
         <tr><td class="id">OBJ-05</td><td>1,000 candidates a month, without slowing the chatbots</td><td><span class="chip lo">No longer a risk</span> We call no AI at all, so the shared server is untouched. The same limits are applied to the OCR API</td></tr>
         <tr><td class="id">OBJ-06</td><td>Scored and assigned in under 12 hours</td><td><span class="chip lo">Met in week 4</span> It takes seconds. The rules run the moment the person applies</td></tr>
@@ -493,7 +489,7 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
 
   <div class="note">
     <p class="t">Six things to start before week 1</p>
-    <p><b>1.</b> Decide where the OCR runs. <b>2.</b> Get the server, database and storage. <b>3.</b> Get
+    <p><b>1.</b> Decide where the OCR runs. <span class="chip lo">Decided</span> <b>2.</b> Get the server, database and storage. <b>3.</b> Get
     read access to employee data, for the own-staff check. <b>4.</b> Book a weekly hour with Karim for
     rulings. <b>5.</b> Send the API plan to the CRM team and the website team. <b>6.</b> Ask legal about
     OPN-02 (age) &mdash; it is needed in week 2, not later. <span class="chip lo">Answered 14 Sep</span></p>
@@ -527,7 +523,7 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
           <span class="sn">Written: 29 proposed endpoints, 11 decisions for the two teams. Not yet sent.</span></li>
       </ul></div>
     </div>
-    <div class="check"><b>End of week</b> <span class="st done">Yes</span>The baseline file exists. <span class="st done">Yes</span>The system starts clean and asks for a login. <span class="st todo">Open</span>The OCR decision is made.</div>
+    <div class="check"><b>End of week</b> <span class="st done">Yes</span>The baseline file exists. <span class="st done">Yes</span>The system starts clean and asks for a login. <span class="st done">Yes</span>The OCR decision is made: it runs on our own host.</div>
     <div class="status"><span class="h">Before week 2 starts</span><ul>
       <li><span class="st done">Ruled</span><b>Karim:</b> the 2 rows disqualified by hand (sheet rows 5355 and 5384) stay disqualified. Recorded as exceptions in the replay: <b>parity reached, 0 unexplained differences.</b></li>
       <li><span class="st done">Answered</span><b>Legal + Karim:</b> age limits are allowed, and age may be guessed from graduation year (OPN-02). Still open: which bands apply and how the guess is made (differences D-01, D-02, D-15).</li>
@@ -538,7 +534,7 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
       <li><span class="st part">Week 4</span><b>Send:</b> the API plan to the CRM and website teams. They need it early to build against the frozen API.</li>
       <li><span class="st part">Week 4</span><b>IT:</b> identity provider details (issuer and client ID) so staging signs in with company accounts.</li>
       <li><span class="st part">Week 4</span><b>Infrastructure:</b> a test server, so CI can deploy and the CRM team can test against it.</li>
-      <li><span class="st todo">Week 5</span><b>AI/ML + Legal:</b> where the OCR runs. If outside the company, every CV leaves it (CR-01).</li>
+      <li><span class="st done">Decided</span><b>OCR:</b> runs on our own host, so CVs never leave the company (CR-01).</li>
     </ul></div>
   </div>
 
@@ -688,7 +684,7 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
     <table>
       <thead><tr><th>ID</th><th>Question</th><th>Who answers</th><th>Stops</th></tr></thead>
       <tbody>
-        <tr><td class="id">&mdash;</td><td><b>Where does the OCR API run?</b> Inside our network, or outside?</td><td>AI/ML + Legal</td><td><b>Week 5</b>, and CR-01</td></tr>
+        <tr><td class="id">&mdash;</td><td><b>Where does the OCR API run?</b> Inside our network, or outside?</td><td>AI/ML + Legal</td><td><span class="chip lo">Decided</span> Runs on our own host</td></tr>
         <tr><td class="id">OPN-02</td><td><b>Are age limits allowed?</b> And can we guess age from graduation year?</td><td>Legal + Karim</td><td><span class="chip lo">Answered 14 Sep</span> Yes: age limits are allowed, and age may be guessed from graduation year</td></tr>
         <tr><td class="id">&mdash;</td><td>What are the steps, and what moves are allowed between them? What are the rejection reasons?</td><td>TA leadership</td><td>Week 3</td></tr>
         <tr><td class="id">OPN-03</td><td>Two candidates say their employer is "The Address". Keep them out, or bring them back?</td><td>Karim</td><td>Week 3 sign-off</td></tr>
@@ -710,7 +706,7 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
       <tbody>
         <tr><td><b>There is no spare time.</b> 8 weeks &times; 2 people is fully used</td><td><span class="chip hi">High</span></td><td>The drop order is decided now: first old-CV import, then source reports, then the manual-entry screen. <b>Never drop the replay, the step machine or the backups</b></td></tr>
         <tr><td>Week 2 finds many differences and Karim must rule on all of them</td><td><span class="chip hi">High</span></td><td>Collect them, ask once. If it runs long, everything moves one week. Do not start week 3 to look busy</td></tr>
-        <tr><td>The OCR turns out to be outside-only and legal says no</td><td><span class="chip hi">High</span></td><td>Decide in week 1. A self-hosted replacement costs about one week of Person B, taken from week 7</td></tr>
+        <tr><td>The OCR turns out to be outside-only and legal says no</td><td><span class="chip lo">Closed</span></td><td>The OCR runs on our own host</td></tr>
         <tr><td>CRM team or website team are late</td><td><span class="chip med">Medium</span></td><td>API sent week 1, frozen week 4. Small internal screens held ready, about 4 days total</td></tr>
         <tr><td>Recruiters still do not record steps</td><td><span class="chip med">Medium</span></td><td>A recruiter who wants to act <b>must</b> record, because there is no other way to move a candidate. The rest needs the CPO. It is not something code can fix</td></tr>
         <tr><td>Fewer candidates arrive after the scrapers stop</td><td><span class="chip med">Medium</span></td><td>The apply page is live in week 6 and the scrapers stop in week 8. Measure every week. <b>If the numbers are low at week 8, do not switch off</b> &mdash; run both longer and take it to TA leadership</td></tr>

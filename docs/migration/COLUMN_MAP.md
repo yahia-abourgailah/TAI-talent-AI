@@ -20,9 +20,9 @@ This document says where each of the 47 columns in `TAI_Master.xlsx` goes in the
 
 | Code | Meaning |
 |---|---|
-| RAW | Every sheet row is first stored whole, once, as one `raw.capture` (source `tai_master`, with the workbook hash on the migration job run). Raw is never updated. All 47 cells stay there, byte for byte, even when a column has no structured home. |
-| M-PROV | Provenance on `core.candidate_field`: `source = migrated from TAI_Master`, `source_ref = raw capture id + exact column header`, `verification_state = unverified`, `verified_at` empty, `verified_by` empty (BR-201, BRD 6.2). |
-| HIST-EVAL | Stored on `core.evaluation` as the historic evaluation under criteria v1, with `origin = migrated_historic`. The value is copied as it is. It is **never recomputed on import**. It is the golden-replay baseline (BR-702). |
+| RAW | Every sheet row is first stored whole, once, as one `raw.capture` (source `tai_master`, with the workbook hash on the migration job run). Raw is never updated. Every cell of the row is kept in it, typed, even when a column has no structured home. A row's capture is keyed by sheet row and a hash of its cells, so re-saving the workbook creates no new captures. The workbook file itself is kept as its own capture, byte for byte. |
+| M-PROV | Provenance on `core.candidate_field`: `source = migrated from TAI_Master`, `source_ref = raw capture id + exact column header`, `verification_status = unverified`, `verified_at` empty, `verified_by` empty (BR-201, BRD 6.2). Fields are append-only: a correction or verification is a new row, and `core.candidate_field_current` shows the latest. |
+| HIST-EVAL | Stored on `core.evaluation` as the historic evaluation under criteria version `2026-08-04`, with `origin = stored`. The value is copied as it is. It is **never recomputed on import**. It is the golden-replay baseline (BR-702). |
 | NR | An empty pipeline cell becomes an explicit `not_recorded` state. It is never read as "new", "not contacted" or "not hired", and it is never back-filled (BR-703). |
 | UNK | An actor, timestamp or previous stage the sheet does not hold is stored as `unknown`. It is never invented or guessed from nearby columns. |
 | INF? | The value may have been derived or inferred, not stated by the candidate. It is stored with `inference = unknown`, so it cannot pass as verified. |
@@ -35,9 +35,9 @@ The golden replay reads inputs from the raw capture, not from `core`. So cleanin
 |---|---|
 | `raw.capture` | Already exists (migration 0001). One append-only capture per sheet row. |
 | `core.candidate` | One record per imported row. Lifecycle state, archive reason and actor (BR-205). |
-| `core.candidate_field` | One row per attribute: `field`, `value`, `source`, `source_ref`, `verified_at`, `verified_by`, `verification_state`, `inference`. |
-| `core.candidate_identifier` | External identifiers: profile URL, Notion page. Used for matching in P5. |
-| `core.candidate_source` | Channel, sourcing recruiter and team, first-captured date (BR-108). |
+| `core.candidate_field` | One row per attribute: `field`, `value`, `source`, `source_ref`, `verified_at`, `verified_by`, `verification_status`, `inference`, `recorded_by`. Append-only. |
+| `core.candidate_identifier` | Planned for P5: external identifiers (profile URL, Notion page) for matching. Not built yet; week 2 stores the profile URL as a candidate field. |
+| `core.candidate_source` | Planned once Q-13 and Q-14 are ruled: channel, sourcing recruiter and team, first-captured date (BR-108). Not built yet; week 2 stores Platform and Date Added as candidate fields. |
 | `core.criteria_version` | v1 = ratified 4 August 2026 rules. |
 | `core.evaluation` | `score`, `tier`, `recommendation`, `signals`, `flags`, `call_priority`, `criteria_version_id`, `origin`, `evaluated_at`. |
 | `pipeline.requisition` | Job openings. The sheet has none (see Q-17). |
@@ -60,19 +60,19 @@ The golden replay reads inputs from the raw capture, not from `core`. So cleanin
 | 5 | Location | 3,887 (75.6%) | profile | `core.candidate_field` `location` | M-PROV. Original text, no geocoding at import. Scoring input (Greater Cairo gate). | BR-201, BR-301, BR-704 |
 | 6 | Phone Number | 238 (4.6%) | contact PII | `core.candidate_field` `phone` | M-PROV: "migrated from TAI_Master, unverified". Original text kept. A normalised copy is used for matching only. Unverified, so it cannot be used for contact. No consent is recorded. | BR-201, BR-202, BR-109, CR-02, OPN-01, OPN-11 |
 | 7 | Email | 49 (1.0%) | contact PII | `core.candidate_field` `email` | M-PROV: "migrated from TAI_Master, unverified". Same rules as Phone Number. | BR-201, BR-202, BR-109, CR-02, OPN-01, OPN-11 |
-| 8 | Profile URL | 5,082 (98.9%) | external reference | `core.candidate_identifier` `kind = profile_url` | M-PROV. Stored as given, plus a normalised form for matching. Shared URLs are flagged for P5 review, never merged at import (see Findings F-03). | BR-106, BR-203, BR-204, BR-206, OPN-10 |
+| 8 | Profile URL | 5,082 (98.9%) | external reference | `core.candidate_field` `profile_url` (week 2); `core.candidate_identifier` in P5 | M-PROV. Stored as given. A normalised form for matching comes with P5. Shared URLs are flagged for P5 review, never merged at import (see Findings F-03). | BR-106, BR-203, BR-204, BR-206, OPN-10 |
 | 9 | WhatsApp Invite Sent | 0 (0%) | outreach | `pipeline.contact_attempt` `purpose = invite` (home unconfirmed) | Empty in every row. Nothing created. Outreach history is NR. | BR-505, BR-703, Q-07 |
 | 10 | Education | 3,424 (66.6%) | profile | `core.candidate_field` `education` | M-PROV. Original text. Scoring input, and the likely basis of any age inference. | BR-201, BR-301, OPN-02 |
 | 11 | Years Exp | 3,913 (76.1%) | profile | `core.candidate_field` `years_experience` | M-PROV + INF?. 2,448 are numbers and 1,465 are digits stored as text. Cast only a plain number. May have been computed from job dates. Scoring input (eleven-or-more-years gate). | BR-201, BR-301, Q-19 |
 | 12 | Last Active | 3,933 (76.5%) | profile | `core.candidate_field` `source_last_active` | M-PROV. Original text only. 406 cells are "?", so not recorded. About 15 formats, some relative with no anchor date. Never converted to a date. | BR-201, Q-19 |
-| 13 | Platform | 3,939 (76.6%) | profile | `core.candidate_source` `channel`, `sourcing_recruiter` | M-PROV. Original label kept. Split into channel and the recruiter in brackets only after Q-13. The single "Test" row is archived with a reason once ruled. | BR-108, BR-205, BR-602, Q-13 |
-| 14 | Date Added | 3,939 (76.6%) | profile | `core.candidate_source` `first_captured_at` | M-PROV. Date only; time and timezone UNK. This is not `raw.capture.received_at`, which is the migration time. | BR-701, BR-704, Q-14 |
+| 13 | Platform | 3,939 (76.6%) | profile | `core.candidate_field` `source_platform` (week 2); `core.candidate_source` after Q-13 | M-PROV. Original label kept. Split into channel and the recruiter in brackets only after Q-13. The single "Test" row is archived with a reason once ruled. | BR-108, BR-205, BR-602, Q-13 |
+| 14 | Date Added | 3,939 (76.6%) | profile | `core.candidate_field` `date_added` (week 2); `core.candidate_source` after Q-14 | M-PROV. Date only; time and timezone UNK. This is not `raw.capture.received_at`, which is the migration time. | BR-701, BR-704, Q-14 |
 | 15 | Score | 3,940 (76.7%) | evaluation output | `core.evaluation` `score` | HIST-EVAL. Integer as stored. On the 1,200 blank rows: no evaluation row, and the candidate state is "never scored", not zero. | BR-701, BR-702, BR-301, BR-307, CR-04, NFR-08, OPN-10 |
 | 16 | Tier | 3,940 (76.7%) | evaluation output | `core.evaluation` `tier` | HIST-EVAL. Only P1 to P4 are present; there are no T tiers. | BR-701, BR-702, BR-301, Q-11 |
 | 17 | Recommendation | 3,940 (76.7%) | evaluation output | `core.evaluation` `recommendation` | HIST-EVAL. 7 labels. P4 holds 4 different labels that encode a gate or routing outcome. Stays in the replay baseline unless Q-11 says otherwise. | BR-701, BR-702, BR-302, Q-11 |
-| 18 | Signals (Reasons to call) | 3,701 (72.0%) | evaluation output | `core.evaluation` `signals` | HIST-EVAL. Original text plus a split list. On a scored row a blank means an empty list, not NR (confirm in Q-12). | BR-701, BR-702, BR-307, Q-12 |
-| 19 | Flags (reasons of disqualification) | 536 (10.4%) | evaluation output | `core.evaluation` `flags` | HIST-EVAL. Same blank rule as Signals. | BR-701, BR-702, BR-302, Q-12 |
-| 20 | Call Priority | 3,748 (72.9%) | evaluation output (origin unconfirmed) | `core.evaluation` `call_priority` | HIST-EVAL. Original label kept, plus the label without its leading symbol. 192 scored rows are blank. Does not follow Tier (Q-10). | BR-701, BR-702, Q-10 |
+| 18 | Signals (Reasons to call) | 3,701 (72.0%) | evaluation output | `core.evaluation` `signals` | HIST-EVAL. Original text (`signals_text`) plus the list split on "; " (`signals`). On a scored row a blank means an empty list, not NR (confirm in Q-12). | BR-701, BR-702, BR-307, Q-12 |
+| 19 | Flags (reasons of disqualification) | 536 (10.4%) | evaluation output | `core.evaluation` `flags` | HIST-EVAL. Original text (`flags_text`) plus the split list (`flags`). Same blank rule as Signals. | BR-701, BR-702, BR-302, Q-12 |
+| 20 | Call Priority | 3,748 (72.9%) | evaluation output (origin unconfirmed) | `core.evaluation` `call_priority` | HIST-EVAL. Original label kept as written. 192 scored rows are blank. Does not follow Tier (Q-10). | BR-701, BR-702, Q-10 |
 | 21 | Stage | 15 (0.3%) | pipeline event | `pipeline.stage_event` `to_stage`; `pipeline.application` `current_stage` | One stage event per filled cell: `from_stage`, `actor` and `occurred_at` are UNK; `origin = migrated`. "New" maps to new (14) and "HR Interview" to HR interview (1). No steps in between are invented. On the 5,125 blank rows, `stage_recording_state` is NR. | BR-402, BR-403, BR-703, Q-01, Q-17 |
 | 22 | Phone Screen Result | 4 (0.1%) | pipeline event | `pipeline.interview` `kind = phone_screen`, `outcome` | Outcome "accepted" (case folded, original kept). Date and interviewer UNK. No stage event unless Q-01 allows it. Blank is NR. | BR-402, BR-703, Q-01 |
 | 23 | Interview Scheduled | 2 (<0.1%) | pipeline event | `pipeline.interview` `scheduled`, `scheduled_at` | Mixed: one yes-flag and one date-time stored as text. Original kept. `scheduled_at` only after Q-21. Blank is NR. | BR-507, BR-703, Q-21 |
@@ -99,7 +99,7 @@ The golden replay reads inputs from the raw capture, not from `core`. So cleanin
 | 44 | WA Reply Date | 82 (1.6%) | outreach | `pipeline.contact_attempt` (inbound) `occurred_at` | 50 date-time and 32 date-only values. Date-only keeps date precision; no time is invented. | BR-403, BR-703 |
 | 45 | Contact Decision | 82 (1.6%) | pipeline event (meaning unconfirmed) | Proposed `pipeline.contact_attempt` `recruiter_decision` | Copied as a label. Not a rejection, not a stage event, and does not archive the candidate. `actor` UNK. | BR-404, BR-405, Q-09 |
 | 46 | Assigned Recruiter | 596 (11.6%) | pipeline event (ownership) | `pipeline.application` `owner_recruiter_id` | Mapped to a staff login identity (Q-18). `assigned_at` and `assigned_by` UNK. Blank means owner not recorded (NR), not "unassigned". This is not the sourcing recruiter, which comes from Platform. | BR-701, BR-108, BR-408, NFR-09, Q-18 |
-| 47 | Notion Page ID | 15 (0.3%) | external reference | `core.candidate_identifier` `kind = notion_page` | Kept as a reference only. Notion is not called during migration. Filled on exactly the same 15 rows as Stage. | BR-705, CR-01, Q-05 |
+| 47 | Notion Page ID | 15 (0.3%) | external reference | raw capture only in week 2; `core.candidate_identifier` in P5 | Kept as a reference only. Notion is not called during migration. Filled on exactly the same 15 rows as Stage. | BR-705, CR-01, Q-05 |
 
 **Columns mapped: 47 of 47.** Columns with no confirmed home: 33 Attempt #, 34 Sales Team, 36 On Floor Date, 41 HR Feedback, 45 Contact Decision, and the 355 link cells in 42.
 
@@ -148,7 +148,7 @@ Each question needs a short ruling. "Our proposal" is what we would do. It is **
 
 ### Questions the week 2 import depends on (A3)
 
-The week 2 import (`python -m importer.tai_master`) moves only columns 1 to 20 into structured tables, and stores them in a form every proposed ruling can still build on: original text, unverified, inference unknown where the value may be derived, blanks and "?" as not recorded. Columns 9 and 21 to 47 stay in the raw capture only until week 3. So the import can run now, but these rulings decide whether what it stored is final. Ask Karim for these in one meeting and write each answer into the table above.
+The week 2 import (`python -m importer.tai_master`) moves only columns 1 to 20 into structured tables, and stores them in a form every proposed ruling can still build on: the cell text as the sheet shows it (dates as ISO 8601 text), unverified, inference unknown where the value may be derived, blanks and "?" as not recorded. Columns 9 and 21 to 47 stay in the raw capture only until week 3. So the import can run now, but these rulings decide whether what it stored is final. Ask Karim for these in one meeting and write each answer into the table above.
 
 | ID | Why the import needs it | What the import does until it is ruled | Answer (Karim, date) |
 |---|---|---|---|
