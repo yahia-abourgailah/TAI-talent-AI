@@ -30,6 +30,7 @@ from pipeline.store import (
 )
 
 PROVISIONAL = "provisional-brd-2026-09"
+PROPOSED = "proposed-2026-09-15"
 STEPS = (
     "new",
     "contacted",
@@ -112,9 +113,9 @@ def _refused(conn, *args, **kwargs) -> str:
 # --- B2: the step list is data, and provisional ---------------------------------------------------
 
 
-def test_the_provisional_brd_list_is_in_force_and_marked_provisional(conn):
+def test_the_proposed_list_is_in_force_and_still_marked_provisional(conn):
     steps = active_step_list(conn)
-    assert (steps["version"], steps["provisional"]) == (PROVISIONAL, True)
+    assert (steps["version"], steps["provisional"]) == (PROPOSED, True)  # migration 0009
     assert tuple(step["code"] for step in steps["steps"]) == STEPS
     assert {s["code"]: s["outcome"] for s in steps["steps"]}["hired"] == "hired"
     moves = {(m["from_step"], m["to_step"]) for m in steps["moves"]}

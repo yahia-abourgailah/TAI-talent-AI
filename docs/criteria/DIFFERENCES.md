@@ -582,6 +582,39 @@ Confirm that none of these carries rule meaning. Options: (a) confirmed — the 
 
 ---
 
+## D-19 — Track B disqualifications with no rejection reason
+
+**What the code does**
+
+When a new application is scored (week 4), a disqualification never rejects anyone: it opens a review item with a reason from the rejection list, for a person to confirm. Each scorer reason is mapped to a list reason in `src/scoring/platform.py`. Two Track B reasons have no agreed mapping, so they open no review item and are listed as unresolved in the scoring run:
+
+- "No tenured title match" (`v2026_08_04.py:1039-1040`): the current title is not one of the tenured sales titles.
+- "Employer not recognised (not RE, brokerage, or crossover industry)" (`:1050-1051`).
+
+Four more were mapped without a ruling and need confirming:
+
+- "Too senior for agent recruit" (`:1009-1010`) → `experience_not_a_fit`.
+- "Over 38" (`:1026-1027`) → `age_outside_range`.
+- "Under 25 — route to entry-level Track A" (`:1031-1032`) → routed, no review item.
+- Track A "Team Leader / Supervisor — Track B target" (`:551`) → routed, no review item.
+
+**On the real workbook**
+
+None of the 5,140 rows is Track B, so no migrated candidate is affected. All 239 migrated disqualifications are Track A and map to agreed reasons: Team Leader or Supervisor routed 113, managerial title 54, current employee 38, outside Cairo 17, under 21 9, 11+ years 4, over 32 2, non-Egypt location 2.
+
+**Why it matters**
+
+The first Track B openings will produce these verdicts. Without a ruling, the candidate gets a score of 0 but no review item, so no one is asked to decide.
+
+**Question**
+
+1. For "No tenured title match" and for "Employer not recognised", choose: (a) a review item with `experience_not_a_fit`; (b) a new reason on the list, for example `not_a_tenured_profile` or `background_not_relevant`; (c) not a rejection: keep the score and open nothing.
+2. Confirm or correct the four mappings above.
+
+**Related:** BR-301, BR-404, BR-405, D-10, D-18.
+
+---
+
 ## Question for TA leadership: answered
 
 OBJ-01 says "≥ 95% of active applications" carry a current stage 30 days after go-live. Neither the BRD nor the criteria defined "active".

@@ -170,7 +170,7 @@ def test_a_rejection_is_reversed_by_a_new_application(api):
     headers = _as(client, "recruiter-a")
     rejected = client.post(
         f"/v1/applications/{application['id']}/transitions",
-        json={"from_stage": "new", "to_stage": "rejected", "reason_code": "withdrew"},
+        json={"from_stage": "new", "to_stage": "rejected", "reason_code": "withdrew_other"},
         headers=headers,
     )
     assert rejected.status_code == 201

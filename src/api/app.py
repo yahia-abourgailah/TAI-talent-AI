@@ -18,6 +18,7 @@ from api.candidate_routes import router as candidate_router
 from api.dev_routes import router as dev_router
 from api.event_routes import router as event_router
 from api.pipeline_routes import router as pipeline_router
+from api.report_routes import router as report_router
 from api.review_routes import router as review_router
 from api.routes import router
 from auth import DevIdentity, TokenVerifier
@@ -91,4 +92,5 @@ def create_app(
     app.include_router(event_router)
     app.include_router(review_router)
     app.include_router(candidate_router)
+    app.include_router(report_router)
     return app

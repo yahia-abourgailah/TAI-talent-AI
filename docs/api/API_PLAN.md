@@ -75,9 +75,10 @@ The `/v1` surface below is **built and frozen** (week 4). From here on it change
 | POST | `/v1/candidates/search` | Find candidates by name, email or phone, sent in the body |
 | GET | `/v1/candidates/{candidate_id}/evaluations`, `/v1/evaluations/{evaluation_id}` | Evaluations and the reasons behind them |
 | GET | `/v1/events` | The event feed (section 7) |
+| GET | `/v1/reports/funnel` | Volume and conversion per stage, with contactability. TA lead and admin |
 | GET, POST | `/dev/accounts`, `/dev/token` | **Dev only.** Fake accounts `recruiter-a`, `recruiter-b`, `ta-lead`, `criteria-owner`, `admin`, and tokens for them. Absent in staging and production |
 
-**Still to come:** `GET /v1/reports/funnel` later in week 4. CV upload, manual candidate entry and documents in week 5, the public website endpoints in weeks 5–6 (section 8).
+**Still to come:** CV upload, manual candidate entry and documents in week 5, the public website endpoints in weeks 5–6 (section 8).
 
 **Where the build differs from the first proposal:**
 
@@ -228,6 +229,7 @@ Every error has this body:
 | `reason_not_allowed` | 409 | Only a rejection carries a reason code |
 | `requisition_closed` | 409 | A closed requisition takes no applications and cannot close again |
 | `candidate_not_eligible` | 409 | This candidate cannot receive applications yet |
+| `grouping_not_available` | 400 | The report cannot be grouped that way yet |
 | `review_item_resolved` | 409 | The review item was already confirmed or dismissed |
 | `not_a_rejection` | 409 | Only an application's rejection, as its latest move, can be reversed |
 | `already_exists` | 409 | For example, the candidate already has an application on this requisition |
@@ -353,9 +355,36 @@ Item kinds fill in as the platform grows: `negative_verdict` now; `flagged_docum
 
 ### Reports
 
-| Method | Path | Purpose | Requirements | Week |
-|---|---|---|---|---|
-| GET | `/v1/reports/funnel` | Volume and conversion per stage, computed from saved transitions. Parameters: `from`, `to`, `group_by` (`requisition`, `brand`, `recruiter`, `team`, `source`). Includes contactability next to volume | BR-601, BR-109 | 4 (later) |
+`GET /v1/reports/funnel`, for a TA lead or an admin (BR-601, BR-109). Counted only from recorded transitions, never from an application's current stage:
+
+- **Parameters:** `group_by` (`requisition`, `brand`, `recruiter`, `team`), `from` and `to` (arrivals at a stage; `from` inclusive, `to` exclusive; with a time zone). `group_by=source` returns 400 `grouping_not_available` until applications carry a channel and tracking code.
+- **Each group** has `applications`, `candidates`, `contactable_candidates` and `contactability`, and for each stage of the list in force: `reached`, `moved_on`, `rejected_here` with `rejected_by_reason`, `still_here`, and `conversion` (moved on ÷ reached).
+- **`all_candidates`** gives contactability for every candidate on record, next to the volume.
+
+```json
+{
+  "stage_list": "proposed-2026-09-15",
+  "provisional": true,
+  "group_by": "requisition",
+  "from": null,
+  "to": null,
+  "groups": [
+    {
+      "group": "req_12",
+      "applications": 2,
+      "candidates": 2,
+      "contactable_candidates": 1,
+      "contactability": 0.5,
+      "stages": [
+        {"stage": "new", "label": "New", "reached": 2, "moved_on": 1, "rejected_here": 1,
+         "rejected_by_reason": {"not_reachable": 1}, "still_here": 0, "conversion": 0.5}
+      ]
+    }
+  ],
+  "arrivals_at_stages_not_in_the_list": 0,
+  "all_candidates": {"candidates": 5140, "contactable": 242, "contactability": 0.0471}
+}
+```
 
 ---
 

@@ -1,10 +1,10 @@
 # Pipeline step lists
 
-**Requirements:** BR-402, BR-404. **Status:** provisional list in force until TA sends the final one.
+**Requirements:** BR-402, BR-404. **Status:** the proposed list is in force (migration 0009), marked provisional until TA confirms it.
 
 ## What is in force now
 
-Migration 0005 loads and activates list `provisional-brd-2026-09`, marked **provisional**. It follows the BRD stage order:
+Migration 0009 puts list `proposed-2026-09-15` in force, marked **provisional** until TA confirms it: the BRD steps and moves from migration 0005's `provisional-brd-2026-09`, with 19 rejection reasons in place of its placeholders ([lists/proposed-2026-09-15.json](lists/proposed-2026-09-15.json)). It follows the BRD stage order:
 
 new → contacted → replied → phone screen → HR interview → test → technical interview → offer → hired · rejected
 
@@ -13,7 +13,7 @@ new → contacted → replied → phone screen → HR interview → test → tec
 | First step | `new`. Every application starts there, as a recorded move. |
 | Allowed moves | One step forward, and from any open step to `rejected`. Nothing else. |
 | Final steps | `hired` and `rejected`. Nothing moves out of them. |
-| Rejection reasons | `does_not_meet_criteria`, `not_reachable`, `no_response`, `withdrew`, `not_suitable_after_interview`, `did_not_pass_test`, `declined_offer`, `opening_filled`. Placeholders, not TA's list. |
+| Rejection reasons | 19 reasons: 11 the company decided (`outside_hiring_area`, `age_outside_range`, `experience_not_a_fit`, `current_employee`, `not_eligible_for_rehire`, `communication_below_need`, `salary_expectation_above_range`, `did_not_pass_test`, `not_suitable_after_interview`, `checks_not_passed`, `opening_filled`) and 8 the candidate decided (`not_reachable`, `no_response`, `not_interested`, `no_show`, `commute_or_hours`, `accepted_other_offer`, `declined_offer`, `withdrew_other`). |
 
 See it at any time: `GET /v1/pipeline/steps`, or `python -m pipeline.lists show`.
 

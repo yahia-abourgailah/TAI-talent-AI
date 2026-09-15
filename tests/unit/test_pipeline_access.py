@@ -33,6 +33,7 @@ ROUTES = (
     ("get", "/v1/candidates/cand_1/evaluations"),
     ("get", "/v1/evaluations/evl_1"),
     ("get", "/v1/events"),
+    ("get", "/v1/reports/funnel"),
 )
 
 

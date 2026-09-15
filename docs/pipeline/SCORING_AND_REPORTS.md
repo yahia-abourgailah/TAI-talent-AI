@@ -19,11 +19,7 @@ A disqualification never rejects anyone. It opens a `proposed_rejection` review 
 | Team Leader / Supervisor → Track B; Under 25 → Track A | none: routing, not a rejection |
 | Track B: no tenured title, employer not recognised | none: listed as unresolved in the job run, **needs a ruling** |
 
-If the list in force does not have the reason (for example the BRD placeholder list), no item is opened and the run lists it as unresolved. Load the proposed list first:
-
-```bash
-docker compose run --rm api python -m pipeline.lists load docs/pipeline/lists/proposed-2026-09-15.json --by "<your name>"
-```
+Migration 0009 puts the proposed rejection reasons in force, so every agreed reason exists. If a later list lacks one, no item is opened and the run lists it as unresolved.
 
 ## A2: loading TA's open jobs
 
@@ -38,7 +34,7 @@ On the test server use `--token-env TALENT_API_TOKEN` with a TA lead's token. An
 
 ## A3: the funnel
 
-`reports.funnel.funnel_report(conn, group_by=..., date_from=..., date_to=...)`, the numbers behind `GET /v1/reports/funnel`. Counted only from `pipeline.move`; steps from the list in force. Group by `opening`, `brand`, `recruiter`, `team`. **Source is not offered** until applications carry a channel and tracking code. Contactability (phone or email on record) is reported per group and for all candidates.
+`reports.funnel.funnel_report(conn, group_by=..., date_from=..., date_to=...)`, served by `GET /v1/reports/funnel` (`group_by=requisition` there). Counted only from `pipeline.move`; steps from the list in force. Group by `opening`, `brand`, `recruiter`, `team`. **Source is not offered** until applications carry a channel and tracking code. Contactability (phone or email on record) is reported per group and for all candidates.
 
 ```bash
 docker compose run --rm api python -m reports funnel --group-by brand --from 2026-09-21T00:00:00+03:00

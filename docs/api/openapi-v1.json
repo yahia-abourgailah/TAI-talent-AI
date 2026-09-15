@@ -376,6 +376,36 @@
         "title": "CloseRequisitionIn",
         "type": "object"
       },
+      "ContactabilityOut": {
+        "properties": {
+          "candidates": {
+            "title": "Candidates",
+            "type": "integer"
+          },
+          "contactability": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contactability"
+          },
+          "contactable": {
+            "title": "Contactable",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "candidates",
+          "contactable",
+          "contactability"
+        ],
+        "title": "ContactabilityOut",
+        "type": "object"
+      },
       "Error": {
         "properties": {
           "error": {
@@ -628,6 +658,125 @@
           "next_cursor"
         ],
         "title": "EventPage",
+        "type": "object"
+      },
+      "FunnelGroupOut": {
+        "properties": {
+          "applications": {
+            "title": "Applications",
+            "type": "integer"
+          },
+          "candidates": {
+            "title": "Candidates",
+            "type": "integer"
+          },
+          "contactability": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contactability"
+          },
+          "contactable_candidates": {
+            "title": "Contactable Candidates",
+            "type": "integer"
+          },
+          "group": {
+            "title": "Group",
+            "type": "string"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/StageCountsOut"
+            },
+            "title": "Stages",
+            "type": "array"
+          }
+        },
+        "required": [
+          "group",
+          "applications",
+          "candidates",
+          "contactable_candidates",
+          "contactability",
+          "stages"
+        ],
+        "title": "FunnelGroupOut",
+        "type": "object"
+      },
+      "FunnelOut": {
+        "properties": {
+          "all_candidates": {
+            "$ref": "#/components/schemas/ContactabilityOut"
+          },
+          "arrivals_at_stages_not_in_the_list": {
+            "title": "Arrivals At Stages Not In The List",
+            "type": "integer"
+          },
+          "from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From"
+          },
+          "group_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group By"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/FunnelGroupOut"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "provisional": {
+            "title": "Provisional",
+            "type": "boolean"
+          },
+          "stage_list": {
+            "title": "Stage List",
+            "type": "string"
+          },
+          "to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To"
+          }
+        },
+        "required": [
+          "stage_list",
+          "provisional",
+          "group_by",
+          "from",
+          "to",
+          "groups",
+          "arrivals_at_stages_not_in_the_list",
+          "all_candidates"
+        ],
+        "title": "FunnelOut",
         "type": "object"
       },
       "ReasonOut": {
@@ -1059,6 +1208,64 @@
           "next_cursor"
         ],
         "title": "ReviewItemPage",
+        "type": "object"
+      },
+      "StageCountsOut": {
+        "properties": {
+          "conversion": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversion"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "moved_on": {
+            "title": "Moved On",
+            "type": "integer"
+          },
+          "reached": {
+            "title": "Reached",
+            "type": "integer"
+          },
+          "rejected_by_reason": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Rejected By Reason",
+            "type": "object"
+          },
+          "rejected_here": {
+            "title": "Rejected Here",
+            "type": "integer"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          },
+          "still_here": {
+            "title": "Still Here",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "stage",
+          "label",
+          "reached",
+          "moved_on",
+          "rejected_here",
+          "rejected_by_reason",
+          "still_here",
+          "conversion"
+        ],
+        "title": "StageCountsOut",
         "type": "object"
       },
       "StageOut": {
@@ -2305,6 +2512,102 @@
         "summary": "Stages",
         "tags": [
           "reference"
+        ]
+      }
+    },
+    "/v1/reports/funnel": {
+      "get": {
+        "description": "Volume and conversion per stage, from recorded transitions, with contactability.",
+        "operationId": "funnel_v1_reports_funnel_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "group_by",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "requisition",
+                    "brand",
+                    "recruiter",
+                    "team",
+                    "source"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Group By"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunnelOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Funnel",
+        "tags": [
+          "reports"
         ]
       }
     },

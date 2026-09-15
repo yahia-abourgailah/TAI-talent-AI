@@ -126,7 +126,7 @@ def test_full_walk_through_every_stage_as_recruiter_a(api):
     assert {item["actor"]["kind"] for item in items} == {"person"}
     assert all(item["occurred_at"].endswith("Z") for item in items)
 
-    after_hired = _move(client, headers, application, "hired", "rejected", "withdrew")
+    after_hired = _move(client, headers, application, "hired", "rejected", "withdrew_other")
     assert after_hired.status_code == 409
     assert _error(after_hired)["code"] == "stage_is_final"
 
@@ -165,9 +165,9 @@ def test_a_rejection_through_the_api_needs_a_listed_reason(api):
         response = _move(client, headers, application, "new", "rejected", reason)
         assert response.status_code == 409
         assert _error(response)["code"] == "rejection_reason_required"
-    response = _move(client, headers, application, "new", "rejected", "withdrew")
+    response = _move(client, headers, application, "new", "rejected", "withdrew_other")
     assert response.status_code == 201
-    assert response.json()["reason_code"] == "withdrew"
+    assert response.json()["reason_code"] == "withdrew_other"
 
 
 def test_recruiter_a_gets_not_found_for_recruiter_b_application(api):
@@ -339,6 +339,6 @@ def test_reference_reasons_come_from_the_list_in_force(api):
     client, _connection = api
     headers = _as(client, "recruiter-a")
     rejection = client.get("/v1/reference/reasons", params={"kind": "rejection"}, headers=headers)
-    assert "withdrew" in {reason["code"] for reason in rejection.json()["items"]}
+    assert "withdrew_other" in {reason["code"] for reason in rejection.json()["items"]}
     override = client.get("/v1/reference/reasons", params={"kind": "override"}, headers=headers)
     assert override.json()["items"] == []
