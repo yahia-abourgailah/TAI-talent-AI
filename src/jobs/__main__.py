@@ -1,6 +1,6 @@
 """Run queued jobs and look up what earlier runs did.
 
-python -m jobs work [--job JOB_ID]
+python -m jobs work [--job JOB_ID] [--loop [--poll SECONDS]]
 python -m jobs recover
 python -m jobs show JOB_ID
 python -m jobs history [--kind KIND] [--limit N]
@@ -9,15 +9,22 @@ python -m jobs history [--kind KIND] [--limit N]
 import argparse
 import json
 import sys
+import time
 from typing import Any
 
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
 
 from importer.tai_master import JOB_KIND as TAI_MASTER_IMPORT
 from importer.tai_master import handle as import_tai_master
 from jobs.queue import Handler, engine_from_environment, find_runs, recover_stopped, work_one
+from scoring.platform import JOB_KIND as SCORE_APPLICATION
+from scoring.platform import handle as score_application
 
-HANDLERS: dict[str, Handler] = {TAI_MASTER_IMPORT: import_tai_master}
+HANDLERS: dict[str, Handler] = {
+    TAI_MASTER_IMPORT: import_tai_master,
+    SCORE_APPLICATION: score_application,
+}
 
 
 def _print(value: Any) -> None:
@@ -29,6 +36,8 @@ def main(argv: list[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     work = commands.add_parser("work", help="run queued jobs until none are left")
     work.add_argument("--job", type=int, help="run only this queued job")
+    work.add_argument("--loop", action="store_true", help="keep running and pick up new jobs")
+    work.add_argument("--poll", type=float, default=1.0, help="seconds between checks (--loop)")
     commands.add_parser("recover", help="record and requeue jobs whose worker stopped")
     show = commands.add_parser("show", help="every recorded run of one job")
     show.add_argument("job_id", type=int)
@@ -71,8 +80,18 @@ def main(argv: list[str] | None = None) -> int:
 
     failed = 0
     while True:
-        result = work_one(engine, HANDLERS, args.job)
+        try:
+            result = work_one(engine, HANDLERS, args.job)
+        except DBAPIError as exc:
+            if not args.loop:
+                raise
+            print(f"Database unavailable ({type(exc).__name__}); retrying.", file=sys.stderr)
+            time.sleep(max(args.poll, 5.0))
+            continue
         if result is None:
+            if args.loop and args.job is None:
+                time.sleep(args.poll)
+                continue
             break
         job, run = result
         print(f"Job {job.id} ({job.kind}) {run['outcome']}, run {run['id']}.")

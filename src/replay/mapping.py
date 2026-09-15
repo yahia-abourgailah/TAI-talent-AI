@@ -25,6 +25,7 @@ defaults, as they evidently did when the stored scores were produced.
 import hashlib
 import json
 import math
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -77,8 +78,12 @@ def track(values: dict[str, Any]) -> str:
     return "headhunt" if text(values.get("Tier")).upper().startswith("T") else "entry"
 
 
-def map_row(row: MasterRow) -> MappedRow:
-    values = row.values
+def candidate_from_values(values: Mapping[str, Any]) -> tuple[Candidate, tuple[str, ...]]:
+    """The ruleset's Candidate from values keyed by workbook column, and the columns unreadable.
+
+    The one mapping both the replay and the platform's live scoring use, so they cannot disagree
+    about the same fields.
+    """
     issues: list[str] = []
     years = number(values.get("Years Exp"), "Years Exp", issues)
     age = number(values.get("Age"), "Age", issues)
@@ -95,10 +100,19 @@ def map_row(row: MasterRow) -> MappedRow:
         age=None if age is None else int(age),
         source_platform=text(values.get("Platform")).lower(),
     )
+    return candidate, tuple(issues)
+
+
+def input_sha256(candidate: Candidate) -> str:
     encoded = json.dumps(asdict(candidate), sort_keys=True, ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def map_row(row: MasterRow) -> MappedRow:
+    candidate, issues = candidate_from_values(row.values)
     return MappedRow(
         candidate=candidate,
-        mode=track(values),
-        input_sha256=hashlib.sha256(encoded).hexdigest(),
-        parse_issues=tuple(issues),
+        mode=track(row.values),
+        input_sha256=input_sha256(candidate),
+        parse_issues=issues,
     )

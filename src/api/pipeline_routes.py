@@ -35,6 +35,8 @@ class OpeningIn(BaseModel):
     headcount: int = Field(gt=0, le=10_000)
     team: Text
     owner_recruiter: Text | None = None
+    # Optional: the version in force is used when absent. TA's jobs file names it (A2).
+    criteria_version_id: Annotated[str, Field(pattern=r"^[0-9A-Za-z._-]{1,64}$")] | None = None
 
 
 class CloseOpeningIn(BaseModel):

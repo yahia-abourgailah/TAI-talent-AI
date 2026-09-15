@@ -19,7 +19,7 @@ be a candidate's name, phone or email, and a run record is kept forever.
 
 import json
 import os
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -135,19 +135,29 @@ def find_queued(conn: Connection, kind: str, params: Mapping[str, Any]) -> int |
 
 
 def claim(
-    conn: Connection, job_id: int | None = None, *, lock_conn: Connection | None = None
+    conn: Connection,
+    job_id: int | None = None,
+    *,
+    lock_conn: Connection | None = None,
+    kinds: Sequence[str] | None = None,
 ) -> Job | None:
     """Marks the oldest queued job, or the one given, as running. None when nothing is queued.
+
+    With kinds, only a job of one of those kinds is claimed: a worker never takes a job it has no
+    handler for, which would fail a job another worker could run.
 
     With lock_conn, the job's advisory lock is taken on that connection first, and held until the
     caller releases it. Without it the job is not protected from recover_stopped; that is only for
     a claim and run inside one transaction, as the tests do.
     """
     only = "" if job_id is None else "AND id = :job_id"
-    params: dict[str, Any] = {} if job_id is None else {"job_id": job_id}
+    params: dict[str, Any] = {"kinds": None if kinds is None else list(kinds)}
+    if job_id is not None:
+        params["job_id"] = job_id
     found = conn.execute(
         text(
             f"SELECT id FROM jobs.job WHERE status = 'queued' {only} "
+            "AND (CAST(:kinds AS text[]) IS NULL OR kind = ANY(:kinds)) "
             "ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED"
         ),
         params,
@@ -264,7 +274,7 @@ def work_one(
     with engine.connect() as lock_conn:
         try:
             with engine.begin() as conn:
-                job = claim(conn, job_id, lock_conn=lock_conn)
+                job = claim(conn, job_id, lock_conn=lock_conn, kinds=list(handlers))
             if job is None:
                 return None
             with engine.begin() as conn:

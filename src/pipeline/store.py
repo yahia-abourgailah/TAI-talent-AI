@@ -95,7 +95,9 @@ def create_opening(
     headcount: int,
     team: str,
     owner_recruiter: str | None = None,
+    criteria_version_id: str | None = None,
 ) -> dict[str, Any]:
+    """Uses the criteria version given, or the one in force when none is given."""
     owner = owner_recruiter or actor.subject
     if not actor.sees_all and owner != actor.subject:
         raise NotPermitted("A recruiter creates openings they own.")
@@ -108,7 +110,9 @@ def create_opening(
                created_by)
             SELECT :brand, :department, :track, :headcount, :owner, :team, cv.id, :by
             FROM (
-              SELECT id FROM core.criteria_version WHERE effective_from <= current_date
+              SELECT id FROM core.criteria_version
+              WHERE CASE WHEN CAST(:criteria AS text) IS NULL THEN effective_from <= current_date
+                         ELSE id = :criteria END
               ORDER BY effective_from DESC, created_at DESC LIMIT 1
             ) cv
             RETURNING {_OPENING}
@@ -122,9 +126,12 @@ def create_opening(
             "owner": owner,
             "team": team,
             "by": actor.subject,
+            "criteria": criteria_version_id,
         },
     )
     if not rows:
+        if criteria_version_id is not None:
+            raise Refused(f"No criteria version {criteria_version_id}.")
         raise Refused("No criteria version is in force.")
     return rows[0]
 

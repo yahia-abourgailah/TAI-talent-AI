@@ -1,0 +1,229 @@
+"""A1: a new application is scored straight away, exactly as the replay would score the same
+fields, and a disqualification only ever opens a review item. Made-up candidates; all rolled back.
+"""
+
+import pytest
+from sqlalchemy import text
+
+from jobs.queue import claim, find_runs, run_job
+from pipeline.access import Actor
+from pipeline.store import create_application, create_opening, get_application, move_history
+from replay.mapping import map_row
+from replay.workbook import MasterRow
+from scoring.platform import FIELD_TO_COLUMN, JOB_KIND, handle
+from scoring.rulesets.v2026_08_04 import score_candidate
+
+from .conftest import sign_in
+
+TA_LEAD = Actor("dev|ta-lead", sees_all=True)
+PROFILE = {
+    "Name": "Fake Person",
+    "Age": 25,
+    "Title": "Sales Representative",
+    "Employer": "Made-up Retail Co",
+    "Location": "New Cairo",
+    "Education": "bachelor",
+    "Years Exp": 2,
+    "Platform": "W",
+}
+
+
+@pytest.fixture
+def conn(app_engine):
+    with app_engine.connect() as connection:
+        yield connection
+
+
+def _fields(values: dict[str, object]) -> dict[str, object]:
+    return {f: values[c] for f, c in FIELD_TO_COLUMN.items() if values.get(c) is not None}
+
+
+def _apply(conn, make_candidate, values: dict[str, object], track: str = "A") -> dict:
+    opening = create_opening(
+        conn,
+        TA_LEAD,
+        brand="Made-up Brand",
+        department="Sales",
+        track=track,
+        headcount=2,
+        team="team-a",
+        owner_recruiter="dev|recruiter-a",
+    )
+    return create_application(conn, TA_LEAD, opening["id"], make_candidate(conn, **_fields(values)))
+
+
+def _queued_job(conn, application_id: int) -> int:
+    return int(
+        conn.execute(
+            text(
+                "SELECT id FROM jobs.job WHERE kind = :kind AND status = 'queued' "
+                "AND params->>'application_id' = :application"
+            ),
+            {"kind": JOB_KIND, "application": str(application_id)},
+        ).scalar_one()
+    )
+
+
+def _score(conn, application_id: int) -> dict:
+    job = claim(conn, _queued_job(conn, application_id))
+    assert job is not None
+    run_job(conn, job, {JOB_KIND: handle})
+    (run,) = find_runs(conn, job_id=job.id, limit=1)
+    assert run["outcome"] == "succeeded", run["error"]
+    return run
+
+
+def _evaluations(conn, candidate_id: int):
+    return conn.execute(
+        text(
+            "SELECT id, origin, score, tier, criteria_version_id, evaluated_at "
+            "FROM core.evaluation WHERE candidate_id = :c ORDER BY id"
+        ),
+        {"c": candidate_id},
+    ).all()
+
+
+def _review_items(conn, application_id: int) -> list[tuple]:
+    rows = conn.execute(
+        text("SELECT reason_code, proposed_by FROM pipeline.review_item WHERE application_id = :a"),
+        {"a": application_id},
+    )
+    return [tuple(row) for row in rows]
+
+
+def test_creating_an_application_queues_its_scoring(conn, make_candidate):
+    application = _apply(conn, make_candidate, PROFILE)
+    assert _queued_job(conn, application["id"])
+
+
+def test_the_computed_score_equals_the_replay_for_the_same_fields(
+    conn, make_candidate, use_proposed_list
+):
+    use_proposed_list(conn)
+    application = _apply(conn, make_candidate, PROFILE)
+    _score(conn, application["id"])
+
+    (evaluation,) = _evaluations(conn, application["candidate_id"])
+    expected = score_candidate(map_row(MasterRow(2, PROFILE)).candidate, mode="entry")
+    assert (evaluation.origin, evaluation.criteria_version_id) == ("computed", "2026-08-04")
+    assert (evaluation.score, evaluation.tier) == (expected.overall_score, expected.priority)
+    assert evaluation.evaluated_at >= application["created_at"]
+
+
+def test_a_track_b_opening_scores_in_track_b(conn, make_candidate, use_proposed_list):
+    use_proposed_list(conn)
+    application = _apply(conn, make_candidate, PROFILE, track="B")
+    _score(conn, application["id"])
+    (evaluation,) = _evaluations(conn, application["candidate_id"])
+    expected = score_candidate(map_row(MasterRow(2, PROFILE)).candidate, mode="headhunt")
+    assert (evaluation.score, evaluation.tier) == (expected.overall_score, expected.priority)
+
+
+def test_a_re_score_is_a_new_evaluation_never_an_overwrite(conn, make_candidate, use_proposed_list):
+    use_proposed_list(conn)
+    application = _apply(conn, make_candidate, PROFILE)
+    _score(conn, application["id"])
+    conn.execute(
+        text(
+            "INSERT INTO jobs.job (kind, params, requested_by) "
+            "VALUES (:kind, jsonb_build_object('application_id', CAST(:a AS bigint)), 'test')"
+        ),
+        {"kind": JOB_KIND, "a": application["id"]},
+    )
+    _score(conn, application["id"])
+    first, second = _evaluations(conn, application["candidate_id"])
+    assert first.id != second.id
+    assert first.score == second.score
+    assert second.evaluated_at >= first.evaluated_at
+
+
+@pytest.mark.parametrize(
+    ("changes", "reason"),
+    [
+        ({"Location": "Alexandria"}, "outside_hiring_area"),
+        ({"Age": 40}, "age_outside_range"),
+        ({"Title": "Sales Manager"}, "experience_not_a_fit"),
+    ],
+)
+def test_a_disqualification_opens_a_review_item_and_never_rejects(
+    conn, make_candidate, use_proposed_list, changes, reason
+):
+    use_proposed_list(conn)
+    application = _apply(conn, make_candidate, {**PROFILE, **changes})
+    run = _score(conn, application["id"])
+
+    assert _review_items(conn, application["id"]) == [(reason, "scoring-worker")]
+    assert run["counts"]["review_items_opened"] == 1
+    assert get_application(conn, TA_LEAD, application["id"])["current_step"] == "new"
+    assert [m["to_step"] for m in move_history(conn, TA_LEAD, application["id"])] == ["new"]
+    (evaluation,) = _evaluations(conn, application["candidate_id"])
+    assert evaluation.score == 0
+
+
+def test_routing_to_track_b_is_not_a_rejection(conn, make_candidate, use_proposed_list):
+    use_proposed_list(conn)
+    application = _apply(conn, make_candidate, {**PROFILE, "Title": "Team Leader"})
+    run = _score(conn, application["id"])
+    assert _review_items(conn, application["id"]) == []
+    assert run["counts"]["routed_to_other_track"] == 1
+
+
+def test_scoring_again_does_not_open_a_second_review_item(conn, make_candidate, use_proposed_list):
+    use_proposed_list(conn)
+    application = _apply(conn, make_candidate, {**PROFILE, "Age": 40})
+    _score(conn, application["id"])
+    conn.execute(
+        text(
+            "INSERT INTO jobs.job (kind, params, requested_by) "
+            "VALUES (:kind, jsonb_build_object('application_id', CAST(:a AS bigint)), 'test')"
+        ),
+        {"kind": JOB_KIND, "a": application["id"]},
+    )
+    run = _score(conn, application["id"])
+    assert len(_review_items(conn, application["id"])) == 1
+    assert run["counts"]["review_item_already_open"] == 1
+
+
+def test_a_reason_missing_from_the_list_in_force_is_listed_not_guessed(
+    conn, make_candidate, use_provisional_list
+):
+    use_provisional_list(conn)  # the BRD placeholder list has no outside_hiring_area
+    application = _apply(conn, make_candidate, {**PROFILE, "Location": "Alexandria"})
+    run = _score(conn, application["id"])
+    assert _review_items(conn, application["id"]) == []
+    assert [item["code"] for item in run["unresolved"]] == ["reason_not_on_the_list_in_force"]
+
+
+def test_an_application_created_through_the_api_is_scored_and_never_rejected(
+    api_client, make_candidate, use_proposed_list
+):
+    client, connection = api_client
+    use_proposed_list(connection)
+    headers = sign_in(client, "recruiter-a")
+    opening = client.post(
+        "/v1/openings",
+        json={
+            "brand": "Made-up Brand",
+            "department": "Sales",
+            "track": "A",
+            "headcount": 2,
+            "team": "team-a",
+        },
+        headers=headers,
+    ).json()
+
+    for values, expected_review in ((PROFILE, []), ({**PROFILE, "Age": 40}, ["age_outside_range"])):
+        candidate = make_candidate(connection, **_fields(values))
+        application = client.post(
+            "/v1/applications",
+            json={"opening_id": opening["id"], "candidate_id": candidate},
+            headers=headers,
+        ).json()
+        _score(connection, application["id"])
+
+        (evaluation,) = _evaluations(connection, candidate)
+        replayed = score_candidate(map_row(MasterRow(2, values)).candidate, mode="entry")
+        assert evaluation.score == replayed.overall_score
+        assert [r for r, _by in _review_items(connection, application["id"])] == expected_review
+        state = client.get(f"/v1/applications/{application['id']}", headers=headers).json()
+        assert state["current_step"] == "new"
