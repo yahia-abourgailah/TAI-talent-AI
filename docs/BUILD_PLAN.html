@@ -212,7 +212,7 @@ footer{margin-top:48px; padding-top:20px; border-top:2px solid var(--ink); font-
     <div class="fact"><dt>Candidates moved</dt><dd>5,140</dd></div>
     <div class="fact"><dt>Big gate</dt><dd>Week 2</dd></div>
     <div class="fact"><dt>OCR</dt><dd>On our own host</dd></div>
-    <div class="fact"><dt>Now</dt><dd>Week 1 built &middot; decisions open</dd></div>
+    <div class="fact"><dt>Now</dt><dd>Week 2 built &middot; gate waits on CI and a hand check</dd></div>
   </dl>
 </header>
 
@@ -524,37 +524,55 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
       </ul></div>
     </div>
     <div class="check"><b>End of week</b> <span class="st done">Yes</span>The baseline file exists. <span class="st done">Yes</span>The system starts clean and asks for a login. <span class="st done">Yes</span>The OCR decision is made: it runs on our own host.</div>
-    <div class="status"><span class="h">Before week 2 starts</span><ul>
-      <li><span class="st done">Ruled</span><b>Karim:</b> the 2 rows disqualified by hand (sheet rows 5355 and 5384) stay disqualified. Recorded as exceptions in the replay: <b>parity reached, 0 unexplained differences.</b></li>
-      <li><span class="st done">Answered</span><b>Legal + Karim:</b> age limits are allowed, and age may be guessed from graduation year (OPN-02). Still open: which bands apply and how the guess is made (differences D-01, D-02, D-15).</li>
-      <li><span class="st block">Week 2</span><b>Infrastructure:</b> a self-hosted parity runner. Until it exists, any change to scoring fails CI, including this branch's PR.</li>
-      <li><span class="st done">Done</span><b>Us:</b> week 1 code committed, pushed and merged into <code>dev</code>.</li>
-      <li><span class="st part">Week 3</span><b>TA:</b> the stage list, the allowed moves and the rejection reasons. Also: which of the 5,140 migrated candidates are still in the process (OPN-11)? Every one counts toward the 95% until it has a stage or is closed.</li>
-      <li><span class="st part">Week 3</span><b>Karim:</b> send <code>CLAUDE.md</code> to finish the three-way comparison, and rule on the 18 differences. Rulings go into a new rules version, not version 1.</li>
-      <li><span class="st part">Week 4</span><b>Send:</b> the API plan to the CRM and website teams. They need it early to build against the frozen API.</li>
-      <li><span class="st part">Week 4</span><b>IT:</b> identity provider details (issuer and client ID) so staging signs in with company accounts.</li>
-      <li><span class="st part">Week 4</span><b>Infrastructure:</b> a test server, so CI can deploy and the CRM team can test against it.</li>
+    <div class="status"><span class="h">Settled before week 2</span><ul>
+      <li><span class="st done">Ruled</span><b>Karim:</b> the 2 rows disqualified by hand (sheet rows 5355 and 5384) stay disqualified.</li>
+      <li><span class="st done">Answered</span><b>Legal + Karim:</b> age limits are allowed, and age may be guessed from graduation year (OPN-02).</li>
       <li><span class="st done">Decided</span><b>OCR:</b> runs on our own host, so CVs never leave the company (CR-01).</li>
+      <li><span class="st done">Done</span><b>Us:</b> week 1 code committed, pushed and merged into <code>dev</code>.</li>
+      <li>Everything still open is in the list under week 2.</li>
     </ul></div>
   </div>
 
   <div class="week">
-    <div class="wk-h"><span class="no">WEEK 2</span><span class="ti">Move the scorer. Prove it did not change.</span></div>
+    <div class="wk-h"><span class="no">WEEK 2</span><span class="ti">Move the scorer. Prove it did not change.</span><span class="prog st done">Built &middot; 15 Sep</span></div>
     <div class="lanes">
       <div class="lane A"><p class="who">Person A</p><ul>
-        <li>Move the 1,243-line scorer into the new system as <b>rules version 1</b>: gates, weights, bonuses, caps, tiers, routing, own-staff check. <b>No improvements. No tidying.</b> <span class="r">BR-301, BR-303</span></li>
-        <li>Build the replay: run version 1 over all 5,140 and compare to the week 1 file. <span class="r">BR-702</span></li>
-        <li>Write down every difference with the candidate and the field. <b>Collect them and ask Karim once</b>, not one by one. <span class="r">RSK-04</span></li>
-        <li>Tests named after the old lessons: Shorouk word boundary, senior consultant is not a manager, team leaders are routed, own staff by current job only.</li>
+        <li><span class="st done">Done</span>Move the 1,243-line scorer into the new system as <b>rules version 1</b>: gates, weights, bonuses, caps, tiers, routing, own-staff check. <b>No improvements. No tidying.</b> <span class="r">BR-301, BR-303</span>
+          <span class="sn">Moved unchanged in week 1.</span></li>
+        <li><span class="st done">Done</span>Build the replay: run version 1 over all 5,140 and compare to the week 1 file. <span class="r">BR-702</span>
+          <span class="sn">3,938 of 3,940 exact, 2 ruled, 0 unexplained. CI runs it on every scoring change once the parity runner exists.</span></li>
+        <li><span class="st done">Done</span>Write down every difference with the candidate and the field. <b>Collect them and ask Karim once</b>, not one by one. <span class="r">RSK-04</span>
+          <span class="sn">Only 2 differences. Karim ruled both stay disqualified.</span></li>
+        <li><span class="st done">Done</span>Tests named after the old lessons: Shorouk word boundary, senior consultant is not a manager, team leaders are routed, own staff by current job only.</li>
       </ul></div>
       <div class="lane B"><p class="who">Person B</p><ul>
-        <li>Move the 47 columns into real tables. Every field keeps <b>where it came from and who checked it</b>. <span class="r">BR-201</span></li>
-        <li>Empty fields become <b>"not recorded"</b>. Nothing is guessed or filled in. <span class="r">BR-703</span></li>
-        <li>Archive with a reason instead of delete, everywhere. <span class="r">BR-205</span></li>
-        <li>Background workers with a saved job history, and readable logs. <span class="r">NFR-03, BR-604</span></li>
+        <li><span class="st part">Partly</span>Move the 47 columns into real tables. Every field keeps <b>where it came from and who checked it</b>. <span class="r">BR-201</span>
+          <span class="sn">All 5,140 rows imported: 13 profile columns became 66,820 fields with their source, and 3,940 stored scores became evaluations. The 28 pipeline columns stay in the raw records until their rulings and the week 3 tables. Fields are never overwritten; a correction is a new row.</span></li>
+        <li><span class="st done">Done</span>Empty fields become <b>"not recorded"</b>. Nothing is guessed or filled in. <span class="r">BR-703</span>
+          <span class="sn">24,238 fields stored as not recorded. Every stored value matches its cell in the workbook.</span></li>
+        <li><span class="st done">Done</span>Archive with a reason instead of delete, everywhere. <span class="r">BR-205</span>
+          <span class="sn">An archive needs a reason and a person, and cannot be changed. Nothing can be deleted.</span></li>
+        <li><span class="st done">Done</span>Background workers with a saved job history, and readable logs. <span class="r">NFR-03, BR-604</span>
+          <span class="sn">Every run is logged with its counts, skips and open rows, never with candidate data. A stopped import is recorded and finished on the next run.</span></li>
       </ul></div>
     </div>
-    <div class="check gate"><b>Gate &mdash; week 2</b> <b>Zero unexplained differences on all 5,140 records.</b> Every difference answered by Karim and written down. Row counts match the sheet. <b>Week 3 does not start until this passes.</b> If it is late, everything moves by a week. That is correct, not failure.</div>
+    <div class="check gate"><b>Gate &mdash; week 2</b> <span class="st done">Yes</span>Zero unexplained differences on all 5,140 records. <span class="st done">Yes</span>Every difference answered by Karim and written down. <span class="st done">Yes</span>Row counts match the sheet. <span class="st todo">Open</span>The parity check runs green in CI. <span class="st todo">Open</span>The 200-row sample is checked by hand. <b>Week 3 does not start until this passes.</b></div>
+    <div class="status"><span class="h">Tested on the real workbook, 15 Sep</span><ul>
+      <li>Importing twice changes nothing. Importing a re-saved copy of the workbook adds nothing.</li>
+      <li>An import killed half-way keeps nothing, and the next run finishes it.</li>
+      <li>The reconciliation matches every row, field and evaluation, checked directly against the workbook.</li>
+    </ul></div>
+    <div class="status"><span class="h">Before week 3 starts</span><ul>
+      <li><span class="st block">Week 3</span><b>Infrastructure:</b> the self-hosted parity runner. Until it exists, any change to scoring fails CI.</li>
+      <li><span class="st block">Week 3</span><b>A person:</b> check the 200-row sample by hand against the workbook, and record it in <code>WEEK2_DECISIONS.md</code>.</li>
+      <li><span class="st block">Week 3</span><b>Us:</b> push the week 2 fixes to <code>dev</code> on both repositories.</li>
+      <li><span class="st part">Week 3</span><b>Karim:</b> the 7 column-map answers, what the 1,200 never-scored rows become (OPN-10), the 2 candidates listed at "The Address" (OPN-03), <code>CLAUDE.md</code>, and rulings on the 18 differences.</li>
+      <li><span class="st part">Week 3</span><b>TA:</b> the stage list, allowed moves and rejection reasons, and whether candidates with no phone or email are still in the process (OPN-11).</li>
+      <li><span class="st part">Week 3</span><b>HRIS:</b> read access to employee data, for the own-staff check.</li>
+      <li><span class="st part">Week 4</span><b>Send:</b> the API plan to the CRM and website teams.</li>
+      <li><span class="st part">Week 4</span><b>IT:</b> identity provider details, so staging signs in with company accounts.</li>
+      <li><span class="st part">Week 4</span><b>Infrastructure:</b> a test server, so CI can deploy and the CRM team can test.</li>
+    </ul></div>
   </div>
 
   <div class="phase"><span class="r">Steps that cannot be skipped</span><span class="w">Weeks 3&ndash;4 &middot; BRD P3</span></div>
