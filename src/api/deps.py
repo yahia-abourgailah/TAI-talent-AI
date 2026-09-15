@@ -1,8 +1,10 @@
 import logging
+from collections.abc import Iterator
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.engine import Connection
 
 from auth import AuthError, AuthUnavailable, Principal, TokenVerifier
 
@@ -13,6 +15,12 @@ _bearer = HTTPBearer(
     description="A sign-in token from the company identity provider, or from /dev/token in dev.",
 )
 _CHALLENGE = {"WWW-Authenticate": "Bearer"}
+
+
+def db_connection(request: Request) -> Iterator[Connection]:
+    """One transaction per request, as the app role: committed on success, rolled back on error."""
+    with request.app.state.transaction() as connection:
+        yield connection
 
 
 def current_principal(
