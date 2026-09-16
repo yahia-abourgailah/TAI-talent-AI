@@ -211,7 +211,7 @@ footer{margin-top:48px; padding-top:20px; border-top:2px solid var(--ink); font-
     <div class="fact"><dt>Candidates moved</dt><dd>5,140</dd></div>
     <div class="fact"><dt>Big gate</dt><dd>Week 2</dd></div>
     <div class="fact"><dt>OCR</dt><dd>On our own host</dd></div>
-    <div class="fact"><dt>Now</dt><dd>Weeks 3&ndash;4 built &middot; waiting on TA, Karim and a test server</dd></div>
+    <div class="fact"><dt>Now</dt><dd>Week 5 built on a stand-in OCR &middot; week 6 half built</dd></div>
   </dl>
 </header>
 
@@ -645,40 +645,56 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
   <div class="phase"><span class="r">CVs in, and one record per person</span><span class="w">Weeks 5&ndash;6 &middot; BRD P4, P5</span></div>
 
   <div class="week">
-    <div class="wk-h"><span class="no">WEEK 5</span><span class="ti">Reading CVs safely</span></div>
+    <div class="wk-h"><span class="no">WEEK 5</span><span class="ti">Reading CVs safely</span><span class="prog st part">Built &middot; 16 Sep &middot; on a stand-in OCR</span></div>
     <div class="lanes">
       <div class="lane A"><p class="who">Person A</p><ul>
-        <li>Map the OCR output into fields for <b>Arabic, English and mixed</b> CVs. Never translate names. <span class="r">BR-309, NFR-07</span></li>
-        <li>Build the test set: real CVs in both languages, plus CVs with hidden text. Report accuracy on every change. <span class="r">BR-311</span></li>
-        <li><span class="chip drop">Drops first</span> loading old CVs from drives and email. <span class="r">BR-104</span></li>
+        <li><span class="st done">Done</span>Map the OCR output into fields for <b>Arabic, English and mixed</b> CVs. Never translate names. <span class="r">BR-309, NFR-07</span>
+          <span class="sn">A name comes out exactly as the CV wrote it, with the language it was written in. Numbers are read only when they are plain numbers; anything else is left not recorded and counted. An age of 0 is no age, and an age worked out from a date of birth or a graduation year says so, using the criteria's own rule. Built against a guessed answer shape until the OCR team sends real samples.</span></li>
+        <li><span class="st part">Runner ready</span>Build the test set: real CVs in both languages, plus CVs with hidden text. Report accuracy on every change. <span class="r">BR-311</span>
+          <span class="sn">The runner builds a labels sheet for a person to fill in, then reports per field, per language and for hidden content, in counts only. It works on the stand-in OCR. Real CVs, a recruiter to label them, and the real accuracy numbers are still to come.</span></li>
+        <li><span class="st todo">Moved</span><span class="chip drop">Drops first</span> loading old CVs from drives and email. <span class="r">BR-104</span>
+          <span class="sn">Moved to a later week, as planned: it cannot be done without the OCR API.</span></li>
       </ul></div>
       <div class="lane B"><p class="who">Person B</p><ul>
-        <li>Upload &rarr; <b>keep the original file forever</b> &rarr; call the OCR API &rarr; save its answer &rarr; return the filled form. <span class="r">BR-102, BR-107</span></li>
-        <li>Same file twice = one candidate. <span class="r">BR-106</span></li>
-        <li>Limits and retries on the OCR API. If it fails, the candidate goes to the review list &mdash; never lost. <span class="r">NFR-01, NFR-04</span></li>
-        <li>Recruiters can type in a candidate. Marked as manual, and <b>must be checked before contact</b>. <span class="r">BR-103</span></li>
+        <li><span class="st done">Done</span>Upload &rarr; <b>keep the original file forever</b> &rarr; call the OCR API &rarr; save its answer &rarr; return the filled form. <span class="r">BR-102, BR-107</span>
+          <span class="sn">The file type is checked on the file's content, not its name: PDF, DOCX, JPEG or PNG, up to 10 MB, rate limited per visitor. The original is kept under its own fingerprint and cannot be changed by anyone, the OCR's answer is kept exactly as it came, and every time someone lists or downloads a CV it is recorded with their name.</span></li>
+        <li><span class="st done">Done</span>Same file twice = one candidate. <span class="r">BR-106</span>
+          <span class="sn">Recognised by the file's content, so a renamed copy is the same candidate.</span></li>
+        <li><span class="st done">Done</span>Limits and retries on the OCR API. If it fails, the candidate goes to the review list &mdash; never lost. <span class="r">NFR-01, NFR-04</span>
+          <span class="sn">Only a few CVs are read at once, with a timeout and retries at growing gaps. A failure, a refusal, an answer we cannot read, a missing file or a stopped worker all end with the CV waiting for a person. Hidden content does too, whatever the score, and the candidate is never told.</span></li>
+        <li><span class="st done">Done</span>Recruiters can type in a candidate. Marked as manual, and <b>must be checked before contact</b>. <span class="r">BR-103</span>
+          <span class="sn">Every typed-in field is unchecked and carries the recruiter's name. The candidate waits in the review list until a person checks each field; checking one keeps the old value beside the new.</span></li>
       </ul></div>
     </div>
-    <div class="check"><b>End of week</b> A real CV is uploaded and the form comes back correct. A CV the OCR API flags for hidden content goes to a human &mdash; whatever its score.</div>
+    <div class="check"><b>End of week</b> <span class="st todo">Open</span>A real CV is uploaded and the form comes back correct: it needs the OCR API. <span class="st done">Yes</span>A CV flagged for hidden content goes to a human &mdash; whatever its score. <span class="st done">Yes</span>Nothing is lost when reading fails.</div>
+    <div class="status"><span class="h">The OCR API is not reachable yet</span><ul>
+      <li>The address answers on the network but refuses connections from our machine, so nothing has been tried against the real service.</li>
+      <li>Everything is built and tested against a stand-in that returns saved sample answers and can be told to be slow, fail or report hidden content. <b>Switching to the real API is one setting</b>, then the tests and the accuracy run again.</li>
+      <li><b>OCR team:</b> access, how to call it, its limits, how it reports hidden content, and sample answers in Arabic and English.</li>
+    </ul></div>
   </div>
 
   <div class="week">
-    <div class="wk-h"><span class="no">WEEK 6</span><span class="ti">Apply from a job post</span></div>
+    <div class="wk-h"><span class="no">WEEK 6</span><span class="ti">Apply from a job post</span><span class="prog st part">Half built &middot; 16 Sep</span></div>
     <div class="lanes">
       <div class="lane A"><p class="who">Person A</p><ul>
-        <li>Find the same person twice: phone, email, profile link, and <b>Arabic name spellings</b> &mdash; "ال" prefix, ة and ه, ي and ى, and English spellings of the same name. <span class="r">BR-203</span></li>
-        <li>Joining keeps both histories and <b>can be undone</b>. If it is not clear, ask a human. <span class="r">BR-204, BR-206</span></li>
-        <li>Check the matcher on <b>500 pairs by hand</b>. Wrong joins must be under 0.5%. Run it over the 5,140 and show the groups <b>before</b> joining anything.</li>
+        <li><span class="st todo">Next</span>Find the same person twice: phone, email, profile link, and <b>Arabic name spellings</b> &mdash; "ال" prefix, ة and ه, ي and ى, and English spellings of the same name. <span class="r">BR-203</span></li>
+        <li><span class="st todo">Next</span>Joining keeps both histories and <b>can be undone</b>. If it is not clear, ask a human. <span class="r">BR-204, BR-206</span></li>
+        <li><span class="st todo">Next</span>Check the matcher on <b>500 pairs by hand</b>. Wrong joins must be under 0.5%. Run it over the 5,140 and show the groups <b>before</b> joining anything.</li>
       </ul></div>
       <div class="lane B"><p class="who">Person B</p><ul>
-        <li>The apply page API, with <b>consent taken at the moment of applying</b> &mdash; what they agreed to, when, and through which channel. <span class="r">BR-101, CR-02</span></li>
-        <li><b>A phone or WhatsApp number is required</b> to apply. Report how many candidates can be reached, next to how many there are &mdash; today it is 4.6%. <span class="r">BR-109</span></li>
-        <li>If a candidate withdraws consent, remove them everywhere, not only the main table. <span class="r">BR-504</span></li>
-        <li>A tracking code per job post, so we can see which post brings good people. <span class="r">BR-602</span></li>
-        <li><span class="chip ask">Ask</span> the website team adds upload and prefill. If they are late, we put a simple apply page on our own domain in one day. <b>Applications cannot stop before week 8.</b></li>
+        <li><span class="st done">Done</span>The apply page API, with <b>consent taken at the moment of applying</b> &mdash; what they agreed to, when, and through which channel. <span class="r">BR-101, CR-02</span>
+          <span class="sn">The consent text is versioned in Arabic and English, and each candidate's record keeps the version they were shown, the channels they allowed, the language and the time. Consent records are never edited. The wording is provisional until Legal approves one.</span></li>
+        <li><span class="st done">Done</span><b>A phone or WhatsApp number is required</b> to apply. Report how many candidates can be reached, next to how many there are &mdash; today it is 4.6%. <span class="r">BR-109</span>
+          <span class="sn">An application without one is refused. The funnel report already shows contactability beside volume: 4.7% of everyone on record today.</span></li>
+        <li><span class="st todo">Next</span>If a candidate withdraws consent, remove them everywhere, not only the main table. <span class="r">BR-504</span>
+          <span class="sn"><b>Needs a decision:</b> what "remove" means against the rule that nothing is ever deleted (BR-205). Legal and Karim decide; the platform records the withdrawal either way.</span></li>
+        <li><span class="st done">Done</span>A tracking code per job post, so we can see which post brings good people. <span class="r">BR-602</span>
+          <span class="sn">A recruiter gets a code per post; the link carries it, the apply page sends it back, and it is kept with the candidate's consent.</span></li>
+        <li><span class="chip ask">Ask</span>the website team adds upload and prefill. If they are late, we put a simple apply page on our own domain in one day. <b>Applications cannot stop before week 8.</b></li>
       </ul></div>
     </div>
-    <div class="check"><b>End of week</b> A person taps a link in a TikTok post, uploads a CV, checks the form, agrees, and arrives scored, tiered, de-duplicated and assigned &mdash; in under a minute, with no recruiter involved.</div>
+    <div class="check"><b>End of week</b> <span class="st part">Partly</span>A person taps a link in a job post, uploads a CV, checks the form, agrees, and arrives <b>scored, tiered and assigned</b> with no recruiter involved &mdash; proven end to end on our own API. <span class="st todo">Open</span>De-duplicated: the matcher is next. <span class="st todo">Open</span>On a real page, with a real CV: the website team and the OCR API.</div>
   </div>
 
   <div class="phase"><span class="r">Make it safe, then switch over</span><span class="w">Weeks 7&ndash;8 &middot; BRD P6, P10</span></div>
