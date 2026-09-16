@@ -14,10 +14,14 @@ from fastapi import FastAPI, Request, Response
 from sqlalchemy.engine import Connection
 
 from api import errors
+from api.candidate_review_routes import router as candidate_review_router
 from api.candidate_routes import router as candidate_router
 from api.dev_routes import router as dev_router
 from api.event_routes import router as event_router
+from api.limits import RateLimiter
 from api.pipeline_routes import router as pipeline_router
+from api.public_routes import install_upload_guard
+from api.public_routes import router as public_router
 from api.report_routes import router as report_router
 from api.review_routes import router as review_router
 from api.routes import router
@@ -25,6 +29,7 @@ from auth import DevIdentity, TokenVerifier
 from config import AuthMode, Environment, Settings, get_settings
 from config.logs import configure_logging
 from db import make_engine
+from importer.blobs import BlobStore
 from infra.probes import Probe, default_probes
 
 log = logging.getLogger("talent.api")
@@ -38,6 +43,8 @@ def create_app(
     probes: Mapping[str, Probe] | None = None,
     verifier: TokenVerifier | None = None,
     transaction: Transaction | None = None,
+    blobs: BlobStore | None = None,
+    rate_limiter: RateLimiter | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.log_level)
@@ -54,6 +61,9 @@ def create_app(
     app.state.probes = dict(probes) if probes is not None else default_probes(settings)
     # The engine connects lazily, so building the app never touches the database.
     app.state.transaction = transaction or make_engine(settings.db_dsn.get_secret_value()).begin
+    # Object storage is reached on first use (api.deps.blob_store).
+    app.state.blobs = blobs
+    app.state.rate_limiter = rate_limiter or RateLimiter()
     if settings.auth_mode is AuthMode.DEV:
         dev_identity = DevIdentity()
         app.state.dev_identity = dev_identity
@@ -62,6 +72,9 @@ def create_app(
         log.warning("sign-in uses fake dev accounts from POST /dev/token (dev only)")
     else:
         app.state.verifier = verifier or TokenVerifier(settings.oidc_issuer, settings.oidc_audience)
+
+    # Added first, so it runs inside log_requests and its refusals carry the request id.
+    install_upload_guard(app)
 
     @app.middleware("http")
     async def log_requests(
@@ -91,6 +104,8 @@ def create_app(
     app.include_router(pipeline_router)
     app.include_router(event_router)
     app.include_router(review_router)
+    app.include_router(candidate_review_router)
     app.include_router(candidate_router)
     app.include_router(report_router)
+    app.include_router(public_router)
     return app

@@ -7,6 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.engine import Connection
 
 from auth import AuthError, AuthUnavailable, Principal, TokenVerifier
+from importer.blobs import BlobStore, s3_store
 
 log = logging.getLogger("talent.auth")
 
@@ -21,6 +22,15 @@ def db_connection(request: Request) -> Iterator[Connection]:
     """One transaction per request, as the app role: committed on success, rolled back on error."""
     with request.app.state.transaction() as connection:
         yield connection
+
+
+def blob_store(request: Request) -> BlobStore:
+    """Where original files are kept. Built on first use, so the app starts without storage."""
+    state = request.app.state
+    if state.blobs is None:
+        state.blobs = s3_store(state.settings)
+    blobs: BlobStore = state.blobs
+    return blobs
 
 
 def current_principal(

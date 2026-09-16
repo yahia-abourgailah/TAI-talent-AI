@@ -101,6 +101,18 @@ docker compose --profile crm up -d event-delivery
 docker compose run --rm api python -m integrations.webhooks status   # delivered, pending, parked
 ```
 
+### Reading CVs (week 5)
+
+`TALENT_OCR_MODE` picks the OCR: `fake` (saved samples, dev only, and the default in dev) or `api` (the OCR API on our own host: set `TALENT_OCR_BASE_URL` and `TALENT_OCR_API_KEY`). The `worker` service reads uploaded CVs as `read_cv` jobs. Anything that goes wrong sends the CV to a person as a `flagged_document` review item. Details are in [docs/intake/OCR_ANSWER.md](docs/intake/OCR_ANSWER.md).
+
+```bash
+curl -s -F "file=@/path/outside/repo/made-up-cv.pdf" http://127.0.0.1:8090/v1/public/cv-uploads
+curl -s http://127.0.0.1:8090/v1/public/cv-uploads/upl_1 -H "X-Upload-Token: <token>"
+
+# CV reading accuracy on the labelled test set (docs/intake/CV_TEST_SET.md)
+.venv/bin/python -m intake.accuracy run --set "$TALENT_CV_TEST_SET" --reader api
+```
+
 ### Database areas
 
 | Schema | Holds | The API may |
@@ -111,6 +123,7 @@ docker compose run --rm api python -m integrations.webhooks status   # delivered
 | `audit` | Attributed actions and job runs | Insert and read |
 | `api` | Kept responses for `Idempotency-Key` retries | Insert and read. Append-only |
 | `integration` | Events for the CRM, and every delivery attempt | Read events (the database writes them); insert and read attempts |
+| `intake` | CV uploads (token hashes only) and how reading each CV ended | Insert and read. Append-only |
 
 ## Layout
 
@@ -121,6 +134,7 @@ docker compose run --rm api python -m integrations.webhooks status   # delivered
 | `src/config/` | Settings from `TALENT_*` variables, JSON logging |
 | `src/db/` | Database engine for the app role |
 | `src/infra/` | Readiness checks, dev storage bootstrap |
+| `src/intake/` | CVs in: upload, the OCR adapter (real and fake), the answer-to-fields mapping, the `read_cv` job, manual entry, and the accuracy runner |
 | `src/integrations/` | Events for the CRM: the feed and webhook delivery |
 | `src/replay/` | Golden replay: re-runs a criteria version over the master workbook |
 | `src/scoring/` | Candidate scoring. `rulesets/` holds one immutable module per criteria version |

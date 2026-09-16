@@ -1,0 +1,13 @@
+{
+  "_note": "MADE-UP sample, a guess at how the OCR API reports hidden content. No real person. Replace with the OCR team's samples when they arrive.",
+  "schema": "talent-ocr-answer/guess-2026-09-16",
+  "document": {"language": "en", "pages": 1},
+  "fields": {
+    "full_name": {"text": "Test Candidate Gamma", "language": "en", "confidence": 0.97},
+    "phone": {"text": "+20 111 000 0000", "language": "en", "confidence": 0.94},
+    "location": {"text": "Maadi, Cairo", "language": "en", "confidence": 0.9},
+    "current_title": {"text": "Customer Service Agent", "language": "en", "confidence": 0.9},
+    "age": {"text": "27", "language": "en", "confidence": 0.9}
+  },
+  "hidden_content": {"found": true, "kinds": ["white_text", "instructions"], "removed": true}
+}

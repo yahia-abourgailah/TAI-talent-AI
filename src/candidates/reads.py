@@ -1,8 +1,9 @@
 """Reading candidates and their evaluations, scoped to the person asking (BR-201, BR-303, BR-408).
 
-A recruiter sees a candidate when they own one of the candidate's applications; a TA lead or an
-admin sees every candidate. Every field says where it came from and whether anyone verified it; a
-field nobody recorded is not recorded, never a guess (BR-703). Out of scope reads as not found.
+A recruiter sees a candidate when they own one of the candidate's applications, or typed the
+candidate in themselves; a TA lead or an admin sees every candidate. Every field says where it
+came from and whether anyone verified it; a field nobody recorded is not recorded, never a guess
+(BR-703). Out of scope reads as not found.
 
 Evaluations are read with the same scope, except that the criteria owner reads all of them.
 """
@@ -19,10 +20,14 @@ from pipeline.access import Actor, NotFound, run
 CANDIDATE_NOT_FOUND = "Candidate not found."
 EVALUATION_NOT_FOUND = "Evaluation not found."
 
-_VISIBLE = """
+VISIBLE = """
     (:sees_all OR EXISTS (
        SELECT 1 FROM pipeline.application a
        WHERE a.candidate_id = c.id AND a.owner_recruiter = :subject
+    ) OR (
+       c.created_by = :subject AND EXISTS (
+         SELECT 1 FROM raw.capture m WHERE m.id = c.capture_id AND m.source = 'manual_entry'
+       )
     ))
 """
 
@@ -40,7 +45,7 @@ def _visible(conn: Connection, actor: Actor, candidate_id: int) -> dict[str, Any
             f"""
             SELECT c.id, c.created_at, c.archived_at, c.archived_reason, r.source
             FROM core.candidate c JOIN raw.capture r ON r.id = c.capture_id
-            WHERE c.id = :id AND {_VISIBLE}
+            WHERE c.id = :id AND {VISIBLE}
             """
         ),
         {"id": candidate_id, **actor.scope()},
@@ -55,7 +60,8 @@ def get_candidate(conn: Connection, actor: Actor, candidate_id: int) -> dict[str
     candidate["fields"] = run(
         conn,
         text(
-            "SELECT field, value, source, verification_status, verified_at, inference "
+            "SELECT field, value, source, verification_status, verified_at, verified_by, "
+            "inference, language "
             "FROM core.candidate_field_current WHERE candidate_id = :id ORDER BY field"
         ),
         {"id": candidate_id},
@@ -79,7 +85,7 @@ def list_candidates(
             f"""
             SELECT c.id, c.created_at, c.archived_at, r.source
             FROM core.candidate c JOIN raw.capture r ON r.id = c.capture_id
-            WHERE {_VISIBLE}
+            WHERE {VISIBLE}
               AND (CAST(:before AS bigint) IS NULL OR c.id < :before)
               AND (CAST(:opening AS bigint) IS NULL OR EXISTS (
                 SELECT 1 FROM pipeline.application o
@@ -117,7 +123,7 @@ def get_evaluation(conn: Connection, actor: Actor, evaluation_id: int) -> dict[s
             f"""
             SELECT {_EVALUATION} FROM core.evaluation e
             JOIN core.candidate c ON c.id = e.candidate_id
-            WHERE e.id = :id AND {_VISIBLE}
+            WHERE e.id = :id AND {VISIBLE}
             """
         ),
         {"id": evaluation_id, **actor.scope()},
@@ -196,7 +202,7 @@ def search_candidates(
             rf"""
             SELECT c.id, c.created_at, c.archived_at, r.source
             FROM core.candidate c JOIN raw.capture r ON r.id = c.capture_id
-            WHERE {_VISIBLE}
+            WHERE {VISIBLE}
               AND (CAST(:name AS text) IS NULL OR EXISTS (
                 SELECT 1 FROM core.candidate_field_current f
                 WHERE f.candidate_id = c.id AND f.field = 'full_name'

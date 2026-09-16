@@ -75,10 +75,17 @@ The `/v1` surface below is **built and frozen** (week 4). From here on it change
 | POST | `/v1/candidates/search` | Find candidates by name, email or phone, sent in the body |
 | GET | `/v1/candidates/{candidate_id}/evaluations`, `/v1/evaluations/{evaluation_id}` | Evaluations and the reasons behind them |
 | GET | `/v1/events` | The event feed (section 7) |
+| POST | `/v1/candidates` | Week 5. A candidate typed in by a recruiter: manual, unchecked, with the recruiter's name |
+| POST | `/v1/candidates/{candidate_id}/fields/{field}/verification` | Week 5. A person checked one field: a new verified row, and the old row stays |
+| GET | `/v1/candidates/{candidate_id}/documents`, `/v1/documents/{document_id}/file` | Week 5. A candidate's CVs, and the original file byte for byte. Every access is recorded |
+| GET | `/v1/candidate-review-items`, `/v1/candidate-review-items/{review_item_id}` | Week 5. Review items about a candidate: `flagged_document`, `unverified_candidate` |
+| POST | `/v1/candidate-review-items/{review_item_id}/resolution` | Week 5. `{"decision": "checked"}` or `{"decision": "dismiss", "reason": "..."}` |
+| POST | `/v1/public/cv-uploads` | Week 5. Upload a CV (section 8) |
+| GET | `/v1/public/cv-uploads/{upload_id}` | Week 5. Reading status, and the filled form when ready (section 8) |
 | GET | `/v1/reports/funnel` | Volume and conversion per stage, with contactability. TA lead and admin |
 | GET, POST | `/dev/accounts`, `/dev/token` | **Dev only.** Fake accounts `recruiter-a`, `recruiter-b`, `ta-lead`, `criteria-owner`, `admin`, and tokens for them. Absent in staging and production |
 
-**Still to come:** CV upload, manual candidate entry and documents in week 5, the public website endpoints in weeks 5–6 (section 8).
+**Still to come:** the rest of the public website endpoints in week 6 (section 8).
 
 **Where the build differs from the first proposal:**
 
@@ -351,7 +358,11 @@ Idempotency-Key: <a new UUID for each distinct request>
   - `{"decision": "dismiss", "reason": "..."}` leaves the application where it is and keeps your reason as a labelled signal (BR-406).
   - An item is resolved once. The criteria owner can read the queue but not resolve it.
 
-Item kinds fill in as the platform grows: `negative_verdict` now; `flagged_document` and `unverified_candidate` in week 5; `possible_duplicate` in week 6; `borderline` in week 7. **Handle kinds you do not recognise without failing.**
+Item kinds fill in as the platform grows: `negative_verdict` now and `borderline` in week 7. **Handle kinds you do not recognise without failing.**
+
+**Items about a candidate (week 5): `GET /v1/candidate-review-items`.** Some items have no application: `flagged_document` (a CV a person must look at: `reason_code` `hidden_content`, or a reading failure such as `ocr_timed_out`), `unverified_candidate` (typed in by hand, `manual_entry`), and `possible_duplicate` from week 6. The frozen items above always carry an application, so these are listed on their own path, with the same `rvw_` ids. Each carries `kind`, `candidate_id`, `document_id` (or null), `reason_code`, `proposed_by`, `proposed_at` and `resolution`. The filters are `status`, `kind` and `candidate_id`. To resolve one, send `{"decision": "checked"}` (you looked at the file, or checked every field) or `{"decision": "dismiss", "reason": "..."}`. An unverified candidate resolves itself when the last field is checked. Scope follows the candidate: a recruiter sees the items of the candidates they can see. **This path is decision D-CRM-6.**
+
+**Fields are checked one at a time:** `POST /v1/candidates/{id}/fields/{field}/verification`, with `{}` to confirm the value on record, or `{"value": "..."}` to correct it. The old row stays in the history. A candidate's fields may now also carry `verified_by` and `language` (`ar`, `en`, `mixed`).
 
 ### Reports
 
@@ -393,7 +404,7 @@ Item kinds fill in as the platform grows: `negative_verdict` now; `flagged_docum
 | Event type | Sent when | `data` |
 |---|---|---|
 | `application.stage_changed` | A transition is recorded, including the first stage of a new application (`from_stage` null) | `application_id`, `candidate_id`, `requisition_id`, `transition_id`, `from_stage`, `to_stage` |
-| `review.item_created` | An item enters the review queue | `review_item_id`, `kind`, `candidate_id`, `application_id` |
+| `review.item_created` | An item enters the review queue | `review_item_id`, `kind`, `candidate_id`, `application_id` (null for items about a candidate), and `document_id` for a `flagged_document` |
 | `candidate.scored` | The platform scores a candidate. Scores carried over from the old system are not events | `candidate_id`, `evaluation_id`, `criteria_version`, `outcome`, `tier` |
 
 The database writes an event in the same transaction as the change it describes, so no change can happen without its event.
@@ -463,14 +474,18 @@ Example:
 
 **Upload a CV** (`POST /v1/public/cv-uploads`)
 
-- Send `multipart/form-data` with one `file` part.
-- Proposed limits: PDF, DOCX, JPEG or PNG, up to 10 MB. The type is checked on the file content.
+- Send `multipart/form-data` with one `file` part, and a `Content-Length` header (a missing one gets 411).
+- Proposed limits: PDF, DOCX, JPEG or PNG, up to 10 MB. The type is checked on the file content: a wrong type gets 415 `unsupported_file_type`, and a file that is too big gets 413 `file_too_large`.
+- Rate limit: 10 uploads per client address every 10 minutes, then 429 with `Retry-After`. Status checks are limited to 120 a minute.
+- The response is `201` with `upload_id` (`upl_…`), `upload_token` (shown once), `status` and `expires_at` (24 hours). It is never cached.
+- **The same file uploaded twice** is one stored file and one candidate. Each upload still gets its own id and token, so retrying an upload is harmless and needs no `Idempotency-Key`.
 
 **Poll extraction status** (`GET /v1/public/cv-uploads/{upload_id}`)
 
 - Requires the `X-Upload-Token` header.
 - `status` is one of `processing`, `ready` or `failed`.
-- When `ready`, `fields` holds prefilled values in the language they were written in, and names are never translated.
+- When `ready`, `fields` holds prefilled values in the language they were written in, and names are never translated. Each field is `{"value", "inference", "language"}`, or `{"value": null, "state": "not_recorded"}`. The fields are `full_name`, `phone`, `whatsapp`, `email`, `location`, `current_title`, `current_employer`, `education`, `graduation_year`, `years_experience`, `age` and `profile_url`. When `failed`, `fields` is null: show an empty form.
+- A wrong or expired token gets 404.
 - OCR can take time. Poll every 2 seconds, then back off, for up to about 2 minutes.
 
 **Submit the application** (`POST /v1/public/applications`)
@@ -570,6 +585,7 @@ Each late decision stops the week shown.
 | D-CRM-2 | Where is the dashboard hosted, and does it store copies of candidate details? | Company infrastructure only (CR-01). Show details live from the API and store IDs and states, not personal data | Week 3 |
 | D-CRM-3 | Can your system receive webhooks from our network, or do you prefer to poll `GET /v1/events`? | Webhooks, with the feed for catch-up | Week 4 |
 | D-CRM-4 | Webhook endpoint URLs (staging and production), and how we exchange the signing secret | Exchange the secret through a company secret store or in person, never over email or chat | Week 4 |
+| D-CRM-6 | Review items about a candidate (flagged CVs, typed-in candidates, and duplicates from week 6) have no application, so they are served on `/v1/candidate-review-items`. Is a second queue path acceptable for the dashboard? | Yes. The frozen `/v1/review-items` stays unchanged | Week 5 |
 | D-CRM-5 | Can you commit to building the dashboard against the frozen API from week 4 (ASM-04)? | If not, we build a small internal screen in week 7, which costs about 3 days of hardening (RSK-09) | Week 4 |
 
 ### Website team

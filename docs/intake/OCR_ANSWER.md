@@ -1,0 +1,87 @@
+# The OCR adapter and the answer it expects
+
+**Status: a guess.** The OCR API runs on our own host (CR-01). We have not yet received how to call it or a sample answer. Everything below was built from made-up samples, and will be checked against the real API as soon as we have access.
+
+## One door, two versions
+
+Everything that reads a CV goes through `intake.ocr.OcrReader`. `TALENT_OCR_MODE` picks the version:
+
+| Mode | Class | Where it runs |
+|---|---|---|
+| `api` | `intake.ocr_http.HttpOcrReader` | Staging and production (the default there) |
+| `fake` | `intake.fake_ocr.FakeOcrReader` | Dev and tests only (the default in dev). It refuses to start anywhere else |
+
+The fake returns the saved samples in `src/intake/fake_samples/` (`en`, `ar`, `mixed`, `hidden`). A marker inside a file changes what it does: `FAKE-OCR:slow`, `fail`, `timeout`, `reject` or `garbled`.
+
+## How we call the API (guessed)
+
+```
+POST {TALENT_OCR_BASE_URL}/ocr
+Content-Type: multipart/form-data        one part named "file"
+Authorization: Bearer {TALENT_OCR_API_KEY}   only when a key is set
+```
+
+| Answer | What we do |
+|---|---|
+| 200 with JSON | Save the answer as it came (a raw capture with source `ocr_answer`), then map it |
+| 408, 425, 429, 5xx, timeout, no connection | Try again after 30 s, 2 min, then 10 min, up to `TALENT_OCR_MAX_ATTEMPTS` (4) attempts, then send the CV to a person |
+| Any other 4xx | Send the CV to a person straight away (`ocr_rejected`) |
+
+When the real contract differs, change `PATH` and `FILE_PART` in `src/intake/ocr_http.py`, plus the parser in `src/intake/answer.py`.
+
+## Limits (NFR-01)
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `TALENT_OCR_MAX_CONCURRENCY` | 2 | CVs read at the same time, across every worker (Postgres advisory-lock slots) |
+| `TALENT_OCR_TIMEOUT_SECONDS` | 60 | How long one read may take |
+| `TALENT_OCR_MAX_ATTEMPTS` | 4 | Attempts before the CV goes to a person |
+
+These are safe defaults. Replace them with the OCR team's real numbers.
+
+## The answer shape (guessed)
+
+```json
+{
+  "schema": "talent-ocr-answer/guess-2026-09-16",
+  "document": {"language": "ar | en | mixed", "pages": 2},
+  "fields": {
+    "full_name": {"text": "...", "language": "ar", "confidence": 0.97}
+  },
+  "hidden_content": {"found": true, "kinds": ["white_text", "instructions"], "removed": true}
+}
+```
+
+- **Field names:** `full_name`, `phone`, `whatsapp`, `email`, `location`, `current_title`, `current_employer`, `education`, `graduation_year`, `years_experience`, `age`, `date_of_birth`, `profile_url`. Any other field name is ignored and counted.
+- **`text`** is what the CV says, after the OCR has removed hidden content.
+- **`hidden_content.kinds`** holds codes only, never the hidden text.
+
+## From answer to fields (A1)
+
+Each field becomes one `core.candidate_field` row: source `cv_extraction`, `unverified`, with its `language`.
+
+- **Text is kept as written.** Values are only trimmed at the ends. A name is never translated or re-spelled.
+- **Tidying is for matching only.** Arabic-Indic digits and phone formats are tidied when comparing values, never in what is stored.
+- **Numbers:** `age`, `years_experience` and `graduation_year` must be plain numbers. Arabic-Indic digits are allowed, and the value is stored as plain digits. Anything else (for example "3+ years") is not recorded, and is logged as unreadable.
+- **No guesses:** a missing or blank field is `not_recorded`, and an age of 0 counts as no age.
+- **Age, in this order:**
+  1. The age the CV states (`stated`).
+  2. Worked out from the date of birth (`inferred`). The date of birth itself is not stored.
+  3. Worked out from the graduation year, using the criteria's own rule (`inferred`, OPN-02).
+- **Hidden content:** if the OCR reports any, the CV is read as usual and also sent to a person (`flagged_document` / `hidden_content`). The candidate is never told.
+
+## What we need from the OCR team
+
+1. Access: the base URL on our host, and how to authenticate.
+2. How to call it: the path, the name of the file field, and the accepted file types and sizes.
+3. Sample answers: Arabic, English, mixed, and one CV with hidden content.
+4. Their limits: requests at once, a typical and a worst-case read time, and how they report being busy.
+5. How they report hidden content, and whether they remove it from the text.
+
+## When access arrives
+
+1. Set `TALENT_OCR_MODE=api`, `TALENT_OCR_BASE_URL` and `TALENT_OCR_API_KEY`.
+2. Fix the path and the parser if the real contract differs. Replace the samples in `fake_samples/` with real answers from made-up CVs, then run `pytest tests/unit/test_cv_fields.py`.
+3. Set the three limits above from the OCR team's numbers.
+4. Run the test set: `python -m intake.accuracy run --reader api` (see [CV_TEST_SET.md](CV_TEST_SET.md)).
+5. Upload a real CV on the test stack and check the form that comes back.

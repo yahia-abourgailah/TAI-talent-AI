@@ -12,7 +12,15 @@ from api.errors import ApiError
 from pipeline.access import NotFound
 
 Kind = Literal[
-    "requisition", "application", "candidate", "transition", "review_item", "evaluation", "event"
+    "requisition",
+    "application",
+    "candidate",
+    "transition",
+    "review_item",
+    "evaluation",
+    "event",
+    "document",
+    "upload",
 ]
 
 PREFIX: dict[str, str] = {
@@ -23,6 +31,8 @@ PREFIX: dict[str, str] = {
     "review_item": "rvw",
     "evaluation": "evl",
     "event": "evt",
+    "document": "doc",
+    "upload": "upl",
 }
 
 NOT_FOUND: dict[str, str] = {
@@ -33,6 +43,8 @@ NOT_FOUND: dict[str, str] = {
     "review_item": "Review item not found.",
     "evaluation": "Evaluation not found.",
     "event": "Event not found.",
+    "document": "Document not found.",
+    "upload": "Upload not found.",
 }
 
 

@@ -10,6 +10,7 @@ from sqlalchemy.engine import Engine
 
 from api.app import create_app
 from config import Settings
+from importer.blobs import MemoryBlobStore
 from pipeline.dev_candidate import create_demo_candidate
 from pipeline.lists import load_step_list
 
@@ -56,7 +57,8 @@ def api_client(app_engine):
         blob_access_key="unused",
         blob_secret_key="unused",
     )
-    client = TestClient(create_app(settings, probes={}, transaction=transaction))
+    app = create_app(settings, probes={}, transaction=transaction, blobs=MemoryBlobStore())
+    client = TestClient(app)
     try:
         yield client, connection
     finally:
