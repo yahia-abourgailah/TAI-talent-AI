@@ -1,0 +1,20 @@
+{
+  "_note": "MADE-UP sample, a guess at the OCR API's answer. No real person. Replace with the OCR team's samples when they arrive.",
+  "schema": "talent-ocr-answer/guess-2026-09-16",
+  "document": {"language": "mixed", "pages": 1},
+  "fields": {
+    "full_name": {"text": "مرشح Test الثاني", "confidence": 0.9},
+    "phone": {"text": "0020 100-000-0000", "language": "en", "confidence": 0.93},
+    "email": {"text": "test.mixed@example.com", "language": "en", "confidence": 0.96},
+    "location": {"text": "Sheikh Zayed, الجيزة", "confidence": 0.85},
+    "current_title": {"text": "Real Estate Sales Consultant", "language": "en", "confidence": 0.9},
+    "current_employer": {"text": "شركة مثال للتطوير", "language": "ar", "confidence": 0.88},
+    "education": {"text": "Bachelor of Engineering, جامعة مثال", "confidence": 0.8},
+    "years_experience": {"text": "3+ years", "language": "en", "confidence": 0.7},
+    "age": {"text": "0", "language": "en", "confidence": 0.4},
+    "date_of_birth": {"text": "15/03/1999", "language": "en", "confidence": 0.9},
+    "profile_url": {"text": "https://www.linkedin.com/in/example-test-profile", "language": "en", "confidence": 0.95},
+    "hobbies": {"text": "Football", "language": "en", "confidence": 0.9}
+  },
+  "hidden_content": {"found": false, "kinds": [], "removed": false}
+}

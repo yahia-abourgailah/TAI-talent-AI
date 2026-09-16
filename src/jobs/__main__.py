@@ -13,10 +13,12 @@ import time
 from typing import Any
 
 from sqlalchemy import text
+from sqlalchemy.engine import Engine
 from sqlalchemy.exc import DBAPIError
 
 from importer.tai_master import JOB_KIND as TAI_MASTER_IMPORT
 from importer.tai_master import handle as import_tai_master
+from intake import reading
 from jobs.queue import Handler, engine_from_environment, find_runs, recover_stopped, work_one
 from scoring.platform import JOB_KIND as SCORE_APPLICATION
 from scoring.platform import handle as score_application
@@ -24,11 +26,27 @@ from scoring.platform import handle as score_application
 HANDLERS: dict[str, Handler] = {
     TAI_MASTER_IMPORT: import_tai_master,
     SCORE_APPLICATION: score_application,
+    reading.JOB_KIND: reading.handle,
 }
+
+# How often a looping worker looks for stopped jobs and CVs nobody can read any more.
+RECOVER_EVERY_SECONDS = 60.0
 
 
 def _print(value: Any) -> None:
     print(json.dumps(value, indent=2, default=str, ensure_ascii=False))
+
+
+def _recover(engine: Engine) -> list[tuple[int, str]]:
+    """Requeues jobs whose worker stopped, then sends CVs that can no longer be read to a person."""
+    recovered = recover_stopped(engine)
+    for job_id, status in recovered:
+        print(f"Job {job_id}: its worker had stopped. Recorded as a failed run; now {status}.")
+    with engine.begin() as conn:
+        settled = reading.settle_abandoned(conn)
+    if settled:
+        print(f"CVs no job could read, sent for review: {settled}.")
+    return recovered
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -60,13 +78,14 @@ def main(argv: list[str] | None = None) -> int:
             _print(find_runs(conn, kind=args.kind, limit=args.limit))
         return 0
 
-    recovered = recover_stopped(engine)
-    for job_id, status in recovered:
-        print(f"Job {job_id}: its worker had stopped. Recorded as a failed run; now {status}.")
+    recovered = _recover(engine)
     if args.command == "recover":
         if not recovered:
             print("No stopped jobs.")
         return 0
+
+    # A misconfigured OCR stops the worker now, not at the first CV.
+    reading.services()
 
     if args.job is not None:
         with engine.connect() as conn:
@@ -79,8 +98,12 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
     failed = 0
+    last_recovery = time.monotonic()
     while True:
         try:
+            if args.loop and time.monotonic() - last_recovery >= RECOVER_EVERY_SECONDS:
+                _recover(engine)
+                last_recovery = time.monotonic()
             result = work_one(engine, HANDLERS, args.job)
         except DBAPIError as exc:
             if not args.loop:

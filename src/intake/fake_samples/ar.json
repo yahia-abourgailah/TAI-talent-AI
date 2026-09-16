@@ -1,0 +1,15 @@
+{
+  "_note": "MADE-UP sample, a guess at the OCR API's answer. No real person. Replace with the OCR team's samples when they arrive.",
+  "schema": "talent-ocr-answer/guess-2026-09-16",
+  "document": {"language": "ar", "pages": 2},
+  "fields": {
+    "full_name": {"text": "مرشح  تجريبي الأول", "language": "ar", "confidence": 0.96},
+    "phone": {"text": "٠١٠٠ ٠٠٠ ٠٠٠٠", "language": "ar", "confidence": 0.9},
+    "location": {"text": "مدينة نصر، القاهرة", "language": "ar", "confidence": 0.91},
+    "current_title": {"text": "مندوب مبيعات", "language": "ar", "confidence": 0.9},
+    "education": {"text": "بكالوريوس تجارة", "language": "ar", "confidence": 0.87},
+    "graduation_year": {"text": "٢٠٢٣", "language": "ar", "confidence": 0.9},
+    "years_experience": {"text": "١", "language": "ar", "confidence": 0.8}
+  },
+  "hidden_content": {"found": false, "kinds": [], "removed": false}
+}

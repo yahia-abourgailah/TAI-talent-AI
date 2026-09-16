@@ -109,6 +109,9 @@ _CODES = (
     ("closed, so it takes no applications", "requisition_closed"),
     ("a closed opening is final", "requisition_closed"),
     ("as its latest move, is reversed", "not_a_rejection"),
+    ("still has unchecked fields", "candidate_not_checked"),
+    ("a proposed rejection is confirmed or dismissed", "decision_not_allowed"),
+    ("only a proposed rejection is confirmed", "decision_not_allowed"),
     (" is at ", "stage_changed"),
 )
 

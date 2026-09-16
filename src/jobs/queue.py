@@ -111,13 +111,28 @@ def _params_json(params: Mapping[str, Any]) -> str:
     return json.dumps(dict(params), sort_keys=True)
 
 
-def enqueue(conn: Connection, kind: str, params: Mapping[str, Any], requested_by: str) -> int:
+def enqueue(
+    conn: Connection,
+    kind: str,
+    params: Mapping[str, Any],
+    requested_by: str,
+    *,
+    delay_seconds: float = 0,
+) -> int:
+    """Queues a job. With delay_seconds, no worker claims it before then (a retry's gap)."""
     job_id = conn.execute(
         text(
-            "INSERT INTO jobs.job (kind, params, requested_by) "
-            "VALUES (:kind, CAST(:params AS jsonb), :requested_by) RETURNING id"
+            "INSERT INTO jobs.job (kind, params, requested_by, run_after) "
+            "VALUES (:kind, CAST(:params AS jsonb), :requested_by, "
+            "CASE WHEN :delay > 0 THEN clock_timestamp() + make_interval(secs => :delay) END) "
+            "RETURNING id"
         ),
-        {"kind": kind, "params": _params_json(params), "requested_by": requested_by},
+        {
+            "kind": kind,
+            "params": _params_json(params),
+            "requested_by": requested_by,
+            "delay": delay_seconds,
+        },
     ).scalar_one()
     return int(job_id)
 
@@ -158,6 +173,7 @@ def claim(
         text(
             f"SELECT id FROM jobs.job WHERE status = 'queued' {only} "
             "AND (CAST(:kinds AS text[]) IS NULL OR kind = ANY(:kinds)) "
+            "AND (run_after IS NULL OR run_after <= clock_timestamp()) "
             "ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED"
         ),
         params,

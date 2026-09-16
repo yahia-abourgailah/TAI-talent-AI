@@ -42,13 +42,19 @@ class ApiError(Exception):
     """A refusal raised by the API layer itself. The message is safe to show."""
 
     def __init__(
-        self, status: int, code: str, message: str, details: Mapping[str, Any] | None = None
+        self,
+        status: int,
+        code: str,
+        message: str,
+        details: Mapping[str, Any] | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> None:
         super().__init__(message)
         self.status = status
         self.code = code
         self.message = message
         self.details = dict(details) if details else None
+        self.headers = dict(headers) if headers else None
 
 
 def request_id(request: Request) -> str:
@@ -80,7 +86,9 @@ def install(app: FastAPI) -> None:
     async def api_error(request: Request, exc: Exception) -> JSONResponse:
         if not isinstance(exc, ApiError):
             raise exc
-        return error_response(request, exc.status, exc.code, exc.message, exc.details)
+        return error_response(
+            request, exc.status, exc.code, exc.message, exc.details, headers=exc.headers
+        )
 
     @app.exception_handler(PipelineError)
     async def pipeline_refusal(request: Request, exc: Exception) -> JSONResponse:

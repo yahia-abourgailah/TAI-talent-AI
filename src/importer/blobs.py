@@ -9,7 +9,7 @@ import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
 
-from config import get_settings
+from config import Settings, get_settings
 
 _MISSING = {"404", "NoSuchKey", "NotFound"}
 
@@ -75,8 +75,8 @@ class MemoryBlobStore:
         return self.objects.get(key)
 
 
-def s3_store() -> S3BlobStore:
-    settings = get_settings()
+def s3_store(settings: Settings | None = None) -> S3BlobStore:
+    settings = settings or get_settings()
     client = boto3.client(
         "s3",
         endpoint_url=settings.blob_endpoint,

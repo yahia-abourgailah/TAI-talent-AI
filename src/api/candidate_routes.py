@@ -9,25 +9,31 @@ the score and tier, and the signals and flags behind them. A failed gate is not 
 """
 
 from collections.abc import Mapping
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.engine import Connection
 
-from api.deps import current_principal, db_connection
-from api.errors import ApiError
+from api import idempotency
+from api.deps import blob_store, current_principal, db_connection
+from api.errors import ApiError, request_id
 from api.fields import Timestamp
 from api.ids import decode, decode_filter, encode
 from api.pages import DEFAULT_LIMIT, MAX_LIMIT, decode_cursor, next_cursor
 from auth import Principal
-from candidates import reads
+from candidates import documents, reads
+from importer.blobs import BlobStore
+from intake import manual
+from intake.files import EXTENSION
 from pipeline.access import actor_from_principal, reader_from_principal
 
 router = APIRouter(prefix="/v1")
 
 Signed = Annotated[Principal, Depends(current_principal)]
 Db = Annotated[Connection, Depends(db_connection)]
+Blobs = Annotated[BlobStore, Depends(blob_store)]
 
 
 class CandidateSummaryOut(BaseModel):
@@ -85,6 +91,10 @@ def _field(row: Mapping[str, Any]) -> dict[str, Any]:
     }
     if row["inference"] is not None:
         shown["inference"] = row["inference"]
+    if row.get("verified_by") is not None:
+        shown["verified_by"] = row["verified_by"]
+    if row.get("language") is not None:
+        shown["language"] = row["language"]
     return shown
 
 
@@ -200,3 +210,191 @@ def search_candidates(body: CandidateSearchIn, principal: Signed, conn: Db) -> C
         for row in rows
     ]
     return CandidatePage(items=items, next_cursor=None)
+
+
+# --- Typed in by a recruiter, and checked by a person (BR-103, BR-202) --------------------------
+
+FieldName = Literal[
+    "full_name",
+    "phone",
+    "whatsapp",
+    "email",
+    "location",
+    "current_title",
+    "current_employer",
+    "education",
+    "graduation_year",
+    "years_experience",
+    "age",
+    "profile_url",
+]
+FieldText = Annotated[str, Field(max_length=500)]
+
+
+class CandidateEntryIn(BaseModel):
+    fields: dict[FieldName, FieldText | None] = Field(min_length=1)
+
+
+class EnteredCandidateOut(BaseModel):
+    id: str
+    source: str
+    created_at: Timestamp
+    archived: bool
+    review_item_id: str | None
+
+
+class FieldCheckIn(BaseModel):
+    # The value the person checked. Leave it out to confirm the value on record.
+    value: Annotated[str, Field(min_length=1, max_length=500, pattern=r"\S")] | None = None
+
+
+class FieldCheckOut(BaseModel):
+    candidate_id: str
+    field: str
+    source: str
+    verification: str
+    verified_at: Timestamp
+    verified_by: str
+    corrected: bool
+    # The candidate's unverified_candidate review item, when this check closed it.
+    resolved_review_item_id: str | None
+
+
+@router.post(
+    "/candidates", status_code=201, response_model=EnteredCandidateOut, tags=["candidates"]
+)
+def enter_candidate(
+    body: CandidateEntryIn,
+    request: Request,
+    principal: Signed,
+    conn: Db,
+    blobs: Blobs,
+    key: idempotency.KeyHeader = None,
+) -> JSONResponse:
+    """A candidate you found, typed in by hand. Every field is recorded as manual and unchecked,
+    with your name, and the candidate joins the review queue until a person checks them. Fields
+    left out or empty are not recorded. The response carries ids only."""
+    actor = actor_from_principal(principal)
+
+    def create() -> EnteredCandidateOut:
+        try:
+            values = {str(name): value for name, value in body.fields.items()}
+            entered = manual.enter_candidate(conn, blobs, actor, values)
+        except ValueError as exc:
+            raise ApiError(400, "invalid_request", str(exc)) from None
+        row = reads.get_candidate(conn, actor, entered.candidate_id)
+        item = entered.review_item_id
+        return EnteredCandidateOut(
+            id=encode("candidate", row["id"]),
+            source=row["source"],
+            created_at=row["created_at"],
+            archived=row["archived_at"] is not None,
+            review_item_id=None if item is None else encode("review_item", item),
+        )
+
+    return idempotency.respond(conn, request, principal.subject, key, body, 201, create)
+
+
+@router.post(
+    "/candidates/{candidate_id}/fields/{field}/verification", status_code=201, tags=["candidates"]
+)
+def verify_field(
+    candidate_id: str, field: FieldName, body: FieldCheckIn, principal: Signed, conn: Db
+) -> FieldCheckOut:
+    """You checked one field. Records a new, verified row with your name and the time; the old
+    row stays. Send `value` when you corrected it. Once no field is left unchecked, the
+    candidate's unverified_candidate review item is resolved as checked, by you."""
+    actor = actor_from_principal(principal)
+    number = decode("candidate", candidate_id)
+    row = manual.verify_field(conn, actor, number, field, body.value)
+    closed = manual.close_checked_candidate(conn, actor, number)
+    return FieldCheckOut(
+        candidate_id=encode("candidate", number),
+        field=row["field"],
+        source=row["source"],
+        verification=row["verification_status"],
+        verified_at=row["verified_at"],
+        verified_by=row["verified_by"],
+        corrected=row["corrected"],
+        resolved_review_item_id=None if closed is None else encode("review_item", closed),
+    )
+
+
+# --- A candidate's files (BR-107) -----------------------------------------------------------------
+
+
+class ReadingOut(BaseModel):
+    status: Literal["processing", "read", "failed"]
+    failure: str | None
+    hidden_content: bool
+    finished_at: Timestamp | None
+
+
+class DocumentOut(BaseModel):
+    id: str
+    candidate_id: str
+    media_type: str
+    byte_size: int
+    received_at: Timestamp
+    reading: ReadingOut
+
+
+class DocumentList(BaseModel):
+    items: list[DocumentOut]
+
+
+@router.get("/candidates/{candidate_id}/documents", tags=["documents"])
+def list_documents(
+    candidate_id: str, request: Request, principal: Signed, conn: Db
+) -> DocumentList:
+    """The candidate's CVs, oldest first, with how reading each one ended. Every listing is
+    recorded with your name."""
+    actor = actor_from_principal(principal)
+    number = decode("candidate", candidate_id)
+    rows = documents.list_documents(conn, actor, number, request_id(request))
+    return DocumentList(
+        items=[
+            DocumentOut(
+                id=encode("document", row["id"]),
+                candidate_id=encode("candidate", number),
+                media_type=row["media_type"],
+                byte_size=row["byte_size"],
+                received_at=row["received_at"],
+                reading=ReadingOut(
+                    status=row["reading"] or "processing",
+                    failure=row["reading_failure"],
+                    hidden_content=row["hidden_content"],
+                    finished_at=row["read_at"],
+                ),
+            )
+            for row in rows
+        ]
+    )
+
+
+@router.get(
+    "/documents/{document_id}/file",
+    tags=["documents"],
+    response_class=Response,
+    responses={200: {"description": "The file, byte for byte as uploaded"}},
+)
+def download_document(
+    document_id: str, request: Request, principal: Signed, conn: Db, blobs: Blobs
+) -> Response:
+    """The original file, exactly as it was uploaded. Every download is recorded with your name."""
+    actor = actor_from_principal(principal)
+    number = decode("document", document_id)
+    found = documents.open_document(conn, actor, number, request_id(request))
+    content = blobs.get(found["blob_key"])
+    if content is None:
+        raise ApiError(503, "unavailable", "The file store did not return the file. Try again.")
+    filename = f"{encode('document', number)}.{EXTENSION.get(found['media_type'], 'bin')}"
+    return Response(
+        content,
+        media_type=found["media_type"],
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )

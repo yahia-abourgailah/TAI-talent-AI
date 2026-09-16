@@ -9,7 +9,7 @@ from functools import lru_cache
 from typing import Self
 from urllib.parse import urlsplit
 
-from pydantic import SecretStr, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,6 +22,11 @@ class Environment(StrEnum):
 class AuthMode(StrEnum):
     OIDC = "oidc"  # the company identity provider
     DEV = "dev"  # fake accounts signed locally, dev only
+
+
+class OcrMode(StrEnum):
+    API = "api"  # the company OCR API, on our own host (CR-01)
+    FAKE = "fake"  # saved sample answers, dev and tests only
 
 
 class Settings(BaseSettings):
@@ -45,6 +50,34 @@ class Settings(BaseSettings):
     # Events to the CRM (API plan section 7). Delivery is off while the URL is empty.
     crm_webhook_url: str = ""
     crm_webhook_secret: SecretStr = SecretStr("")
+
+    # Reading CVs (NFR-01, NFR-04). Unset means the fake OCR in dev and the real API elsewhere.
+    # The limits are safe defaults until the OCR team gives its real numbers.
+    ocr_mode: OcrMode | None = None
+    ocr_base_url: str = ""
+    ocr_api_key: SecretStr = SecretStr("")
+    ocr_timeout_seconds: float = Field(default=60.0, gt=0, le=600)
+    ocr_max_concurrency: int = Field(default=2, ge=1, le=32)
+    ocr_max_attempts: int = Field(default=4, ge=1, le=10)
+
+    @property
+    def ocr_mode_in_force(self) -> OcrMode:
+        if self.ocr_mode is not None:
+            return self.ocr_mode
+        return OcrMode.FAKE if self.env is Environment.DEV else OcrMode.API
+
+    @model_validator(mode="after")
+    def _check_ocr(self) -> Self:
+        if self.ocr_mode is OcrMode.FAKE and self.env is not Environment.DEV:
+            raise ValueError(
+                f"TALENT_OCR_MODE=fake is set with TALENT_ENV={self.env}. The fake OCR only runs "
+                "in dev and tests; set TALENT_OCR_MODE=api and TALENT_OCR_BASE_URL."
+            )
+        if self.ocr_base_url:
+            parts = urlsplit(self.ocr_base_url)
+            if parts.scheme not in {"http", "https"} or not parts.hostname:
+                raise ValueError("TALENT_OCR_BASE_URL must be an http or https URL.")
+        return self
 
     @model_validator(mode="after")
     def _check_sign_in(self) -> Self:

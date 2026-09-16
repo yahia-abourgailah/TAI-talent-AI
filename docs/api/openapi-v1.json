@@ -196,6 +196,62 @@
         "title": "ApplicationPage",
         "type": "object"
       },
+      "Body_upload_cv_v1_public_cv_uploads_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "description": "One CV: PDF, DOCX, JPEG or PNG, up to 10 MB",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_cv_v1_public_cv_uploads_post",
+        "type": "object"
+      },
+      "CandidateEntryIn": {
+        "properties": {
+          "fields": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "maxLength": 500,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "minProperties": 1,
+            "propertyNames": {
+              "enum": [
+                "full_name",
+                "phone",
+                "whatsapp",
+                "email",
+                "location",
+                "current_title",
+                "current_employer",
+                "education",
+                "graduation_year",
+                "years_experience",
+                "age",
+                "profile_url"
+              ]
+            },
+            "title": "Fields",
+            "type": "object"
+          }
+        },
+        "required": [
+          "fields"
+        ],
+        "title": "CandidateEntryIn",
+        "type": "object"
+      },
       "CandidateOut": {
         "properties": {
           "archived_at": {
@@ -278,6 +334,161 @@
           "next_cursor"
         ],
         "title": "CandidatePage",
+        "type": "object"
+      },
+      "CandidateResolutionIn": {
+        "properties": {
+          "decision": {
+            "enum": [
+              "checked",
+              "dismiss"
+            ],
+            "title": "Decision",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "pattern": "\\S",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "decision"
+        ],
+        "title": "CandidateResolutionIn",
+        "type": "object"
+      },
+      "CandidateResolutionOut": {
+        "properties": {
+          "decision": {
+            "title": "Decision",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "resolved_at": {
+            "title": "Resolved At",
+            "type": "string"
+          },
+          "resolved_by": {
+            "title": "Resolved By",
+            "type": "string"
+          }
+        },
+        "required": [
+          "decision",
+          "reason",
+          "resolved_by",
+          "resolved_at"
+        ],
+        "title": "CandidateResolutionOut",
+        "type": "object"
+      },
+      "CandidateReviewItemOut": {
+        "properties": {
+          "candidate_id": {
+            "title": "Candidate Id",
+            "type": "string"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "proposed_at": {
+            "title": "Proposed At",
+            "type": "string"
+          },
+          "proposed_by": {
+            "title": "Proposed By",
+            "type": "string"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "resolution": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CandidateResolutionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "candidate_id",
+          "document_id",
+          "reason_code",
+          "proposed_by",
+          "proposed_at",
+          "resolution"
+        ],
+        "title": "CandidateReviewItemOut",
+        "type": "object"
+      },
+      "CandidateReviewItemPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CandidateReviewItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "CandidateReviewItemPage",
         "type": "object"
       },
       "CandidateSearchIn": {
@@ -404,6 +615,176 @@
           "contactability"
         ],
         "title": "ContactabilityOut",
+        "type": "object"
+      },
+      "CvUploadOut": {
+        "properties": {
+          "expires_at": {
+            "title": "Expires At",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "processing",
+              "ready",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "upload_id": {
+            "title": "Upload Id",
+            "type": "string"
+          },
+          "upload_token": {
+            "title": "Upload Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "upload_id",
+          "upload_token",
+          "status",
+          "expires_at"
+        ],
+        "title": "CvUploadOut",
+        "type": "object"
+      },
+      "CvUploadStatusOut": {
+        "properties": {
+          "expires_at": {
+            "title": "Expires At",
+            "type": "string"
+          },
+          "fields": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fields"
+          },
+          "status": {
+            "enum": [
+              "processing",
+              "ready",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "upload_id": {
+            "title": "Upload Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "upload_id",
+          "status",
+          "expires_at",
+          "fields"
+        ],
+        "title": "CvUploadStatusOut",
+        "type": "object"
+      },
+      "DocumentList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "DocumentList",
+        "type": "object"
+      },
+      "DocumentOut": {
+        "properties": {
+          "byte_size": {
+            "title": "Byte Size",
+            "type": "integer"
+          },
+          "candidate_id": {
+            "title": "Candidate Id",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "media_type": {
+            "title": "Media Type",
+            "type": "string"
+          },
+          "reading": {
+            "$ref": "#/components/schemas/ReadingOut"
+          },
+          "received_at": {
+            "title": "Received At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "candidate_id",
+          "media_type",
+          "byte_size",
+          "received_at",
+          "reading"
+        ],
+        "title": "DocumentOut",
+        "type": "object"
+      },
+      "EnteredCandidateOut": {
+        "properties": {
+          "archived": {
+            "title": "Archived",
+            "type": "boolean"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "review_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Item Id"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "created_at",
+          "archived",
+          "review_item_id"
+        ],
+        "title": "EnteredCandidateOut",
         "type": "object"
       },
       "Error": {
@@ -660,6 +1041,81 @@
         "title": "EventPage",
         "type": "object"
       },
+      "FieldCheckIn": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "pattern": "\\S",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "title": "FieldCheckIn",
+        "type": "object"
+      },
+      "FieldCheckOut": {
+        "properties": {
+          "candidate_id": {
+            "title": "Candidate Id",
+            "type": "string"
+          },
+          "corrected": {
+            "title": "Corrected",
+            "type": "boolean"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "resolved_review_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved Review Item Id"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "verification": {
+            "title": "Verification",
+            "type": "string"
+          },
+          "verified_at": {
+            "title": "Verified At",
+            "type": "string"
+          },
+          "verified_by": {
+            "title": "Verified By",
+            "type": "string"
+          }
+        },
+        "required": [
+          "candidate_id",
+          "field",
+          "source",
+          "verification",
+          "verified_at",
+          "verified_by",
+          "corrected",
+          "resolved_review_item_id"
+        ],
+        "title": "FieldCheckOut",
+        "type": "object"
+      },
       "FunnelGroupOut": {
         "properties": {
           "applications": {
@@ -777,6 +1233,53 @@
           "all_candidates"
         ],
         "title": "FunnelOut",
+        "type": "object"
+      },
+      "ReadingOut": {
+        "properties": {
+          "failure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "hidden_content": {
+            "title": "Hidden Content",
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "processing",
+              "read",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "failure",
+          "hidden_content",
+          "finished_at"
+        ],
+        "title": "ReadingOut",
         "type": "object"
       },
       "ReasonOut": {
@@ -1982,6 +2485,249 @@
         ]
       }
     },
+    "/v1/candidate-review-items": {
+      "get": {
+        "description": "Items about candidates in your scope, newest first. Open items by default.",
+        "operationId": "list_candidate_review_items_v1_candidate_review_items_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "open",
+              "enum": [
+                "open",
+                "resolved"
+              ],
+              "title": "Status",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "flagged_document",
+                    "unverified_candidate"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "in": "query",
+            "name": "candidate_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 40,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Candidate Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateReviewItemPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Candidate Review Items",
+        "tags": [
+          "review queue"
+        ]
+      }
+    },
+    "/v1/candidate-review-items/{review_item_id}": {
+      "get": {
+        "operationId": "get_candidate_review_item_v1_candidate_review_items__review_item_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "review_item_id",
+            "required": true,
+            "schema": {
+              "title": "Review Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateReviewItemOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Candidate Review Item",
+        "tags": [
+          "review queue"
+        ]
+      }
+    },
+    "/v1/candidate-review-items/{review_item_id}/resolution": {
+      "post": {
+        "description": "checked: you looked at the file, or checked the candidate (every field). dismiss: needs a\nreason. Recorded with your name, once.",
+        "operationId": "resolve_candidate_review_item_v1_candidate_review_items__review_item_id__resolution_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "review_item_id",
+            "required": true,
+            "schema": {
+              "title": "Review Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "A UUID you generate per distinct request. A retry with it returns the first response instead of doing the work again.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A UUID you generate per distinct request. A retry with it returns the first response instead of doing the work again.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CandidateResolutionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateReviewItemOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Resolve Candidate Review Item",
+        "tags": [
+          "review queue"
+        ]
+      }
+    },
     "/v1/candidates": {
       "get": {
         "description": "Candidates in your scope, newest first, as summaries.",
@@ -2082,6 +2828,72 @@
         "tags": [
           "candidates"
         ]
+      },
+      "post": {
+        "description": "A candidate you found, typed in by hand. Every field is recorded as manual and unchecked,\nwith your name, and the candidate joins the review queue until a person checks them. Fields\nleft out or empty are not recorded. The response carries ids only.",
+        "operationId": "enter_candidate_v1_candidates_post",
+        "parameters": [
+          {
+            "description": "A UUID you generate per distinct request. A retry with it returns the first response instead of doing the work again.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A UUID you generate per distinct request. A retry with it returns the first response instead of doing the work again.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CandidateEntryIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnteredCandidateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Enter Candidate",
+        "tags": [
+          "candidates"
+        ]
       }
     },
     "/v1/candidates/search": {
@@ -2179,6 +2991,54 @@
         ]
       }
     },
+    "/v1/candidates/{candidate_id}/documents": {
+      "get": {
+        "description": "The candidate's CVs, oldest first, with how reading each one ended. Every listing is\nrecorded with your name.",
+        "operationId": "list_documents_v1_candidates__candidate_id__documents_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "candidate_id",
+            "required": true,
+            "schema": {
+              "title": "Candidate Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Documents",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
     "/v1/candidates/{candidate_id}/evaluations": {
       "get": {
         "description": "Every evaluation of a candidate, newest first (BR-303).",
@@ -2224,6 +3084,128 @@
         "summary": "List Evaluations",
         "tags": [
           "evaluations"
+        ]
+      }
+    },
+    "/v1/candidates/{candidate_id}/fields/{field}/verification": {
+      "post": {
+        "description": "You checked one field. Records a new, verified row with your name and the time; the old\nrow stays. Send `value` when you corrected it. Once no field is left unchecked, the\ncandidate's unverified_candidate review item is resolved as checked, by you.",
+        "operationId": "verify_field_v1_candidates__candidate_id__fields__field__verification_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "candidate_id",
+            "required": true,
+            "schema": {
+              "title": "Candidate Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "field",
+            "required": true,
+            "schema": {
+              "enum": [
+                "full_name",
+                "phone",
+                "whatsapp",
+                "email",
+                "location",
+                "current_title",
+                "current_employer",
+                "education",
+                "graduation_year",
+                "years_experience",
+                "age",
+                "profile_url"
+              ],
+              "title": "Field",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldCheckIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldCheckOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Verify Field",
+        "tags": [
+          "candidates"
+        ]
+      }
+    },
+    "/v1/documents/{document_id}/file": {
+      "get": {
+        "description": "The original file, exactly as it was uploaded. Every download is recorded with your name.",
+        "operationId": "download_document_v1_documents__document_id__file_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The file, byte for byte as uploaded"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Download Document",
+        "tags": [
+          "documents"
         ]
       }
     },
@@ -2422,6 +3404,102 @@
         "summary": "Me",
         "tags": [
           "account"
+        ]
+      }
+    },
+    "/v1/public/cv-uploads": {
+      "post": {
+        "description": "Keeps the CV and starts reading it. Poll the status with the returned token.",
+        "operationId": "upload_cv_v1_public_cv_uploads_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_cv_v1_public_cv_uploads_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CvUploadOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "summary": "Upload Cv",
+        "tags": [
+          "public: careers page"
+        ]
+      }
+    },
+    "/v1/public/cv-uploads/{upload_id}": {
+      "get": {
+        "description": "processing, ready (with the form to check) or failed (show an empty form). A wrong or\nexpired token reads as not found.",
+        "operationId": "cv_upload_status_v1_public_cv_uploads__upload_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "upload_id",
+            "required": true,
+            "schema": {
+              "title": "Upload Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Upload-Token",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "X-Upload-Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CvUploadStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "summary": "Cv Upload Status",
+        "tags": [
+          "public: careers page"
         ]
       }
     },

@@ -1,0 +1,18 @@
+{
+  "_note": "MADE-UP sample, a guess at the OCR API's answer. No real person. Replace with the OCR team's samples when they arrive.",
+  "schema": "talent-ocr-answer/guess-2026-09-16",
+  "document": {"language": "en", "pages": 1},
+  "fields": {
+    "full_name": {"text": "Test Candidate Alpha", "language": "en", "confidence": 0.98},
+    "phone": {"text": "+20 100 000 0000", "language": "en", "confidence": 0.95},
+    "email": {"text": "test.alpha@example.com", "language": "en", "confidence": 0.97},
+    "location": {"text": "New Cairo, Cairo", "language": "en", "confidence": 0.9},
+    "current_title": {"text": "Sales Representative", "language": "en", "confidence": 0.92},
+    "current_employer": {"text": "Example Trading Co.", "language": "en", "confidence": 0.9},
+    "education": {"text": "Bachelor of Commerce, Example University", "language": "en", "confidence": 0.88},
+    "graduation_year": {"text": "2022", "language": "en", "confidence": 0.93},
+    "years_experience": {"text": "2", "language": "en", "confidence": 0.8},
+    "age": {"text": "25", "language": "en", "confidence": 0.9}
+  },
+  "hidden_content": {"found": false, "kinds": [], "removed": false}
+}
