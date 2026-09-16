@@ -6,8 +6,8 @@ Counts and candidate ids only; no names, numbers or addresses. Nothing here is j
 |---|---:|
 | Candidates with a phone, email, profile or name | 5,140 |
 | Pairs found | 1,681 |
-| &nbsp;&nbsp;strong (same phone, email or profile) | 1,338 |
-| &nbsp;&nbsp;possible (same name only) | 343 |
+| &nbsp;&nbsp;strong (same phone, email or profile) | 1,352 |
+| &nbsp;&nbsp;possible (same name only) | 329 |
 | Groups | 1,178 |
 | Records inside a group | 2,646 |
 
@@ -18,8 +18,8 @@ Counts and candidate ids only; no names, numbers or addresses. Nothing here is j
 | email | 5 |
 | name_arabic | 216 |
 | name_latin | 386 |
-| phone | 7 |
-| profile_url | 1,332 |
+| phone | 21 |
+| profile_url | 1,348 |
 
 ## Group sizes
 

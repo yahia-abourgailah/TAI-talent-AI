@@ -1,7 +1,7 @@
 """Finding the same person twice (A: BR-203, BR-206).
 
     python -m candidates.duplicates scan --out DIR [--report-copy docs/migration/DUPLICATES.md]
-    python -m candidates.duplicates sample --out DIR [--pairs 500]
+    python -m candidates.duplicates sample --out DIR [--pairs 500] [--ids-only]
     python -m candidates.duplicates check --labels FILE [--report-copy FILE]
 
 What two records are matched on, strongest first:
@@ -9,6 +9,9 @@ What two records are matched on, strongest first:
     phone        the last 10 digits, so +20 100..., 0020 100... and 0100... are one number
     email        trimmed and lower-cased
     profile_url  the profile itself: no scheme, no www, no query, no trailing slash
+
+A cell can hold more than one of these — a number and a profile link together, as some of the
+sourcing batches were written — so each piece is read as what it is, not as what its column says.
     name         the same name written differently. Arabic spellings are brought together
                  (ال prefix, ة and ه, ى and ي, hamza forms, diacritics), and an Arabic name and its
                  English spelling meet in the middle: Arabic has no short vowels, so both become
@@ -33,7 +36,7 @@ import os
 import re
 import sys
 import unicodedata
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from itertools import combinations
 from pathlib import Path
@@ -116,6 +119,24 @@ class Pair:
     evidence: tuple[str, ...]
 
 
+# A cell sometimes holds more than one thing: "+20100...  |  linkedin.com/in/...". Each piece is
+# read on its own, so a number is never taken from the digits inside a link.
+_BETWEEN_PIECES = re.compile(r"[|;,\n\t]+|\s{2,}")
+
+
+def pieces(value: str) -> list[str]:
+    return [piece.strip() for piece in _BETWEEN_PIECES.split(value) if piece.strip()]
+
+
+def kind_of(piece: str) -> str:
+    """What a piece of a contact cell is: an address, a link, or a number."""
+    if "@" in piece:
+        return "email"
+    if "/" in piece or re.search(r"[a-z]\.[a-z]{2,}", piece.lower()):
+        return "profile_url"
+    return "phone"
+
+
 def phone_key(value: str) -> str | None:
     digits = "".join(ch for ch in value.translate(_DIGITS) if ch.isdigit())
     return digits[-10:] if len(digits) >= 10 else None
@@ -170,18 +191,29 @@ def name_keys(value: str) -> dict[str, str]:
     return keys
 
 
-def keys_of(field: str, value: str) -> dict[str, str]:
-    if field in {"phone", "whatsapp"}:
-        key = phone_key(value)
-        return {"phone": key} if key else {}
-    if field == "email":
-        key = email_key(value)
-        return {"email": key} if key else {}
-    if field == "profile_url":
-        key = profile_key(value)
-        return {"profile_url": key} if key else {}
+_KEY_OF = {"phone": phone_key, "email": email_key, "profile_url": profile_key}
+
+
+def contact_keys(field: str, value: str) -> dict[str, list[str]]:
+    """The keys in a contact cell, each piece read as what it is rather than as what its heading
+    says: a link written in the phone column is a link, not a number ending in its digits."""
+    found: dict[str, list[str]] = {}
+    for piece in pieces(value):
+        kind = kind_of(piece)
+        if field == "email" and kind == "phone":
+            continue  # a number in the email column is not an address, and not a mobile either
+        key = _KEY_OF[kind](piece)
+        if key and key not in found.setdefault(kind, []):
+            found[kind].append(key)
+    return found
+
+
+def keys_of(field: str, value: str) -> dict[str, list[str]]:
+    """Every key this value is matched on, by kind. A cell can hold more than one."""
+    if field in {"phone", "whatsapp", "email", "profile_url"}:
+        return contact_keys(field, value)
     if field == "full_name":
-        return name_keys(value)
+        return {kind: [key] for kind, key in name_keys(value).items()}
     return {}
 
 
@@ -200,8 +232,9 @@ def find_pairs(identities: Iterable[tuple[int, str, str]]) -> tuple[list[Pair], 
     """Every pair of candidates sharing a key, with what they share. Counts what was skipped."""
     by_key: dict[tuple[str, str], set[int]] = {}
     for candidate_id, field, value in identities:
-        for evidence, key in keys_of(field, value).items():
-            by_key.setdefault((evidence, key), set()).add(candidate_id)
+        for evidence, keys in keys_of(field, value).items():
+            for key in keys:
+                by_key.setdefault((evidence, key), set()).add(candidate_id)
 
     evidence_of: dict[tuple[int, int], set[str]] = {}
     too_common: dict[str, int] = {}
@@ -390,22 +423,96 @@ def _pairs_csv(pairs: Sequence[Pair]) -> str:
     return buffer.getvalue()
 
 
-def _sample_csv(pairs: Sequence[Pair], wanted: int) -> str:
-    """A spread of pairs for a person to check: the strong ones first, then the possible ones."""
-    strong = [pair for pair in pairs if pair.strength == STRONG]
-    possible = [pair for pair in pairs if pair.strength == POSSIBLE]
+SHOWN_FIELDS = ("full_name", "phone", "whatsapp", "email", "profile_url")
+
+
+def pick_sample(
+    pairs: Sequence[Pair], wanted: int, worth_asking: Callable[[Pair], bool] | None = None
+) -> list[Pair]:
+    """A spread of pairs for a person to check: the strong ones first, then the possible ones.
+
+    Where two records were matched on a profile link and one of them holds nothing but that link,
+    there is nothing for a person to weigh, so those go to the back: a sample is worth someone's
+    afternoon only if the pairs in it can be got wrong.
+    """
+    order = (lambda pair: not worth_asking(pair)) if worth_asking else (lambda pair: False)
+    strong = sorted((pair for pair in pairs if pair.strength == STRONG), key=order)
+    possible = sorted((pair for pair in pairs if pair.strength == POSSIBLE), key=order)
     half = wanted // 2
     picked = strong[: max(half, wanted - len(possible))]
-    picked += possible[: wanted - len(picked)]
+    return picked + possible[: wanted - len(picked)]
+
+
+def shown_values(conn: Connection, candidates: Sequence[int]) -> dict[int, dict[str, str]]:
+    """What a person needs to tell two records apart: the name, a way to reach them, the profile.
+
+    Only ever written into the file the person checks, which lives outside the repository.
+    """
+    if not candidates:
+        return {}
+    found: dict[int, dict[str, str]] = {}
+    rows = conn.execute(
+        text(
+            "SELECT candidate_id, field, value FROM core.candidate_field_current "
+            "WHERE candidate_id = ANY(:ids) AND field = ANY(:fields) AND value IS NOT NULL"
+        ),
+        {"ids": list(candidates), "fields": list(SHOWN_FIELDS)},
+    )
+    for row in rows:
+        found.setdefault(int(row.candidate_id), {})[row.field] = str(row.value)
+    return found
+
+
+def _side(found: Mapping[str, str]) -> list[str]:
+    """Name, number, email and profile as a person should read them.
+
+    Some rows arrived with a number and a profile in one cell, separated by a bar; the pieces are
+    put under the right heading here so the person checking sees a number where a number belongs.
+    """
+    columns: dict[str, list[str]] = {"phone": [], "email": [], "profile_url": []}
+    for field in ("phone", "whatsapp", "email", "profile_url"):
+        for piece in pieces(str(found.get(field, ""))):
+            kind = kind_of(piece)
+            if piece not in columns[kind]:
+                columns[kind].append(piece)
+    return [found.get("full_name", "")] + [
+        " ".join(columns[kind]) for kind in ("phone", "email", "profile_url")
+    ]
+
+
+def _worth_asking(values: Mapping[int, Mapping[str, str]]) -> Callable[[Pair], bool]:
+    """A pair is worth a person's time when both records hold more than the key they matched on."""
+
+    def told_apart(candidate: int) -> bool:
+        found = values.get(candidate, {})
+        return bool(found.get("full_name", "").strip()) and any(
+            found.get(field, "").strip() for field in ("phone", "whatsapp", "email", "profile_url")
+        )
+
+    return lambda pair: told_apart(pair.lower_id) and told_apart(pair.higher_id)
+
+
+def _sample_csv(
+    pairs: Sequence[Pair],
+    wanted: int,
+    values: Mapping[int, Mapping[str, str]] | None = None,
+    picked: Sequence[Pair] | None = None,
+) -> str:
+    picked = pick_sample(pairs, wanted) if picked is None else picked
+    columns = ("name", "phone", "email", "profile") if values is not None else ()
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow(
-        ["candidate_a", "candidate_b", "strength", "evidence", "decision", "checked_by", "note"]
+        ["pair", "candidate_a", "candidate_b"]
+        + [f"{side}_{column}" for side in ("a", "b") for column in columns]
+        + ["matched_on", "strength", "decision", "checked_by", "note"]
     )
-    for pair in picked:
-        writer.writerow(
-            [pair.lower_id, pair.higher_id, pair.strength, " ".join(pair.evidence), "", "", ""]
-        )
+    for number, pair in enumerate(picked, start=1):
+        row: list[Any] = [number, pair.lower_id, pair.higher_id]
+        if values is not None:
+            row += _side(values.get(pair.lower_id, {})) + _side(values.get(pair.higher_id, {}))
+        row += [" ".join(pair.evidence), pair.strength, "", "", ""]
+        writer.writerow(row)
     return buffer.getvalue()
 
 
@@ -456,6 +563,11 @@ def main(argv: list[str] | None = None) -> int:
     sample = commands.add_parser("sample", help="pairs for a person to check by hand")
     sample.add_argument("--out", type=Path, required=True)
     sample.add_argument("--pairs", type=int, default=500)
+    sample.add_argument(
+        "--ids-only",
+        action="store_true",
+        help="leave out the names, numbers and profiles the person needs to judge a pair",
+    )
     check = commands.add_parser("check", help="read the checked sample and report the rate")
     check.add_argument("--labels", type=Path, required=True)
     check.add_argument("--report-copy", type=Path)
@@ -491,10 +603,24 @@ def main(argv: list[str] | None = None) -> int:
         pairs, too_common = find_pairs(identities)
         summary = summarise(pairs, too_common, len({row[0] for row in identities}))
         if args.command == "sample":
-            _write_private(out / "duplicate-sample.csv", _sample_csv(pairs, args.pairs))
-            print(
-                f"{min(args.pairs, len(pairs))} pairs for checking: {out / 'duplicate-sample.csv'}"
+            if args.ids_only:
+                picked, values = pick_sample(pairs, args.pairs), None
+            else:
+                sides = sorted({side for pair in pairs for side in (pair.lower_id, pair.higher_id)})
+                values = shown_values(conn, sides)
+                worth_asking = _worth_asking(values)
+                picked = pick_sample(pairs, args.pairs, worth_asking)
+                thin = sum(1 for pair in pairs if not worth_asking(pair))
+                print(
+                    f"{thin} of {len(pairs)} pairs are a shared profile link where one record "
+                    "holds nothing else; they go last, as there is nothing to weigh."
+                )
+            _write_private(
+                out / "duplicate-sample.csv", _sample_csv(pairs, args.pairs, values, picked)
             )
+            print(f"{len(picked)} pairs for checking: {out / 'duplicate-sample.csv'}")
+            if values is not None:
+                print("  It holds candidate details for the person checking. Never commit it.")
             return 0
         recorded = None if args.dry_run else record(conn, pairs)
     _write_private(out / "duplicate-pairs.csv", _pairs_csv(pairs))
