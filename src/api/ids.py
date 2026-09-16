@@ -22,6 +22,7 @@ Kind = Literal[
     "document",
     "upload",
     "join",
+    "withdrawal",
 ]
 
 PREFIX: dict[str, str] = {
@@ -35,6 +36,7 @@ PREFIX: dict[str, str] = {
     "document": "doc",
     "upload": "upl",
     "join": "jon",
+    "withdrawal": "wdr",
 }
 
 NOT_FOUND: dict[str, str] = {
@@ -48,6 +50,7 @@ NOT_FOUND: dict[str, str] = {
     "document": "Document not found.",
     "upload": "Upload not found.",
     "join": "Join not found.",
+    "withdrawal": "Withdrawal not found.",
 }
 
 

@@ -1600,6 +1600,21 @@
         "title": "JoinOut",
         "type": "object"
       },
+      "LiftIn": {
+        "properties": {
+          "reason": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "LiftIn",
+        "type": "object"
+      },
       "MatchOut": {
         "properties": {
           "evidence": {
@@ -2573,6 +2588,168 @@
           "reason"
         ],
         "title": "UndoJoinIn",
+        "type": "object"
+      },
+      "WithdrawalIn": {
+        "properties": {
+          "asked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When they asked, if it was not just now",
+            "title": "Asked At"
+          },
+          "asked_how": {
+            "description": "How the candidate asked us",
+            "enum": [
+              "phone",
+              "whatsapp",
+              "email",
+              "in_person",
+              "letter",
+              "other"
+            ],
+            "title": "Asked How",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How they put it, in your words. No more than they told you.",
+            "title": "Note"
+          }
+        },
+        "required": [
+          "asked_how"
+        ],
+        "title": "WithdrawalIn",
+        "type": "object"
+      },
+      "WithdrawalOut": {
+        "properties": {
+          "asked_at": {
+            "title": "Asked At",
+            "type": "string"
+          },
+          "asked_how": {
+            "title": "Asked How",
+            "type": "string"
+          },
+          "candidate_id": {
+            "title": "Candidate Id",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "lifted_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lifted At"
+          },
+          "lifted_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lifted By"
+          },
+          "lifted_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lifted Reason"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "recorded_at": {
+            "title": "Recorded At",
+            "type": "string"
+          },
+          "recorded_by": {
+            "title": "Recorded By",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "candidate_id",
+          "asked_how",
+          "asked_at",
+          "note",
+          "recorded_by",
+          "recorded_at",
+          "lifted_at",
+          "lifted_by",
+          "lifted_reason"
+        ],
+        "title": "WithdrawalOut",
+        "type": "object"
+      },
+      "WithdrawalPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/WithdrawalOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "WithdrawalPage",
         "type": "object"
       }
     },
@@ -3957,6 +4134,133 @@
         "summary": "Join Candidates",
         "tags": [
           "review queue",
+          "candidates"
+        ]
+      }
+    },
+    "/v1/candidates/{candidate_id}/withdrawals": {
+      "get": {
+        "description": "Every request this candidate made about their data, lifted ones included, newest first.",
+        "operationId": "candidate_withdrawals_v1_candidates__candidate_id__withdrawals_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "candidate_id",
+            "required": true,
+            "schema": {
+              "title": "Candidate Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WithdrawalOut"
+                  },
+                  "title": "Response Candidate Withdrawals V1 Candidates  Candidate Id  Withdrawals Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Candidate Withdrawals",
+        "tags": [
+          "candidates"
+        ]
+      },
+      "post": {
+        "description": "Records that this candidate asked us to stop keeping their data, and locks the record.\n\nFrom here the candidate is not read, listed, searched, scored or matched, and no one but an\nadmin sees the record is there. Nothing is deleted, so a request recorded by mistake can be\nlifted by an admin.",
+        "operationId": "record_withdrawal_v1_candidates__candidate_id__withdrawals_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "candidate_id",
+            "required": true,
+            "schema": {
+              "title": "Candidate Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "A UUID you generate per distinct request. A retry with it returns the first response instead of doing the work again.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A UUID you generate per distinct request. A retry with it returns the first response instead of doing the work again.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WithdrawalIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WithdrawalOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Record Withdrawal",
+        "tags": [
           "candidates"
         ]
       }
@@ -5375,6 +5679,143 @@
         "summary": "Resolve Review Item",
         "tags": [
           "review queue"
+        ]
+      }
+    },
+    "/v1/withdrawals": {
+      "get": {
+        "description": "The locked records, newest first. Admins only.",
+        "operationId": "list_withdrawals_v1_withdrawals_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "description": "Only the locks in force",
+            "in": "query",
+            "name": "standing",
+            "required": false,
+            "schema": {
+              "default": true,
+              "description": "Only the locks in force",
+              "title": "Standing",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WithdrawalPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Withdrawals",
+        "tags": [
+          "candidates"
+        ]
+      }
+    },
+    "/v1/withdrawals/{withdrawal_id}/lift": {
+      "post": {
+        "description": "Lifts a withdrawal recorded by mistake, with a reason. Admins only; the record is kept.",
+        "operationId": "lift_withdrawal_v1_withdrawals__withdrawal_id__lift_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "withdrawal_id",
+            "required": true,
+            "schema": {
+              "title": "Withdrawal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LiftIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WithdrawalOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Lift Withdrawal",
+        "tags": [
+          "candidates"
         ]
       }
     }

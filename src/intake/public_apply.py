@@ -26,6 +26,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
+from candidates.withdrawal import is_locked
 from importer.blobs import BlobStore
 from intake import consent as consent_records
 from intake import job_posts
@@ -136,7 +137,13 @@ def _candidate_from_upload(conn: Connection, application: Application) -> int | 
     ).one_or_none()
     if found is None:
         raise NotFound("Upload not found.")
-    return int(found.candidate_id)
+    candidate_id = int(found.candidate_id)
+    if is_locked(conn, candidate_id):
+        # The record was locked after the candidate asked us to stop keeping their data (BR-504).
+        # They are applying again and agreeing again, so this application starts a new record: the
+        # locked one stays locked, and a person decides later whether the two are one (BR-206).
+        return None
+    return candidate_id
 
 
 def _confirmed_fields(application: Application) -> list[FieldRow]:

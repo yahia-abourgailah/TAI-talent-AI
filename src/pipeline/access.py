@@ -28,6 +28,19 @@ CRITERIA_OWNER = "criteria_owner"
 
 NO_SUCH_RECORD = "No such requisition, candidate or application."
 
+# A candidate who asked us to stop keeping their data is locked: their record, their applications
+# and everything about them read as not found for everyone but an admin (BR-504, migration 0013).
+# `column` is how the query names the candidate id.
+NOT_LOCKED = """
+    (:sees_locked OR NOT EXISTS (
+       SELECT 1 FROM core.candidate_locked lock WHERE lock.candidate_id = {column}
+    ))
+"""
+
+
+def not_locked(column: str) -> str:
+    return NOT_LOCKED.format(column=column)
+
 
 class PipelineError(Exception):
     """A request the pipeline will not carry out. The message is safe to show.
@@ -65,15 +78,20 @@ class NotPermitted(PipelineError):
 class Actor:
     subject: str
     sees_all: bool
+    is_admin: bool = False
 
     def scope(self) -> dict[str, Any]:
-        return {"sees_all": self.sees_all, "subject": self.subject}
+        return {
+            "sees_all": self.sees_all,
+            "subject": self.subject,
+            "sees_locked": self.is_admin,
+        }
 
 
 def actor_from_principal(principal: Principal) -> Actor:
     """Who works in the pipeline: reads, moves and decides. Every action records the subject."""
     if principal.roles & {TA_LEAD, ADMIN}:
-        return Actor(principal.subject, sees_all=True)
+        return Actor(principal.subject, sees_all=True, is_admin=ADMIN in principal.roles)
     if RECRUITER in principal.roles:
         return Actor(principal.subject, sees_all=False)
     raise NotPermitted("Your role does not work in the pipeline.")

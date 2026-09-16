@@ -87,9 +87,14 @@ The `/v1` surface below is **built and frozen** (week 4). From here on it change
 | GET | `/v1/public/requisitions` | Open jobs a candidate may apply to. Public fields only |
 | GET | `/v1/public/consent-wording` | The consent text to show, in Arabic and English |
 | POST | `/v1/public/applications` | Apply: a contact channel and consent are required |
+| POST | `/v1/candidates/{candidate_id}/joins`, `/v1/candidate-joins/{join_id}/undo` | Week 6. Record that two records are one person, and undo it. Both records stay (BR-204) |
+| GET | `/v1/candidates/{candidate_id}/group` | Week 6. Which record this one is read under, and every record read under it |
+| POST | `/v1/candidates/{candidate_id}/withdrawals` | Week 6. A TA member records that this candidate asked us to stop keeping their data. The record locks (BR-504) |
+| GET | `/v1/candidates/{candidate_id}/withdrawals`, `/v1/withdrawals` | Week 6. What was recorded, and the locked records. Admin only |
+| POST | `/v1/withdrawals/{withdrawal_id}/lift` | Week 6. Lift a withdrawal recorded by mistake, with a reason. Admin only |
 | GET, POST | `/dev/accounts`, `/dev/token` | **Dev only.** Fake accounts `recruiter-a`, `recruiter-b`, `ta-lead`, `criteria-owner`, `admin`, and tokens for them. Absent in staging and production |
 
-**Still to come:** finding the same person twice and joining records, and withdrawing consent (BR-203, BR-204, BR-504), later in week 6.
+**A locked candidate.** When someone asks us to stop keeping their data, a TA member records it and that candidate is gone from the API: the record, its applications, its review items, its documents and its evaluations all answer 404, exactly as a record that never existed, and searching for the number finds nothing. It is not scored and not matched with anyone. Nothing is deleted (BR-205): an admin sees the locked records and can lift one recorded by mistake, with a reason. Build against this — a candidate you could read yesterday may be 404 today, and that is not an error to retry.
 
 **Where the build differs from the first proposal:**
 
@@ -601,7 +606,7 @@ Each late decision stops the week shown.
 | D-WEB-1 | Upload experience and limits: accepted file types, maximum size, and whether the job is chosen before or after upload | PDF, DOCX, JPEG, PNG; 10 MB; one file; job chosen first (from the link) | Week 5 |
 | D-WEB-2 | Does the browser call the API directly, or does your backend call it? | Direct from the browser, with CORS limited to the careers site origin | Week 5 |
 | D-WEB-3 | Does the careers site already have bot protection? If so, how do we verify it? | Reuse yours if it keeps data in the company. Otherwise rely on our rate and size limits | Week 5 |
-| D-WEB-4 | Who owns the consent wording with Legal, and how does a candidate withdraw consent later (BR-504)? | Wording approved by Legal and served from `/v1/public/consent-wording`. A withdrawal route agreed with Legal | Week 6 |
+| D-WEB-4 | Who owns the consent wording with Legal, and how does a candidate withdraw consent later (BR-504)? | Wording approved by Legal and served from `/v1/public/consent-wording`. Withdrawal is built: the candidate asks us the way they always do, a TA member records it, and the record locks. No self-service link in emails for now, so nothing acts on a mis-click | Week 6 |
 | D-WEB-5 | How are job-post tracking codes generated and put into links? | The platform issues one code per job post. Marketing pastes the link as given | Week 6 |
 | D-WEB-6 | Can the careers page ship upload, prefill and submission in week 6 (ASM-05)? | If not, confirm by the end of week 5 and we launch the fallback apply page | Week 6 |
 

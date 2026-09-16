@@ -25,6 +25,7 @@ from api.public_routes import router as public_router
 from api.report_routes import router as report_router
 from api.review_routes import router as review_router
 from api.routes import router
+from api.withdrawal_routes import router as withdrawal_router
 from auth import DevIdentity, TokenVerifier
 from config import AuthMode, Environment, Settings, get_settings
 from config.logs import configure_logging
@@ -107,5 +108,6 @@ def create_app(
     app.include_router(candidate_review_router)
     app.include_router(candidate_router)
     app.include_router(report_router)
+    app.include_router(withdrawal_router)
     app.include_router(public_router)
     return app

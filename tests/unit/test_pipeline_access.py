@@ -60,7 +60,12 @@ def _principal(*roles: str) -> Principal:
 def test_a_recruiter_is_scoped_and_a_ta_lead_or_admin_sees_all():
     assert actor_from_principal(_principal("recruiter")) == Actor("dev|someone", sees_all=False)
     assert actor_from_principal(_principal("ta_lead")) == Actor("dev|someone", sees_all=True)
-    assert actor_from_principal(_principal("admin")) == Actor("dev|someone", sees_all=True)
+    # Only an admin sees a record locked by a withdrawal (BR-504).
+    assert actor_from_principal(_principal("admin")) == Actor(
+        "dev|someone", sees_all=True, is_admin=True
+    )
+    assert not actor_from_principal(_principal("ta_lead")).is_admin
+    assert actor_from_principal(_principal("ta_lead")).scope()["sees_locked"] is False
 
 
 @pytest.mark.parametrize("roles", [(), ("criteria_owner",)])

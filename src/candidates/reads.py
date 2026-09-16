@@ -15,12 +15,13 @@ from typing import Any, Self
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
-from pipeline.access import Actor, NotFound, run
+from pipeline.access import Actor, NotFound, not_locked, run
 
 CANDIDATE_NOT_FOUND = "Candidate not found."
 EVALUATION_NOT_FOUND = "Evaluation not found."
 
-VISIBLE = """
+VISIBLE = f"""
+    {not_locked("c.id")} AND
     (:sees_all OR EXISTS (
        SELECT 1 FROM pipeline.application a
        WHERE a.candidate_id = c.id AND a.owner_recruiter = :subject

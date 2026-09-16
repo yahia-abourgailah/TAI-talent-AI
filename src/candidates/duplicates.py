@@ -220,8 +220,12 @@ def keys_of(field: str, value: str) -> dict[str, list[str]]:
 def _identities(conn: Connection) -> list[tuple[int, str, str]]:
     rows = conn.execute(
         text(
-            "SELECT candidate_id, field, value FROM core.candidate_field_current "
-            "WHERE field = ANY(:fields) AND value IS NOT NULL AND btrim(value) <> ''"
+            "SELECT candidate_id, field, value FROM core.candidate_field_current f "
+            "WHERE field = ANY(:fields) AND value IS NOT NULL AND btrim(value) <> '' "
+            # A candidate who asked us to stop keeping their data is matched against no one.
+            "AND NOT EXISTS ("
+            "  SELECT 1 FROM core.candidate_locked lock WHERE lock.candidate_id = f.candidate_id"
+            ")"
         ),
         {"fields": list(FIELDS)},
     )

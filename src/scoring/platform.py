@@ -20,6 +20,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
+from candidates.withdrawal import is_locked
 from jobs.queue import ReportableError, RunLog
 from pipeline.store import propose_rejection
 from replay.mapping import candidate_from_values, input_sha256
@@ -113,11 +114,18 @@ _REASON_IN_FORCE = text(
 )
 
 
-def score_application(conn: Connection, application_id: int, log: RunLog) -> int:
-    """Scores the application's candidate, writes the evaluation and returns its id."""
+def score_application(conn: Connection, application_id: int, log: RunLog) -> int | None:
+    """Scores the application's candidate, writes the evaluation and returns its id.
+
+    A candidate who asked us to stop keeping their data is not scored: the job ends quietly, and
+    the run says so (BR-504).
+    """
     application = conn.execute(_APPLICATION, {"id": application_id}).one_or_none()
     if application is None:
         raise ReportableError(f"application {application_id} not found")
+    if is_locked(conn, int(application.candidate_id)):
+        log.count("locked_not_scored")
+        return None
     ruleset = RULESETS.get(application.criteria_version_id)
     if ruleset is None:
         raise ReportableError(f"no scorer for criteria version {application.criteria_version_id}")

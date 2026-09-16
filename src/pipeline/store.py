@@ -10,7 +10,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
-from pipeline.access import Actor, NotFound, NotPermitted, Refused, run
+from pipeline.access import Actor, NotFound, NotPermitted, Refused, not_locked, run
 
 _OPENING = (
     "id, brand, department, track, headcount, status, owner_recruiter, team, "
@@ -269,7 +269,8 @@ def get_application(conn: Connection, actor: Actor, application_id: int) -> dict
         conn,
         text(
             f"SELECT {_APPLICATION} FROM pipeline.application_state "
-            "WHERE id = :id AND (:sees_all OR owner_recruiter = :subject)"
+            f"WHERE id = :id AND {not_locked('candidate_id')} "
+            "AND (:sees_all OR owner_recruiter = :subject)"
         ),
         {"id": application_id, **actor.scope()},
     )
@@ -294,7 +295,8 @@ def list_applications(
         text(
             f"""
             SELECT {_APPLICATION} FROM pipeline.application_state
-            WHERE (:sees_all OR owner_recruiter = :subject)
+            WHERE {not_locked("candidate_id")}
+              AND (:sees_all OR owner_recruiter = :subject)
               AND (CAST(:before AS bigint) IS NULL OR id < :before)
               AND (CAST(:opening AS bigint) IS NULL OR opening_id = :opening)
               AND (CAST(:stage AS text) IS NULL OR current_step = :stage)
@@ -493,7 +495,10 @@ _REVIEW = """
 def get_review_item(conn: Connection, actor: Actor, review_item_id: int) -> dict[str, Any]:
     rows = run(
         conn,
-        text(_REVIEW + "WHERE r.id = :id AND (:sees_all OR a.owner_recruiter = :subject)"),
+        text(
+            _REVIEW + f"WHERE r.id = :id AND {not_locked('a.candidate_id')} "
+            "AND (:sees_all OR a.owner_recruiter = :subject)"
+        ),
         {"id": review_item_id, **actor.scope()},
     )
     if not rows:
@@ -516,8 +521,9 @@ def list_review_items(
         conn,
         text(
             _REVIEW
-            + """
-            WHERE (:sees_all OR a.owner_recruiter = :subject)
+            + f"""
+            WHERE {not_locked("a.candidate_id")}
+              AND (:sees_all OR a.owner_recruiter = :subject)
               AND (CAST(:before AS bigint) IS NULL OR r.id < :before)
               AND (CAST(:status AS text) IS NULL
                    OR (CAST(:status AS text) = 'open') = (x.id IS NULL))
