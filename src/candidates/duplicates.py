@@ -1,10 +1,11 @@
 """Finding the same person twice (A: BR-203, BR-206).
 
     python -m candidates.duplicates scan --out DIR [--report-copy docs/migration/DUPLICATES.md]
-    python -m candidates.duplicates sample --out DIR [--pairs 500] [--ids-only]
+    python -m candidates.duplicates sample --out DIR [--pairs 500] [--include-link-only]
     python -m candidates.duplicates check --labels FILE [--report-copy FILE]
 
-What two records are matched on, strongest first:
+**A name is never a match.** Two records are one person only when they share something that
+belongs to one person:
 
     phone        the last 10 digits, so +20 100..., 0020 100... and 0100... are one number
     email        trimmed and lower-cased
@@ -12,14 +13,15 @@ What two records are matched on, strongest first:
 
 A cell can hold more than one of these — a number and a profile link together, as some of the
 sourcing batches were written — so each piece is read as what it is, not as what its column says.
-    name         the same name written differently. Arabic spellings are brought together
-                 (ال prefix, ة and ه, ى and ي, hamza forms, diacritics), and an Arabic name and its
-                 English spelling meet in the middle: Arabic has no short vowels, so both become
-                 the same consonants. "محمد", "Mohamed", "Mohammed" and "Muhammad" are one key.
 
-A phone, an email or a profile is **strong**: those belong to one person. A name alone is
-**possible**: many people share a name, so it is never treated as the same person. Nothing here
-joins anything: every match waits for a person (BR-206), and a person joins with
+A name is read the same careful way (ال prefix, ة and ه, ى and ي, hamza forms, diacritics, and
+Arabic against its English spelling: "محمد", "Mohamed", "Mohammed" and "Muhammad" are one key), but
+only ever as **extra detail on a pair that already matched on a number, an address or a profile**.
+Egypt has a great many people called Mohamed Ali, and the reading that brings spellings together
+also brings Mahmoud and Mohamed together, so a shared name on its own says nothing and is not put
+in front of anyone.
+
+Nothing here joins anything: every match waits for a person (BR-206), and a person joins with
 candidates.joins.
 
 A name key needs at least two words, and a key shared by more candidates than MOST_PER_KEY is
@@ -117,6 +119,19 @@ class Pair:
     higher_id: int
     strength: str
     evidence: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class Matches:
+    """What a scan found: the pairs to put in front of a person, and what it left alone.
+
+    `name_only` counts the pairs that share nothing but a name. They are not matches, and are
+    counted only so the report can say how many were left alone.
+    """
+
+    pairs: list[Pair]
+    too_common: dict[str, int]
+    name_only: int
 
 
 # A cell sometimes holds more than one thing: "+20100...  |  linkedin.com/in/...". Each piece is
@@ -232,8 +247,11 @@ def _identities(conn: Connection) -> list[tuple[int, str, str]]:
     return [(int(row.candidate_id), row.field, row.value) for row in rows]
 
 
-def find_pairs(identities: Iterable[tuple[int, str, str]]) -> tuple[list[Pair], dict[str, int]]:
-    """Every pair of candidates sharing a key, with what they share. Counts what was skipped."""
+def find_pairs(identities: Iterable[tuple[int, str, str]]) -> Matches:
+    """Every pair of candidates sharing a number, an address or a profile, with what they share.
+
+    A pair that shares only a name is not a match and is left out (see the note at the top).
+    """
     by_key: dict[tuple[str, str], set[int]] = {}
     for candidate_id, field, value in identities:
         for evidence, keys in keys_of(field, value).items():
@@ -252,15 +270,12 @@ def find_pairs(identities: Iterable[tuple[int, str, str]]) -> tuple[list[Pair], 
             evidence_of.setdefault((lower, higher), set()).add(evidence)
 
     pairs = [
-        Pair(
-            lower,
-            higher,
-            STRONG if found & STRONG_EVIDENCE else POSSIBLE,
-            tuple(sorted(found)),
-        )
+        Pair(lower, higher, STRONG, tuple(sorted(found)))
         for (lower, higher), found in sorted(evidence_of.items())
+        if found & STRONG_EVIDENCE
     ]
-    return pairs, too_common
+    name_only = sum(1 for found in evidence_of.values() if not found & STRONG_EVIDENCE)
+    return Matches(pairs, too_common, name_only)
 
 
 def record(conn: Connection, pairs: Sequence[Pair], found_by: str = FOUND_BY) -> dict[str, int]:
@@ -332,9 +347,8 @@ def groups(pairs: Sequence[Pair]) -> list[list[int]]:
     )
 
 
-def summarise(
-    pairs: Sequence[Pair], too_common: Mapping[str, int], candidates: int
-) -> dict[str, Any]:
+def summarise(matches: Matches, candidates: int) -> dict[str, Any]:
+    pairs, too_common = matches.pairs, matches.too_common
     by_evidence: dict[str, int] = {}
     for pair in pairs:
         for evidence in pair.evidence:
@@ -346,8 +360,7 @@ def summarise(
     return {
         "candidates_with_something_to_match_on": candidates,
         "pairs": len(pairs),
-        "strong": sum(pair.strength == STRONG for pair in pairs),
-        "possible": sum(pair.strength == POSSIBLE for pair in pairs),
+        "name_only_not_a_match": matches.name_only,
         "pairs_by_evidence": dict(sorted(by_evidence.items())),
         "groups": len(found),
         "records_in_a_group": sum(len(group) for group in found),
@@ -368,9 +381,8 @@ def render_report(summary: Mapping[str, Any], recorded: Mapping[str, int] | None
         "|---|---:|",
         "| Candidates with a phone, email, profile or name | "
         f"{summary['candidates_with_something_to_match_on']:,} |",
-        f"| Pairs found | {summary['pairs']:,} |",
-        f"| &nbsp;&nbsp;strong (same phone, email or profile) | {summary['strong']:,} |",
-        f"| &nbsp;&nbsp;possible (same name only) | {summary['possible']:,} |",
+        f"| Pairs found (same phone, email or profile) | {summary['pairs']:,} |",
+        f"| Pairs sharing only a name, left alone | {summary['name_only_not_a_match']:,} |",
         f"| Groups | {summary['groups']:,} |",
         f"| Records inside a group | {summary['records_in_a_group']:,} |",
         "",
@@ -433,18 +445,14 @@ SHOWN_FIELDS = ("full_name", "phone", "whatsapp", "email", "profile_url")
 def pick_sample(
     pairs: Sequence[Pair], wanted: int, worth_asking: Callable[[Pair], bool] | None = None
 ) -> list[Pair]:
-    """A spread of pairs for a person to check: the strong ones first, then the possible ones.
+    """The pairs for a person to check by hand.
 
     Where two records were matched on a profile link and one of them holds nothing but that link,
     there is nothing for a person to weigh, so those go to the back: a sample is worth someone's
     afternoon only if the pairs in it can be got wrong.
     """
     order = (lambda pair: not worth_asking(pair)) if worth_asking else (lambda pair: False)
-    strong = sorted((pair for pair in pairs if pair.strength == STRONG), key=order)
-    possible = sorted((pair for pair in pairs if pair.strength == POSSIBLE), key=order)
-    half = wanted // 2
-    picked = strong[: max(half, wanted - len(possible))]
-    return picked + possible[: wanted - len(picked)]
+    return sorted(pairs, key=order)[:wanted]
 
 
 def shown_values(conn: Connection, candidates: Sequence[int]) -> dict[int, dict[str, str]]:
@@ -537,19 +545,14 @@ def read_decisions(path: Path) -> list[dict[str, str]]:
 
 
 def check_report(rows: Sequence[Mapping[str, str]]) -> dict[str, Any]:
-    """What the hand check says: of the strong pairs, how many are not one person after all."""
+    """What the hand check says: of the pairs checked, how many are not one person after all."""
     checked = [row for row in rows if (row.get("decision") or "").strip()]
-    strong = [row for row in checked if row["strength"] == STRONG]
-    possible = [row for row in checked if row["strength"] == POSSIBLE]
-    wrong = [row for row in strong if row["decision"].strip().lower() == "different"]
+    wrong = [row for row in checked if row["decision"].strip().lower() == "different"]
     return {
         "pairs_in_the_sample": len(rows),
         "checked": len(checked),
-        "strong_checked": len(strong),
-        "strong_wrong": len(wrong),
-        "wrong_join_rate": None if not strong else round(len(wrong) / len(strong), 5),
-        "possible_checked": len(possible),
-        "possible_same_person": sum(row["decision"].strip().lower() == "same" for row in possible),
+        "wrong": len(wrong),
+        "wrong_join_rate": None if not checked else round(len(wrong) / len(checked), 5),
         "unclear": sum(row["decision"].strip().lower() == "unclear" for row in checked),
         "wrong_pairs": [(row["candidate_a"], row["candidate_b"]) for row in wrong],
     }
@@ -572,6 +575,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="leave out the names, numbers and profiles the person needs to judge a pair",
     )
+    sample.add_argument(
+        "--include-link-only",
+        action="store_true",
+        help="also include pairs on one profile link where a record holds nothing else",
+    )
     check = commands.add_parser("check", help="read the checked sample and report the rate")
     check.add_argument("--labels", type=Path, required=True)
     check.add_argument("--report-copy", type=Path)
@@ -586,10 +594,8 @@ def main(argv: list[str] | None = None) -> int:
         checked = check_report(rows)
         print(
             f"Checked {checked['checked']} of {checked['pairs_in_the_sample']} pairs. "
-            f"Strong pairs checked {checked['strong_checked']}, of which not one person "
-            f"{checked['strong_wrong']} (rate {checked['wrong_join_rate']}). "
-            f"Possible pairs that are one person: {checked['possible_same_person']} of "
-            f"{checked['possible_checked']}. Unclear {checked['unclear']}."
+            f"Not one person after all: {checked['wrong']} "
+            f"(rate {checked['wrong_join_rate']}). Unclear {checked['unclear']}."
         )
         return 0 if (checked["wrong_join_rate"] or 0) < 0.005 else 1
 
@@ -604,8 +610,9 @@ def main(argv: list[str] | None = None) -> int:
     engine = engine_from_environment()
     with engine.begin() as conn:
         identities = _identities(conn)
-        pairs, too_common = find_pairs(identities)
-        summary = summarise(pairs, too_common, len({row[0] for row in identities}))
+        matches = find_pairs(identities)
+        pairs = matches.pairs
+        summary = summarise(matches, len({row[0] for row in identities}))
         if args.command == "sample":
             if args.ids_only:
                 picked, values = pick_sample(pairs, args.pairs), None
@@ -613,11 +620,21 @@ def main(argv: list[str] | None = None) -> int:
                 sides = sorted({side for pair in pairs for side in (pair.lower_id, pair.higher_id)})
                 values = shown_values(conn, sides)
                 worth_asking = _worth_asking(values)
-                picked = pick_sample(pairs, args.pairs, worth_asking)
-                thin = sum(1 for pair in pairs if not worth_asking(pair))
+                # Two records on one profile link where one of them holds nothing but that link
+                # are the same person by the link itself. There is nothing for a person to weigh,
+                # so they are left out unless they are asked for.
+                judgeable = [pair for pair in pairs if worth_asking(pair)]
+                picked = pick_sample(
+                    pairs if args.include_link_only else judgeable, args.pairs, worth_asking
+                )
                 print(
-                    f"{thin} of {len(pairs)} pairs are a shared profile link where one record "
-                    "holds nothing else; they go last, as there is nothing to weigh."
+                    f"{len(pairs) - len(judgeable)} of {len(pairs)} pairs are one profile link "
+                    "where a record holds nothing else"
+                    + (
+                        "; they are in the file too."
+                        if args.include_link_only
+                        else "; left out (--include-link-only keeps them)."
+                    )
                 )
             _write_private(
                 out / "duplicate-sample.csv", _sample_csv(pairs, args.pairs, values, picked)
@@ -634,8 +651,9 @@ def main(argv: list[str] | None = None) -> int:
         args.report_copy.parent.mkdir(parents=True, exist_ok=True)
         args.report_copy.write_text(report, encoding="utf-8")
     print(
-        f"Pairs {summary['pairs']} (strong {summary['strong']}, possible {summary['possible']}) "
-        f"in {summary['groups']} groups." + ("" if recorded is None else f" Recorded: {recorded}.")
+        f"Pairs {summary['pairs']} in {summary['groups']} groups. "
+        f"Pairs sharing only a name, left alone: {summary['name_only_not_a_match']}."
+        + ("" if recorded is None else f" Recorded: {recorded}.")
     )
     print(f"  pairs  {out / 'duplicate-pairs.csv'}  (candidate ids, never commit)")
     return 0

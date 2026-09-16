@@ -5,19 +5,18 @@ Counts and candidate ids only; no names, numbers or addresses. Nothing here is j
 | What | Count |
 |---|---:|
 | Candidates with a phone, email, profile or name | 5,140 |
-| Pairs found | 1,681 |
-| &nbsp;&nbsp;strong (same phone, email or profile) | 1,352 |
-| &nbsp;&nbsp;possible (same name only) | 329 |
-| Groups | 1,178 |
-| Records inside a group | 2,646 |
+| Pairs found (same phone, email or profile) | 1,352 |
+| Pairs sharing only a name, left alone | 329 |
+| Groups | 1,241 |
+| Records inside a group | 2,525 |
 
 ## What pairs were matched on
 
 | Evidence | Pairs |
 |---|---:|
 | email | 5 |
-| name_arabic | 216 |
-| name_latin | 386 |
+| name_arabic | 60 |
+| name_latin | 59 |
 | phone | 21 |
 | profile_url | 1,348 |
 
@@ -25,17 +24,10 @@ Counts and candidate ids only; no names, numbers or addresses. Nothing here is j
 
 | Records in the group | Groups |
 |---:|---:|
-| 2 | 1,057 |
-| 3 | 48 |
-| 4 | 34 |
-| 5 | 17 |
-| 6 | 10 |
-| 7 | 4 |
-| 8 | 2 |
-| 9 | 3 |
-| 10 | 1 |
-| 12 | 1 |
-| 14 | 1 |
+| 2 | 1,217 |
+| 3 | 9 |
+| 4 | 13 |
+| 6 | 2 |
 
 ## Before anything is joined
 

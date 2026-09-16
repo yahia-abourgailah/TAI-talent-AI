@@ -94,6 +94,8 @@ The `/v1` surface below is **built and frozen** (week 4). From here on it change
 | POST | `/v1/withdrawals/{withdrawal_id}/lift` | Week 6. Lift a withdrawal recorded by mistake, with a reason. Admin only |
 | GET, POST | `/dev/accounts`, `/dev/token` | **Dev only.** Fake accounts `recruiter-a`, `recruiter-b`, `ta-lead`, `criteria-owner`, `admin`, and tokens for them. Absent in staging and production |
 
+**Two records of one person.** A `possible_duplicate` review item is only ever opened when two records share a **phone, an email or a profile link** — something that belongs to one person. A shared name never opens one, however exactly it matches: a name in `evidence` beside a number or a link means the names agree too, nothing more. Nothing is joined by the platform; a person decides, and can undo it.
+
 **A locked candidate.** When someone asks us to stop keeping their data, a TA member records it and that candidate is gone from the API: the record, its applications, its review items, its documents and its evaluations all answer 404, exactly as a record that never existed, and searching for the number finds nothing. It is not scored and not matched with anyone. Nothing is deleted (BR-205): an admin sees the locked records and can lift one recorded by mistake, with a reason. Build against this — a candidate you could read yesterday may be 404 today, and that is not an error to retry.
 
 **Where the build differs from the first proposal:**

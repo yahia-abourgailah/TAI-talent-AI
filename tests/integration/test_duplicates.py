@@ -27,7 +27,7 @@ def conn(app_engine):
 
 
 def _scan(conn) -> dict[str, int]:
-    pairs, _too_common = find_pairs(
+    found = find_pairs(
         [
             (int(row.candidate_id), row.field, row.value)
             for row in conn.execute(
@@ -40,7 +40,7 @@ def _scan(conn) -> dict[str, int]:
             )
         ]
     )
-    return record(conn, pairs)
+    return record(conn, found.pairs)
 
 
 @pytest.fixture

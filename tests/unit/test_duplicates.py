@@ -4,7 +4,6 @@ import pytest
 
 from candidates.duplicates import (
     MOST_PER_KEY,
-    POSSIBLE,
     STRONG,
     check_report,
     email_key,
@@ -61,27 +60,40 @@ def test_a_single_word_is_never_a_name_key():
     assert keys_of("full_name", "Mohamed") == {}
 
 
-def test_a_shared_number_is_strong_and_a_shared_name_is_only_possible():
+def test_a_shared_number_is_a_match_and_a_shared_name_alone_is_not():
     identities = [
         (1, "phone", MOBILE),
         (2, "whatsapp", "+20 100 000 0021"),
         (3, "full_name", "Made Up Person"),
         (4, "full_name", "Made-up  PERSON"),
     ]
-    pairs, too_common = find_pairs(identities)
-    by_pair = {(pair.lower_id, pair.higher_id): pair for pair in pairs}
+    found = find_pairs(identities)
+    by_pair = {(pair.lower_id, pair.higher_id): pair for pair in found.pairs}
     assert by_pair[(1, 2)].strength == STRONG
     assert by_pair[(1, 2)].evidence == ("phone",)
-    assert by_pair[(3, 4)].strength == POSSIBLE
-    assert set(by_pair[(3, 4)].evidence) == {"name_arabic", "name_latin"}
-    assert too_common == {}
+    # Two people called the same thing are not one person, and nobody is asked about them.
+    assert (3, 4) not in by_pair
+    assert found.name_only == 1
+    assert found.too_common == {}
+
+
+def test_a_name_is_kept_as_detail_on_a_pair_that_matched_on_something_real():
+    identities = [
+        (1, "phone", MOBILE),
+        (1, "full_name", "Made Up Person"),
+        (2, "whatsapp", "+20 100 000 0021"),
+        (2, "full_name", "Made-up  PERSON"),
+    ]
+    (pair,) = find_pairs(identities).pairs
+    assert pair.strength == STRONG
+    assert set(pair.evidence) == {"phone", "name_arabic", "name_latin"}
 
 
 def test_a_key_shared_by_too_many_records_is_left_out():
-    shared = [(number, "full_name", "Made Up Person") for number in range(MOST_PER_KEY + 2)]
-    pairs, too_common = find_pairs(shared)
-    assert pairs == []
-    assert too_common["name_arabic"] == 1
+    shared = [(number, "email", "made.up@example.com") for number in range(MOST_PER_KEY + 2)]
+    found = find_pairs(shared)
+    assert found.pairs == []
+    assert found.too_common["email"] == 1
 
 
 def test_records_matched_to_each_other_become_one_group():
@@ -93,22 +105,20 @@ def test_records_matched_to_each_other_become_one_group():
         (7, "email", "someone.else@example.com"),
         (8, "email", "someone.else@example.com"),
     ]
-    pairs, _ = find_pairs(identities)
-    assert groups(pairs) == [[1, 2, 3], [7, 8]]
+    assert groups(find_pairs(identities).pairs) == [[1, 2, 3], [7, 8]]
 
 
 def test_the_hand_check_reports_the_wrong_join_rate():
     rows = [
         {"candidate_a": "1", "candidate_b": "2", "strength": STRONG, "decision": "same"},
         {"candidate_a": "3", "candidate_b": "4", "strength": STRONG, "decision": "different"},
-        {"candidate_a": "5", "candidate_b": "6", "strength": POSSIBLE, "decision": "same"},
-        {"candidate_a": "7", "candidate_b": "8", "strength": POSSIBLE, "decision": "unclear"},
+        {"candidate_a": "5", "candidate_b": "6", "strength": STRONG, "decision": "same"},
+        {"candidate_a": "7", "candidate_b": "8", "strength": STRONG, "decision": "unclear"},
         {"candidate_a": "9", "candidate_b": "10", "strength": STRONG, "decision": ""},
     ]
     report = check_report(rows)
-    assert (report["checked"], report["strong_checked"], report["strong_wrong"]) == (4, 2, 1)
-    assert report["wrong_join_rate"] == 0.5
-    assert report["possible_same_person"] == 1
+    assert (report["checked"], report["wrong"]) == (4, 1)
+    assert report["wrong_join_rate"] == 0.25
     assert report["unclear"] == 1
     assert report["wrong_pairs"] == [("3", "4")]
 

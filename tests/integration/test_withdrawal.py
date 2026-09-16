@@ -76,8 +76,7 @@ def test_a_locked_record_is_matched_against_no_one(conn, asked_to_be_left_alone,
             {"a": candidate, "b": twin},
         )
     ]
-    pairs, _too_common = find_pairs(identities)
-    assert pairs == []
+    assert find_pairs(identities).pairs == []
 
 
 def test_only_an_admin_lifts_a_withdrawal(conn, asked_to_be_left_alone):
