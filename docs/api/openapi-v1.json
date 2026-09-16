@@ -196,6 +196,25 @@
         "title": "ApplicationPage",
         "type": "object"
       },
+      "ApplicationReceivedOut": {
+        "properties": {
+          "application_id": {
+            "title": "Application Id",
+            "type": "string"
+          },
+          "status": {
+            "const": "received",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "application_id",
+          "status"
+        ],
+        "title": "ApplicationReceivedOut",
+        "type": "object"
+      },
       "Body_upload_cv_v1_public_cv_uploads_post": {
         "properties": {
           "file": {
@@ -585,6 +604,123 @@
           "reason"
         ],
         "title": "CloseRequisitionIn",
+        "type": "object"
+      },
+      "ConsentIn": {
+        "properties": {
+          "agreed": {
+            "title": "Agreed",
+            "type": "boolean"
+          },
+          "agreed_at": {
+            "format": "date-time",
+            "title": "Agreed At",
+            "type": "string"
+          },
+          "channels": {
+            "items": {
+              "enum": [
+                "phone",
+                "whatsapp",
+                "email"
+              ],
+              "type": "string"
+            },
+            "title": "Channels",
+            "type": "array"
+          },
+          "language": {
+            "enum": [
+              "ar",
+              "en"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "purposes": {
+            "default": [],
+            "items": {
+              "maxLength": 64,
+              "type": "string"
+            },
+            "title": "Purposes",
+            "type": "array"
+          },
+          "wording_version": {
+            "maxLength": 64,
+            "title": "Wording Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "agreed",
+          "wording_version",
+          "channels",
+          "language",
+          "agreed_at"
+        ],
+        "title": "ConsentIn",
+        "type": "object"
+      },
+      "ConsentWordingOut": {
+        "properties": {
+          "provisional": {
+            "title": "Provisional",
+            "type": "boolean"
+          },
+          "purposes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Purposes",
+            "type": "array"
+          },
+          "text_ar": {
+            "title": "Text Ar",
+            "type": "string"
+          },
+          "text_en": {
+            "title": "Text En",
+            "type": "string"
+          },
+          "wording_version": {
+            "title": "Wording Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "wording_version",
+          "provisional",
+          "purposes",
+          "text_ar",
+          "text_en"
+        ],
+        "title": "ConsentWordingOut",
+        "type": "object"
+      },
+      "ContactChannelIn": {
+        "properties": {
+          "type": {
+            "enum": [
+              "phone",
+              "whatsapp"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "value": {
+            "maxLength": 40,
+            "minLength": 6,
+            "pattern": "\\S",
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "value"
+        ],
+        "title": "ContactChannelIn",
         "type": "object"
       },
       "ContactabilityOut": {
@@ -1235,6 +1371,244 @@
         "title": "FunnelOut",
         "type": "object"
       },
+      "JobPostIn": {
+        "properties": {
+          "channel": {
+            "pattern": "^[a-z][a-z_]{1,29}$",
+            "title": "Channel",
+            "type": "string"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z0-9][a-z0-9-]{3,39}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "\\S",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          }
+        },
+        "required": [
+          "channel"
+        ],
+        "title": "JobPostIn",
+        "type": "object"
+      },
+      "JobPostList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/JobPostOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "JobPostList",
+        "type": "object"
+      },
+      "JobPostOut": {
+        "properties": {
+          "channel": {
+            "title": "Channel",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "requisition_id": {
+            "title": "Requisition Id",
+            "type": "string"
+          },
+          "tracking_code": {
+            "title": "Tracking Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tracking_code",
+          "requisition_id",
+          "channel",
+          "label",
+          "created_at",
+          "created_by"
+        ],
+        "title": "JobPostOut",
+        "type": "object"
+      },
+      "PublicApplicationIn": {
+        "properties": {
+          "consent": {
+            "$ref": "#/components/schemas/ConsentIn"
+          },
+          "contact_channel": {
+            "$ref": "#/components/schemas/ContactChannelIn"
+          },
+          "fields": {
+            "default": {},
+            "patternProperties": {
+              "^[a-z][a-z_]{1,40}$": {
+                "anyOf": [
+                  {
+                    "maxLength": 500,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "title": "Fields",
+            "type": "object"
+          },
+          "requisition_id": {
+            "maxLength": 40,
+            "title": "Requisition Id",
+            "type": "string"
+          },
+          "tracking_code": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tracking Code"
+          },
+          "upload_id": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upload Id"
+          }
+        },
+        "required": [
+          "requisition_id",
+          "contact_channel",
+          "consent"
+        ],
+        "title": "PublicApplicationIn",
+        "type": "object"
+      },
+      "PublicRequisitionOut": {
+        "properties": {
+          "brand": {
+            "title": "Brand",
+            "type": "string"
+          },
+          "department": {
+            "title": "Department",
+            "type": "string"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "requisition_id": {
+            "title": "Requisition Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "track": {
+            "title": "Track",
+            "type": "string"
+          }
+        },
+        "required": [
+          "requisition_id",
+          "title",
+          "brand",
+          "department",
+          "location",
+          "track"
+        ],
+        "title": "PublicRequisitionOut",
+        "type": "object"
+      },
+      "PublicRequisitionPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PublicRequisitionOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "PublicRequisitionPage",
+        "type": "object"
+      },
       "ReadingOut": {
         "properties": {
           "failure": {
@@ -1360,6 +1734,20 @@
             "title": "Headcount",
             "type": "integer"
           },
+          "location": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "\\S",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
           "owner_id": {
             "anyOf": [
               {
@@ -1374,12 +1762,31 @@
             ],
             "title": "Owner Id"
           },
+          "public": {
+            "default": false,
+            "title": "Public",
+            "type": "boolean"
+          },
           "team": {
             "maxLength": 200,
             "minLength": 1,
             "pattern": "\\S",
             "title": "Team",
             "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "\\S",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
           },
           "track": {
             "enum": [
@@ -1463,9 +1870,24 @@
             "title": "Id",
             "type": "string"
           },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
           "owner_id": {
             "title": "Owner Id",
             "type": "string"
+          },
+          "public": {
+            "title": "Public",
+            "type": "boolean"
           },
           "status": {
             "title": "Status",
@@ -1474,6 +1896,17 @@
           "team": {
             "title": "Team",
             "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
           },
           "track": {
             "title": "Track",
@@ -1494,7 +1927,10 @@
           "created_by",
           "closed_at",
           "closed_reason",
-          "closed_by"
+          "closed_by",
+          "title",
+          "location",
+          "public"
         ],
         "title": "RequisitionOut",
         "type": "object"
@@ -3407,6 +3843,118 @@
         ]
       }
     },
+    "/v1/public/applications": {
+      "post": {
+        "description": "Sends one application. A phone or WhatsApp number and an agreement are required. The answer\ncarries the application id only: never a score, a tier or a gate result.",
+        "operationId": "apply_v1_public_applications_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Upload-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Upload-Token"
+            }
+          },
+          {
+            "description": "A UUID you generate per distinct request. A retry with it returns the first response instead of doing the work again.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A UUID you generate per distinct request. A retry with it returns the first response instead of doing the work again.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicApplicationIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationReceivedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "summary": "Apply",
+        "tags": [
+          "public: careers page"
+        ]
+      }
+    },
+    "/v1/public/consent-wording": {
+      "get": {
+        "description": "The approved consent text, in Arabic and English. Show exactly this text, and send its\nversion back with the application.",
+        "operationId": "consent_wording_v1_public_consent_wording_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsentWordingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "summary": "Consent Wording",
+        "tags": [
+          "public: careers page"
+        ]
+      }
+    },
     "/v1/public/cv-uploads": {
       "post": {
         "description": "Keeps the CV and starts reading it. Poll the status with the returned token.",
@@ -3498,6 +4046,112 @@
           }
         },
         "summary": "Cv Upload Status",
+        "tags": [
+          "public: careers page"
+        ]
+      }
+    },
+    "/v1/public/requisitions": {
+      "get": {
+        "description": "Open jobs a candidate may apply to. Public fields only.",
+        "operationId": "public_requisitions_v1_public_requisitions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicRequisitionPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "summary": "Public Requisitions",
+        "tags": [
+          "public: careers page"
+        ]
+      }
+    },
+    "/v1/public/requisitions/{requisition_id}": {
+      "get": {
+        "description": "One open job, for the page a job-post link opens.",
+        "operationId": "public_requisition_v1_public_requisitions__requisition_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "requisition_id",
+            "required": true,
+            "schema": {
+              "title": "Requisition Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicRequisitionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "summary": "Public Requisition",
         "tags": [
           "public: careers page"
         ]
@@ -3999,6 +4653,129 @@
           }
         ],
         "summary": "Close Requisition",
+        "tags": [
+          "requisitions"
+        ]
+      }
+    },
+    "/v1/requisitions/{requisition_id}/job-posts": {
+      "get": {
+        "description": "Every job post of a requisition, oldest first.",
+        "operationId": "list_job_posts_v1_requisitions__requisition_id__job_posts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "requisition_id",
+            "required": true,
+            "schema": {
+              "title": "Requisition Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobPostList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Job Posts",
+        "tags": [
+          "requisitions"
+        ]
+      },
+      "post": {
+        "description": "A tracking code for one job post, so we can see which post brings good candidates. Put the\ncode in the link you publish; the apply page sends it back.",
+        "operationId": "create_job_post_v1_requisitions__requisition_id__job_posts_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "requisition_id",
+            "required": true,
+            "schema": {
+              "title": "Requisition Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "A UUID you generate per distinct request. A retry with it returns the first response instead of doing the work again.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A UUID you generate per distinct request. A retry with it returns the first response instead of doing the work again.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobPostIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobPostOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Job Post",
         "tags": [
           "requisitions"
         ]

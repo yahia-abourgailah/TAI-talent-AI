@@ -13,20 +13,34 @@ needs no Idempotency-Key.
 """
 
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, FastAPI, File, Header, Request, Response, UploadFile
-from pydantic import BaseModel
+from fastapi import (
+    APIRouter,
+    Depends,
+    FastAPI,
+    File,
+    Header,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+)
+from pydantic import BaseModel, Field
 from sqlalchemy.engine import Connection
 
+from api import idempotency
 from api.deps import blob_store, db_connection
 from api.errors import ApiError, error_response
 from api.fields import Timestamp
-from api.ids import decode, encode
-from api.limits import STATUS_CHECKS, UPLOADS, RateLimiter, Rule
+from api.ids import decode, decode_filter, encode
+from api.limits import APPLICATIONS, STATUS_CHECKS, UPLOADS, RateLimiter, Rule
+from api.pages import DEFAULT_LIMIT, MAX_LIMIT, decode_cursor, next_cursor
 from importer.blobs import BlobStore
-from intake import files, uploads
-from pipeline.access import NotFound
+from intake import consent as consent_records
+from intake import files, public_apply, uploads
+from pipeline.access import NotFound, Refused
 
 router = APIRouter(prefix="/v1/public", tags=["public: careers page"])
 
@@ -162,3 +176,185 @@ def cv_upload_status(
         expires_at=found["expires_at"],
         fields=found["fields"],
     )
+
+
+# --- The jobs a careers page may show (BR-401) ----------------------------------------------------
+
+
+class PublicRequisitionOut(BaseModel):
+    requisition_id: str
+    title: str
+    brand: str
+    department: str
+    location: str | None
+    track: str
+
+
+class PublicRequisitionPage(BaseModel):
+    items: list[PublicRequisitionOut]
+    next_cursor: str | None
+
+
+def _requisition(row: dict[str, Any]) -> PublicRequisitionOut:
+    return PublicRequisitionOut(
+        requisition_id=encode("requisition", row["id"]),
+        title=row["title"],
+        brand=row["brand"],
+        department=row["department"],
+        location=row["location"],
+        track=row["track"],
+    )
+
+
+@router.get("/requisitions")
+def public_requisitions(
+    request: Request,
+    response: Response,
+    conn: Db,
+    limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,
+    cursor: Annotated[str | None, Query(max_length=200)] = None,
+) -> PublicRequisitionPage:
+    """Open jobs a candidate may apply to. Public fields only."""
+    _limited(request, STATUS_CHECKS)
+    rows = public_apply.list_open_requisitions(conn, limit + 1, decode_cursor(cursor))
+    response.headers.update(_NO_STORE)
+    return PublicRequisitionPage(
+        items=[_requisition(row) for row in rows[:limit]], next_cursor=next_cursor(rows, limit)
+    )
+
+
+@router.get("/requisitions/{requisition_id}")
+def public_requisition(
+    requisition_id: str, request: Request, response: Response, conn: Db
+) -> PublicRequisitionOut:
+    """One open job, for the page a job-post link opens."""
+    _limited(request, STATUS_CHECKS)
+    row = public_apply.open_requisition(conn, decode("requisition", requisition_id))
+    response.headers.update(_NO_STORE)
+    return _requisition(row)
+
+
+# --- The words a candidate agrees to (CR-02) ------------------------------------------------------
+
+
+class ConsentWordingOut(BaseModel):
+    wording_version: str
+    provisional: bool
+    purposes: list[str]
+    text_ar: str
+    text_en: str
+
+
+@router.get("/consent-wording")
+def consent_wording(request: Request, response: Response, conn: Db) -> ConsentWordingOut:
+    """The approved consent text, in Arabic and English. Show exactly this text, and send its
+    version back with the application."""
+    _limited(request, STATUS_CHECKS)
+    wording = consent_records.wording_in_force(conn)
+    response.headers.update(_NO_STORE)
+    return ConsentWordingOut(
+        wording_version=wording["version"],
+        provisional=wording["provisional"],
+        purposes=list(wording["purposes"]),
+        text_ar=wording["text_ar"],
+        text_en=wording["text_en"],
+    )
+
+
+# --- Applying (BR-101, BR-109, BR-602, CR-02) -----------------------------------------------------
+
+FieldName = Annotated[str, Field(pattern=r"^[a-z][a-z_]{1,40}$")]
+FieldText = Annotated[str, Field(max_length=500)]
+AGREED_AT_AHEAD = timedelta(hours=1)
+
+
+class ContactChannelIn(BaseModel):
+    type: Literal["phone", "whatsapp"]
+    value: Annotated[str, Field(min_length=6, max_length=40, pattern=r"\S")]
+
+
+class ConsentIn(BaseModel):
+    agreed: bool
+    wording_version: Annotated[str, Field(max_length=64)]
+    purposes: list[Annotated[str, Field(max_length=64)]] = []
+    channels: list[Literal["phone", "whatsapp", "email"]]
+    language: Literal["ar", "en"]
+    agreed_at: datetime
+
+
+class PublicApplicationIn(BaseModel):
+    requisition_id: Annotated[str, Field(max_length=40)]
+    upload_id: Annotated[str, Field(max_length=40)] | None = None
+    fields: dict[FieldName, FieldText | None] = {}
+    contact_channel: ContactChannelIn
+    consent: ConsentIn
+    tracking_code: Annotated[str, Field(max_length=40)] | None = None
+
+
+class ApplicationReceivedOut(BaseModel):
+    application_id: str
+    status: Literal["received"]
+
+
+@router.post("/applications", status_code=201, response_model=ApplicationReceivedOut)
+def apply(
+    body: PublicApplicationIn,
+    request: Request,
+    conn: Db,
+    blobs: Blobs,
+    token: Annotated[str | None, Header(alias="X-Upload-Token", max_length=200)] = None,
+    key: idempotency.KeyHeader = None,
+) -> Any:
+    """Sends one application. A phone or WhatsApp number and an agreement are required. The answer
+    carries the application id only: never a score, a tier or a gate result."""
+    _limited(request, APPLICATIONS)
+    if key is None:
+        raise ApiError(
+            400,
+            "idempotency_key_required",
+            "Send an Idempotency-Key (a UUID) with an application, so a retry is harmless.",
+        )
+    if body.consent.agreed_at.tzinfo is None:
+        raise ApiError(
+            400,
+            "invalid_request",
+            "consent.agreed_at needs a time zone, for example 2026-10-05T09:00:00Z.",
+        )
+    if body.consent.agreed_at > datetime.now(UTC) + AGREED_AT_AHEAD:
+        raise ApiError(400, "invalid_request", "consent.agreed_at is in the future.")
+
+    received = public_apply.Application(
+        requisition_id=decode("requisition", body.requisition_id),
+        fields=dict(body.fields),
+        contact_type=body.contact_channel.type,
+        contact_value=body.contact_channel.value,
+        consent=public_apply.Consent(
+            agreed=body.consent.agreed,
+            wording_version=body.consent.wording_version,
+            purposes=tuple(body.consent.purposes),
+            channels=tuple(body.consent.channels),
+            language=body.consent.language,
+            agreed_at=body.consent.agreed_at,
+        ),
+        upload_id=decode_filter("upload", "upload_id", body.upload_id),
+        upload_token=token,
+        tracking_code=body.tracking_code,
+    )
+
+    def send() -> ApplicationReceivedOut:
+        try:
+            done = public_apply.apply(conn, blobs, received)
+        except consent_records.ConsentRefused as refusal:
+            raise ApiError(400, refusal.code, str(refusal)) from None
+        except Refused as refusal:
+            # What the sender can fix is a bad request; anything else stays a refusal (409).
+            if refusal.code in public_apply.BAD_REQUEST_CODES:
+                raise ApiError(400, refusal.code, str(refusal)) from None
+            raise
+        return ApplicationReceivedOut(
+            application_id=encode("application", done.application_id), status="received"
+        )
+
+    answer = idempotency.respond(conn, request, "public", key, body, 201, send)
+    answer.headers.update(_NO_STORE)
+    return answer

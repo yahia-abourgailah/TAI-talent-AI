@@ -23,6 +23,7 @@ class Rule:
 
 UPLOADS = Rule("cv_uploads", requests=10, window_seconds=600)
 STATUS_CHECKS = Rule("cv_upload_status", requests=120, window_seconds=60)
+APPLICATIONS = Rule("public_applications", requests=20, window_seconds=600)
 
 _MAX_KEYS = 50_000
 

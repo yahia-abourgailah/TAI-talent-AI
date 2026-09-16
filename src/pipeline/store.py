@@ -14,7 +14,8 @@ from pipeline.access import Actor, NotFound, NotPermitted, Refused, run
 
 _OPENING = (
     "id, brand, department, track, headcount, status, owner_recruiter, team, "
-    "criteria_version_id, created_at, created_by, closed_at, closed_reason, closed_by"
+    "criteria_version_id, created_at, created_by, closed_at, closed_reason, closed_by, "
+    "title, location, public"
 )
 _APPLICATION = (
     "id, opening_id, candidate_id, owner_recruiter, team, reopens_application_id, created_at, "
@@ -104,6 +105,9 @@ def create_opening(
     team: str,
     owner_recruiter: str | None = None,
     criteria_version_id: str | None = None,
+    title: str | None = None,
+    location: str | None = None,
+    public: bool = False,
 ) -> dict[str, Any]:
     """Uses the criteria version given, or the one in force when none is given."""
     owner = owner_recruiter or actor.subject
@@ -115,8 +119,9 @@ def create_opening(
             f"""
             INSERT INTO pipeline.opening
               (brand, department, track, headcount, owner_recruiter, team, criteria_version_id,
-               created_by)
-            SELECT :brand, :department, :track, :headcount, :owner, :team, cv.id, :by
+               created_by, title, location, public)
+            SELECT :brand, :department, :track, :headcount, :owner, :team, cv.id, :by,
+                   :title, :location, :public
             FROM (
               SELECT id FROM core.criteria_version
               WHERE CASE WHEN CAST(:criteria AS text) IS NULL THEN effective_from <= current_date
@@ -135,6 +140,9 @@ def create_opening(
             "team": team,
             "by": actor.subject,
             "criteria": criteria_version_id,
+            "title": title,
+            "location": location,
+            "public": public,
         },
     )
     if not rows:

@@ -19,6 +19,7 @@ from api.fields import Timestamp
 from api.ids import decode, decode_filter, encode
 from api.pages import DEFAULT_LIMIT, MAX_LIMIT, decode_cursor, next_cursor
 from auth import Principal
+from intake import job_posts
 from pipeline import store
 from pipeline.access import Actor, NotPermitted, Refused, actor_from_principal
 
@@ -126,6 +127,10 @@ class RequisitionIn(BaseModel):
     # A TA lead or an admin may name the version, e.g. from TA's open-jobs file. Otherwise the
     # version in force is used (BR-303).
     criteria_version: Annotated[str, Field(pattern=r"^[0-9A-Za-z._-]{1,64}$")] | None = None
+    # What a careers page may show. A public requisition needs a title (BR-401, week 6).
+    title: Text | None = None
+    location: Text | None = None
+    public: bool = False
 
 
 class CloseRequisitionIn(BaseModel):
@@ -147,6 +152,9 @@ class RequisitionOut(BaseModel):
     closed_at: Timestamp | None
     closed_reason: str | None
     closed_by: str | None
+    title: str | None
+    location: str | None
+    public: bool
 
 
 class RequisitionPage(BaseModel):
@@ -170,6 +178,9 @@ def _requisition(row: Mapping[str, Any]) -> RequisitionOut:
         closed_at=row["closed_at"],
         closed_reason=row["closed_reason"],
         closed_by=row["closed_by"],
+        title=row["title"],
+        location=row["location"],
+        public=row["public"],
     )
 
 
@@ -193,6 +204,9 @@ def create_requisition(
             team=body.team,
             owner_recruiter=body.owner_id,
             criteria_version_id=body.criteria_version,
+            title=body.title,
+            location=body.location,
+            public=body.public,
         )
         return _requisition(row)
 
@@ -473,3 +487,74 @@ def reverse_rejection(
         return _application(row, store.allowed_moves(conn))
 
     return idempotency.respond(conn, request, principal.subject, key, body, 201, reverse)
+
+
+# --- Job posts and their tracking codes (BR-602) --------------------------------------------------
+
+
+class JobPostIn(BaseModel):
+    channel: Annotated[str, Field(pattern=r"^[a-z][a-z_]{1,29}$")]
+    label: Annotated[str, Field(min_length=1, max_length=200, pattern=r"\S")] | None = None
+    # Leave out to be given one.
+    code: Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9-]{3,39}$")] | None = None
+
+
+class JobPostOut(BaseModel):
+    tracking_code: str
+    requisition_id: str
+    channel: str
+    label: str | None
+    created_at: Timestamp
+    created_by: str
+
+
+class JobPostList(BaseModel):
+    items: list[JobPostOut]
+
+
+def _job_post(row: Mapping[str, Any]) -> JobPostOut:
+    return JobPostOut(
+        tracking_code=row["code"],
+        requisition_id=encode("requisition", row["opening_id"]),
+        channel=row["channel"],
+        label=row["label"],
+        created_at=row["created_at"],
+        created_by=row["created_by"],
+    )
+
+
+@router.post(
+    "/requisitions/{requisition_id}/job-posts",
+    status_code=201,
+    response_model=JobPostOut,
+    tags=["requisitions"],
+)
+def create_job_post(
+    requisition_id: str,
+    body: JobPostIn,
+    request: Request,
+    principal: Signed,
+    conn: Db,
+    key: IdempotencyKey = None,
+) -> JSONResponse:
+    """A tracking code for one job post, so we can see which post brings good candidates. Put the
+    code in the link you publish; the apply page sends it back."""
+    actor = actor_from_principal(principal)
+    number = decode("requisition", requisition_id)
+
+    def create() -> JobPostOut:
+        return _job_post(
+            job_posts.issue(
+                conn, actor, number, channel=body.channel, label=body.label, code=body.code
+            )
+        )
+
+    return idempotency.respond(conn, request, principal.subject, key, body, 201, create)
+
+
+@router.get("/requisitions/{requisition_id}/job-posts", tags=["requisitions"])
+def list_job_posts(requisition_id: str, principal: Signed, conn: Db) -> JobPostList:
+    """Every job post of a requisition, oldest first."""
+    actor = actor_from_principal(principal)
+    rows = job_posts.list_for_opening(conn, actor, decode("requisition", requisition_id))
+    return JobPostList(items=[_job_post(row) for row in rows])

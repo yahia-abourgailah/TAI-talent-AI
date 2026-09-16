@@ -83,9 +83,13 @@ The `/v1` surface below is **built and frozen** (week 4). From here on it change
 | POST | `/v1/public/cv-uploads` | Week 5. Upload a CV (section 8) |
 | GET | `/v1/public/cv-uploads/{upload_id}` | Week 5. Reading status, and the filled form when ready (section 8) |
 | GET | `/v1/reports/funnel` | Volume and conversion per stage, with contactability. TA lead and admin |
+| POST, GET | `/v1/requisitions/{requisition_id}/job-posts` | A tracking code per job post, and the codes issued |
+| GET | `/v1/public/requisitions` | Open jobs a candidate may apply to. Public fields only |
+| GET | `/v1/public/consent-wording` | The consent text to show, in Arabic and English |
+| POST | `/v1/public/applications` | Apply: a contact channel and consent are required |
 | GET, POST | `/dev/accounts`, `/dev/token` | **Dev only.** Fake accounts `recruiter-a`, `recruiter-b`, `ta-lead`, `criteria-owner`, `admin`, and tokens for them. Absent in staging and production |
 
-**Still to come:** the rest of the public website endpoints in week 6 (section 8).
+**Still to come:** finding the same person twice and joining records, and withdrawing consent (BR-203, BR-204, BR-504), later in week 6.
 
 **Where the build differs from the first proposal:**
 
@@ -447,9 +451,11 @@ Example:
 
 ---
 
-## 8. Website surface (proposed, weeks 5–6)
+## 8. Website surface (built in weeks 5 and 6)
 
-**No sign-in, but limits apply.** All paths are under `/v1/public`. They are rate-limited and size-limited (section 3).
+**No sign-in, but limits apply.** All paths are under `/v1/public`. They are rate-limited and size-limited (section 3): 10 uploads and 20 applications per client address every 10 minutes, and a CV of up to 10 MB whose type is checked on its content.
+
+**Applying** needs an `Idempotency-Key`, a phone or WhatsApp number (BR-109), and consent carrying the `wording_version` that was shown. Send `X-Upload-Token` with `upload_id` when the candidate uploaded a CV, so the application and the CV are one candidate. A `tracking_code` from the job-post link is kept with the consent record (BR-602). The answer is the application id and `status: "received"`, never a score, tier or gate result.
 
 **CORS or backend.** If the browser calls the API directly, we allow only the careers site's origin. If your backend calls us instead, tell us (D-WEB-2).
 
