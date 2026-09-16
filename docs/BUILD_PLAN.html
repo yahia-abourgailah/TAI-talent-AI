@@ -211,7 +211,7 @@ footer{margin-top:48px; padding-top:20px; border-top:2px solid var(--ink); font-
     <div class="fact"><dt>Candidates moved</dt><dd>5,140</dd></div>
     <div class="fact"><dt>Big gate</dt><dd>Week 2</dd></div>
     <div class="fact"><dt>OCR</dt><dd>On our own host</dd></div>
-    <div class="fact"><dt>Now</dt><dd>Week 5 built on a stand-in OCR &middot; week 6 half built</dd></div>
+    <div class="fact"><dt>Now</dt><dd>Week 5 built on a stand-in OCR &middot; week 6 built, 500 pairs with TA to check</dd></div>
   </dl>
 </header>
 
@@ -404,7 +404,7 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
         <tr><td class="id">BR-501</td><td>No message without consent</td><td class="wk">&mdash; <span class="chip hi">Blocked by OPN-01</span></td></tr>
         <tr><td class="id">BR-502</td><td>System writes the message, a person presses send</td><td class="wk">&mdash; <span class="chip drop">Later</span></td></tr>
         <tr><td class="id">BR-503</td><td>Block do-not-contact, cooldown, own staff, closed job, daily cap</td><td class="wk">&mdash; <span class="chip drop">Later</span> <span class="chip ask">numbers not yet decided</span></td></tr>
-        <tr><td class="id">BR-504</td><td>Withdrawing consent removes the person everywhere</td><td class="wk">Week 6 <span class="chip med">Part</span> built with consent</td></tr>
+        <tr><td class="id">BR-504</td><td>Withdrawing consent removes the person everywhere</td><td class="wk">Week 6</td></tr>
         <tr><td class="id">BR-505</td><td>Log every message written and sent</td><td class="wk">&mdash; <span class="chip drop">Later</span></td></tr>
         <tr><td class="id">BR-506</td><td>Brand voice, right language</td><td class="wk">&mdash; <span class="chip drop">Later</span></td></tr>
         <tr><td class="id">BR-507</td><td>Book interviews on an internal calendar</td><td class="wk">&mdash; <span class="chip drop">Later</span></td></tr>
@@ -675,26 +675,33 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
   </div>
 
   <div class="week">
-    <div class="wk-h"><span class="no">WEEK 6</span><span class="ti">Apply from a job post</span><span class="prog st part">Half built &middot; 16 Sep</span></div>
+    <div class="wk-h"><span class="no">WEEK 6</span><span class="ti">Apply from a job post</span><span class="prog st done">Built &middot; 16 Sep</span></div>
     <div class="lanes">
       <div class="lane A"><p class="who">Person A</p><ul>
-        <li><span class="st todo">Next</span>Find the same person twice: phone, email, profile link, and <b>Arabic name spellings</b> &mdash; "ال" prefix, ة and ه, ي and ى, and English spellings of the same name. <span class="r">BR-203</span></li>
-        <li><span class="st todo">Next</span>Joining keeps both histories and <b>can be undone</b>. If it is not clear, ask a human. <span class="r">BR-204, BR-206</span></li>
-        <li><span class="st todo">Next</span>Check the matcher on <b>500 pairs by hand</b>. Wrong joins must be under 0.5%. Run it over the 5,140 and show the groups <b>before</b> joining anything.</li>
+        <li><span class="st done">Done</span>Find the same person twice: phone, email, profile link, and <b>Arabic name spellings</b> &mdash; "ال" prefix, ة and ه, ي and ى, and English spellings of the same name. <span class="r">BR-203</span>
+          <span class="sn">A shared number, address or profile is strong; a shared name alone is only possible, and is never treated as one person. A cell holding a number and a profile link together is read piece by piece, so no one is keyed on the digits inside a link.</span></li>
+        <li><span class="st done">Done</span>Joining keeps both histories and <b>can be undone</b>. If it is not clear, ask a human. <span class="r">BR-204, BR-206</span>
+          <span class="sn">The matcher joins nothing: every match waits in the review list. A join says which record the other is read under, both records keep everything, and undoing puts it back. A group is only ever one level deep.</span></li>
+        <li><span class="st part">With TA</span>Check the matcher on <b>500 pairs by hand</b>. Wrong joins must be under 0.5%. Run it over the 5,140 and show the groups <b>before</b> joining anything.
+          <span class="sn">Run over the 5,140 without writing anything: <b>1,681 pairs, 1,178 groups, 2,646 records</b> &mdash; 1,352 strong, 329 on a name alone. The 500-pair file is with a TA recruiter, with the names, numbers and links needed to judge each pair. Nothing is joined until it comes back under 0.5%.</span></li>
       </ul></div>
       <div class="lane B"><p class="who">Person B</p><ul>
         <li><span class="st done">Done</span>The apply page API, with <b>consent taken at the moment of applying</b> &mdash; what they agreed to, when, and through which channel. <span class="r">BR-101, CR-02</span>
           <span class="sn">The consent text is versioned in Arabic and English, and each candidate's record keeps the version they were shown, the channels they allowed, the language and the time. Consent records are never edited. The wording is provisional until Legal approves one.</span></li>
         <li><span class="st done">Done</span><b>A phone or WhatsApp number is required</b> to apply. Report how many candidates can be reached, next to how many there are &mdash; today it is 4.6%. <span class="r">BR-109</span>
           <span class="sn">An application without one is refused. The funnel report already shows contactability beside volume: 4.7% of everyone on record today.</span></li>
-        <li><span class="st todo">Next</span>If a candidate withdraws consent, remove them everywhere, not only the main table. <span class="r">BR-504</span>
-          <span class="sn"><b>Needs a decision:</b> what "remove" means against the rule that nothing is ever deleted (BR-205). Legal and Karim decide; the platform records the withdrawal either way.</span></li>
+        <li><span class="st done">Done</span>If a candidate withdraws consent, remove them everywhere, not only the main table. <span class="r">BR-504</span>
+          <span class="sn"><b>Decided 16 Sep:</b> the candidate asks us the way they always do and a TA member records it; the record then locks. It is not read, listed, searched, scored, matched or moved, and every part of the API answers as if it never existed. Nothing is deleted (BR-205), so an admin &mdash; the only role that still sees it &mdash; can lift a request recorded against the wrong person, with a reason. No self-service link in emails, so nothing acts on a mis-click.</span></li>
         <li><span class="st done">Done</span>A tracking code per job post, so we can see which post brings good people. <span class="r">BR-602</span>
           <span class="sn">A recruiter gets a code per post; the link carries it, the apply page sends it back, and it is kept with the candidate's consent.</span></li>
         <li><span class="chip ask">Ask</span>the website team adds upload and prefill. If they are late, we put a simple apply page on our own domain in one day. <b>Applications cannot stop before week 8.</b></li>
       </ul></div>
     </div>
-    <div class="check"><b>End of week</b> <span class="st part">Partly</span>A person taps a link in a job post, uploads a CV, checks the form, agrees, and arrives <b>scored, tiered and assigned</b> with no recruiter involved &mdash; proven end to end on our own API. <span class="st todo">Open</span>De-duplicated: the matcher is next. <span class="st todo">Open</span>On a real page, with a real CV: the website team and the OCR API.</div>
+    <div class="check"><b>End of week</b> <span class="st done">Yes</span>A person taps a link in a job post, uploads a CV, checks the form, agrees, and arrives <b>scored, tiered and assigned</b> with no recruiter involved &mdash; proven end to end on our own API. <span class="st part">Partly</span>De-duplicated: the matcher is built and run; the 500-pair check is with TA. <span class="st todo">Open</span>On a real page, with a real CV: the website team and the OCR API.</div>
+    <div class="status"><span class="h">With TA, 16 Sep</span><ul>
+      <li><b>500 pairs to check by hand</b>, with the name, number and profile of both records, and a sheet saying how to decide. It is candidate data, so it stays on the work machine and never in the repository.</li>
+      <li>Nothing is joined until it comes back and the wrong-join rate is under 0.5%.</li>
+    </ul></div>
   </div>
 
   <div class="phase"><span class="r">Make it safe, then switch over</span><span class="w">Weeks 7&ndash;8 &middot; BRD P6, P10</span></div>
