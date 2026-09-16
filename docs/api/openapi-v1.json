@@ -446,6 +446,16 @@
             "title": "Kind",
             "type": "string"
           },
+          "match": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MatchOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "proposed_at": {
             "title": "Proposed At",
             "type": "string"
@@ -474,6 +484,7 @@
           "kind",
           "candidate_id",
           "document_id",
+          "match",
           "reason_code",
           "proposed_by",
           "proposed_at",
@@ -1371,6 +1382,27 @@
         "title": "FunnelOut",
         "type": "object"
       },
+      "GroupOut": {
+        "properties": {
+          "members": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Members",
+            "type": "array"
+          },
+          "primary_candidate_id": {
+            "title": "Primary Candidate Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "primary_candidate_id",
+          "members"
+        ],
+        "title": "GroupOut",
+        "type": "object"
+      },
       "JobPostIn": {
         "properties": {
           "channel": {
@@ -1470,6 +1502,128 @@
           "created_by"
         ],
         "title": "JobPostOut",
+        "type": "object"
+      },
+      "JoinIn": {
+        "properties": {
+          "joined_candidate_id": {
+            "maxLength": 40,
+            "title": "Joined Candidate Id",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "pattern": "\\S",
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "joined_candidate_id",
+          "reason"
+        ],
+        "title": "JoinIn",
+        "type": "object"
+      },
+      "JoinOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "joined_at": {
+            "title": "Joined At",
+            "type": "string"
+          },
+          "joined_by": {
+            "title": "Joined By",
+            "type": "string"
+          },
+          "joined_candidate_id": {
+            "title": "Joined Candidate Id",
+            "type": "string"
+          },
+          "primary_candidate_id": {
+            "title": "Primary Candidate Id",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "undone_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Undone At"
+          },
+          "undone_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Undone By"
+          },
+          "undone_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Undone Reason"
+          }
+        },
+        "required": [
+          "id",
+          "primary_candidate_id",
+          "joined_candidate_id",
+          "reason",
+          "joined_by",
+          "joined_at",
+          "undone_at",
+          "undone_by",
+          "undone_reason"
+        ],
+        "title": "JoinOut",
+        "type": "object"
+      },
+      "MatchOut": {
+        "properties": {
+          "evidence": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "other_candidate_id": {
+            "title": "Other Candidate Id",
+            "type": "string"
+          },
+          "strength": {
+            "title": "Strength",
+            "type": "string"
+          }
+        },
+        "required": [
+          "other_candidate_id",
+          "strength",
+          "evidence"
+        ],
+        "title": "MatchOut",
         "type": "object"
       },
       "PublicApplicationIn": {
@@ -2404,6 +2558,22 @@
         ],
         "title": "TransitionOut",
         "type": "object"
+      },
+      "UndoJoinIn": {
+        "properties": {
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "pattern": "\\S",
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "UndoJoinIn",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -2921,6 +3091,65 @@
         ]
       }
     },
+    "/v1/candidate-joins/{join_id}/undo": {
+      "post": {
+        "description": "Undoes a join, with a reason. The join itself is kept, marked undone by you.",
+        "operationId": "undo_join_v1_candidate_joins__join_id__undo_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "join_id",
+            "required": true,
+            "schema": {
+              "title": "Join Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UndoJoinIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JoinOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Undo Join",
+        "tags": [
+          "review queue",
+          "candidates"
+        ]
+      }
+    },
     "/v1/candidate-review-items": {
       "get": {
         "description": "Items about candidates in your scope, newest first. Open items by default.",
@@ -2978,7 +3207,8 @@
                 {
                   "enum": [
                     "flagged_document",
-                    "unverified_candidate"
+                    "unverified_candidate",
+                    "possible_duplicate"
                   ],
                   "type": "string"
                 },
@@ -3600,6 +3830,133 @@
         ],
         "summary": "Verify Field",
         "tags": [
+          "candidates"
+        ]
+      }
+    },
+    "/v1/candidates/{candidate_id}/group": {
+      "get": {
+        "description": "Which record this one is read under, and every record read under it.",
+        "operationId": "candidate_group_v1_candidates__candidate_id__group_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "candidate_id",
+            "required": true,
+            "schema": {
+              "title": "Candidate Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Candidate Group",
+        "tags": [
+          "review queue",
+          "candidates"
+        ]
+      }
+    },
+    "/v1/candidates/{candidate_id}/joins": {
+      "post": {
+        "description": "Records that two records are one person, with your name and a reason. Both records stay as\nthey are: the joined one is read under this one, and undoing puts it back.",
+        "operationId": "join_candidates_v1_candidates__candidate_id__joins_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "candidate_id",
+            "required": true,
+            "schema": {
+              "title": "Candidate Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "A UUID you generate per distinct request. A retry with it returns the first response instead of doing the work again.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A UUID you generate per distinct request. A retry with it returns the first response instead of doing the work again.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JoinIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JoinOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Join Candidates",
+        "tags": [
+          "review queue",
           "candidates"
         ]
       }

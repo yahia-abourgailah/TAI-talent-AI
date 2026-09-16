@@ -48,6 +48,9 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
 [tool.ruff.lint.per-file-ignores]
 # Tests use Arabic text and Arabic-Indic digits on purpose (BR-309).
 "tests/**" = ["RUF001"]
+# The matcher and the consent wording are about Arabic letters themselves (BR-203, CR-02).
+"src/candidates/duplicates.py" = ["RUF001", "RUF002", "RUF003"]
+"migrations/versions/0011_apply_and_consent.py" = ["RUF001"]
 
 [tool.ruff.lint.isort]
 known-first-party = [

@@ -28,8 +28,8 @@ from api.fields import Timestamp
 from api.ids import decode, decode_filter, encode
 from api.pages import DEFAULT_LIMIT, MAX_LIMIT, decode_cursor, next_cursor
 from auth import Principal
-from candidates import reviews
-from pipeline.access import actor_from_principal, reader_from_principal
+from candidates import joins, reviews
+from pipeline.access import Refused, actor_from_principal, reader_from_principal
 
 router = APIRouter(prefix="/v1", tags=["review queue"])
 
@@ -47,11 +47,18 @@ class CandidateResolutionOut(BaseModel):
     resolved_at: Timestamp
 
 
+class MatchOut(BaseModel):
+    other_candidate_id: str
+    strength: str
+    evidence: list[str]
+
+
 class CandidateReviewItemOut(BaseModel):
     id: str
     kind: str
     candidate_id: str
     document_id: str | None
+    match: MatchOut | None
     reason_code: str
     proposed_by: str
     proposed_at: Timestamp
@@ -78,11 +85,19 @@ def _item(row: Mapping[str, Any]) -> CandidateReviewItemOut:
             resolved_at=row["resolved_at"],
         )
     capture = row["capture_id"]
+    match = None
+    if row.get("match_id") is not None:
+        match = MatchOut(
+            other_candidate_id=encode("candidate", row["match_other_candidate_id"]),
+            strength=row["match_strength"],
+            evidence=list(row["match_evidence"] or []),
+        )
     return CandidateReviewItemOut(
         id=encode("review_item", row["id"]),
         kind=row["kind"],
         candidate_id=encode("candidate", row["candidate_id"]),
         document_id=None if capture is None else encode("document", capture),
+        match=match,
         reason_code=row["reason_code"],
         proposed_by=row["proposed_by"],
         proposed_at=row["proposed_at"],
@@ -97,7 +112,10 @@ def list_candidate_review_items(
     limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,
     cursor: Annotated[str | None, Query(max_length=200)] = None,
     status: Annotated[Literal["open", "resolved"], Query()] = "open",
-    kind: Annotated[Literal["flagged_document", "unverified_candidate"] | None, Query()] = None,
+    kind: Annotated[
+        Literal["flagged_document", "unverified_candidate", "possible_duplicate"] | None,
+        Query(),
+    ] = None,
     candidate_id: Annotated[str | None, Query(max_length=40)] = None,
 ) -> CandidateReviewItemPage:
     """Items about candidates in your scope, newest first. Open items by default."""
@@ -148,3 +166,92 @@ def resolve_candidate_review_item(
         return _item(row)
 
     return idempotency.respond(conn, request, principal.subject, key, body, 201, resolve)
+
+
+# --- Two records, one person (BR-203, BR-204, BR-206) ---------------------------------------------
+
+
+class JoinIn(BaseModel):
+    joined_candidate_id: Annotated[str, Field(max_length=40)]
+    reason: Annotated[str, Field(min_length=1, max_length=500, pattern=r"\S")]
+
+
+class UndoJoinIn(BaseModel):
+    reason: Annotated[str, Field(min_length=1, max_length=500, pattern=r"\S")]
+
+
+class JoinOut(BaseModel):
+    id: str
+    primary_candidate_id: str
+    joined_candidate_id: str
+    reason: str
+    joined_by: str
+    joined_at: Timestamp
+    undone_at: Timestamp | None
+    undone_by: str | None
+    undone_reason: str | None
+
+
+class GroupOut(BaseModel):
+    primary_candidate_id: str
+    members: list[str]
+
+
+def _join(row: Mapping[str, Any]) -> JoinOut:
+    return JoinOut(
+        id=encode("join", row["id"]),
+        primary_candidate_id=encode("candidate", row["primary_id"]),
+        joined_candidate_id=encode("candidate", row["joined_id"]),
+        reason=row["reason"],
+        joined_by=row["joined_by"],
+        joined_at=row["joined_at"],
+        undone_at=row["undone_at"],
+        undone_by=row["undone_by"],
+        undone_reason=row["undone_reason"],
+    )
+
+
+@router.post(
+    "/candidates/{candidate_id}/joins", status_code=201, response_model=JoinOut, tags=["candidates"]
+)
+def join_candidates(
+    candidate_id: str,
+    body: JoinIn,
+    request: Request,
+    principal: Signed,
+    conn: Db,
+    key: idempotency.KeyHeader = None,
+) -> JSONResponse:
+    """Records that two records are one person, with your name and a reason. Both records stay as
+    they are: the joined one is read under this one, and undoing puts it back."""
+    actor = actor_from_principal(principal)
+    primary = decode("candidate", candidate_id)
+    joined = decode("candidate", body.joined_candidate_id)
+
+    def decide() -> JoinOut:
+        try:
+            return _join(joins.join(conn, actor, primary, joined, body.reason))
+        except Refused as refusal:
+            if refusal.code == "invalid_request":
+                raise ApiError(400, refusal.code, str(refusal)) from None
+            raise
+
+    return idempotency.respond(conn, request, principal.subject, key, body, 201, decide)
+
+
+@router.post("/candidate-joins/{join_id}/undo", status_code=201, tags=["candidates"])
+def undo_join(join_id: str, body: UndoJoinIn, principal: Signed, conn: Db) -> JoinOut:
+    """Undoes a join, with a reason. The join itself is kept, marked undone by you."""
+    actor = actor_from_principal(principal)
+    return _join(joins.undo(conn, actor, decode("join", join_id), body.reason))
+
+
+@router.get("/candidates/{candidate_id}/group", tags=["candidates"])
+def candidate_group(candidate_id: str, principal: Signed, conn: Db) -> GroupOut:
+    """Which record this one is read under, and every record read under it."""
+    actor = reader_from_principal(principal)
+    found = joins.group_of(conn, actor, decode("candidate", candidate_id))
+    return GroupOut(
+        primary_candidate_id=encode("candidate", found["primary_id"]),
+        members=[encode("candidate", member) for member in found["members"]],
+    )

@@ -21,6 +21,7 @@ Kind = Literal[
     "event",
     "document",
     "upload",
+    "join",
 ]
 
 PREFIX: dict[str, str] = {
@@ -33,6 +34,7 @@ PREFIX: dict[str, str] = {
     "event": "evt",
     "document": "doc",
     "upload": "upl",
+    "join": "jon",
 }
 
 NOT_FOUND: dict[str, str] = {
@@ -45,6 +47,7 @@ NOT_FOUND: dict[str, str] = {
     "event": "Event not found.",
     "document": "Document not found.",
     "upload": "Upload not found.",
+    "join": "Join not found.",
 }
 
 

@@ -18,16 +18,20 @@ from sqlalchemy.engine import Connection
 from candidates.reads import VISIBLE
 from pipeline.access import Actor, NotFound, Refused, run
 
-KINDS = ("flagged_document", "unverified_candidate")
+KINDS = ("flagged_document", "unverified_candidate", "possible_duplicate")
 REVIEW_ITEM_NOT_FOUND = "Review item not found."
 
 _ITEMS = f"""
     SELECT r.id, r.kind, r.candidate_id, r.capture_id, r.reason_code, r.proposed_by,
            r.proposed_at, x.outcome AS resolution, x.reason AS resolution_reason,
-           x.resolved_by, x.resolved_at
+           x.resolved_by, x.resolved_at,
+           r.match_id, m.strength AS match_strength, m.evidence AS match_evidence,
+           CASE WHEN m.lower_id = r.candidate_id THEN m.higher_id ELSE m.lower_id END
+             AS match_other_candidate_id
     FROM pipeline.review_item r
     JOIN core.candidate c ON c.id = r.candidate_id
     LEFT JOIN pipeline.review_resolution x ON x.review_item_id = r.id
+    LEFT JOIN core.candidate_match m ON m.id = r.match_id
     WHERE r.kind IN {tuple(KINDS)!r} AND {VISIBLE}
 """
 
