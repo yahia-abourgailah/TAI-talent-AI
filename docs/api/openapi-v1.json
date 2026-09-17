@@ -601,6 +601,35 @@
         "title": "CandidateSummaryOut",
         "type": "object"
       },
+      "CheckOut": {
+        "properties": {
+          "check": {
+            "title": "Check",
+            "type": "string"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "numbers": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Numbers",
+            "type": "object"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "check",
+          "status",
+          "detail"
+        ],
+        "title": "CheckOut",
+        "type": "object"
+      },
       "CloseRequisitionIn": {
         "properties": {
           "reason": {
@@ -1401,6 +1430,37 @@
           "members"
         ],
         "title": "GroupOut",
+        "type": "object"
+      },
+      "HealthOut": {
+        "properties": {
+          "checked_at": {
+            "title": "Checked At",
+            "type": "string"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/CheckOut"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "runbook": {
+            "title": "Runbook",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "checked_at",
+          "checks",
+          "runbook"
+        ],
+        "title": "HealthOut",
         "type": "object"
       },
       "JobPostIn": {
@@ -4501,6 +4561,43 @@
         "summary": "Me",
         "tags": [
           "account"
+        ]
+      }
+    },
+    "/v1/ops/health": {
+      "get": {
+        "description": "Every check the nightly watch runs: the queue, failed jobs, stuck jobs, events the CRM has\nnot taken, and whether last night's backup was restored. `status` is ok, warning or critical.",
+        "operationId": "operational_health_v1_ops_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Operational Health",
+        "tags": [
+          "operations"
         ]
       }
     },

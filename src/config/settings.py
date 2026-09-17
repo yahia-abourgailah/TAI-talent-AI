@@ -47,6 +47,10 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
+    # Where backups are kept, so the health checks can say whether last night's ran (NFR-02).
+    # Empty means backups are not watched from the API.
+    backup_dir: str = ""
+
     # Events to the CRM (API plan section 7). Delivery is off while the URL is empty.
     crm_webhook_url: str = ""
     crm_webhook_secret: SecretStr = SecretStr("")

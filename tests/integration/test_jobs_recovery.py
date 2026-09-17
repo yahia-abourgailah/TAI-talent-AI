@@ -24,8 +24,19 @@ ACTOR = "integration-test"
 
 
 @pytest.fixture
-def kind() -> str:
-    return f"test-recovery-{uuid.uuid4().hex[:12]}"
+def kind(app_engine):
+    """A job kind of this test's own, finished off afterwards.
+
+    These tests commit, so anything left queued or running stays in the queue of a shared
+    development database and makes the watcher (ops.watch) cry wolf. The tidy-up is the real path:
+    recover what was left running, then run it with a handler that does nothing.
+    """
+    name = f"test-recovery-{uuid.uuid4().hex[:12]}"
+    yield name
+    recover_stopped(app_engine, name)
+    for _ in range(MAX_ATTEMPTS + 2):
+        if work_one(app_engine, {name: lambda *_: None}) is None:
+            break
 
 
 def _left_running(engine, kind: str, attempts: int = 1) -> int:

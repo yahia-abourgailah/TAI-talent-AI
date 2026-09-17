@@ -19,6 +19,7 @@ from api.candidate_routes import router as candidate_router
 from api.dev_routes import router as dev_router
 from api.event_routes import router as event_router
 from api.limits import RateLimiter
+from api.ops_routes import router as ops_router
 from api.pipeline_routes import router as pipeline_router
 from api.public_routes import install_upload_guard
 from api.public_routes import router as public_router
@@ -109,5 +110,6 @@ def create_app(
     app.include_router(candidate_router)
     app.include_router(report_router)
     app.include_router(withdrawal_router)
+    app.include_router(ops_router)
     app.include_router(public_router)
     return app

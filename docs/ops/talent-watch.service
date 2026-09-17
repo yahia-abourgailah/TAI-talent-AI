@@ -1,0 +1,16 @@
+# Checks the platform every few minutes and posts to the chat channel when something is wrong.
+#   sudo cp docs/ops/talent-watch.* /etc/systemd/system/
+#   sudo systemctl enable --now talent-watch.timer
+[Unit]
+Description=Talent Platform health check
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=talent
+WorkingDirectory=/opt/talent
+EnvironmentFile=/etc/talent/backup.env
+Environment=PYTHONPATH=src
+# Exit 1 is "look at this today", exit 2 is "wrong now"; both have already been posted by --alert.
+SuccessExitStatus=0 1 2
+ExecStart=/opt/talent/.venv/bin/python -m ops.watch --alert
