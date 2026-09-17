@@ -2,6 +2,9 @@
 
 python -m reports funnel [--group-by opening|brand|recruiter|team] [--from ISO] [--to ISO]
 python -m reports timing [--from ISO] [--to ISO]
+python -m reports review-queue
+
+The funnel carries the review queue next to it: open items per kind, and the oldest one's wait.
 """
 
 import argparse
@@ -9,7 +12,9 @@ import json
 import sys
 from datetime import datetime
 
+from candidates import queue
 from jobs.queue import engine_from_environment
+from pipeline.access import Actor
 from reports import ReportRefused
 from reports.funnel import funnel_report
 from reports.timing import timing_report
@@ -31,20 +36,26 @@ def main(argv: list[str] | None = None) -> int:
         command.add_argument("--to", dest="date_to", type=_moment)
         if name == "funnel":
             command.add_argument("--group-by")
+    commands.add_parser("review-queue")
     args = parser.parse_args(argv)
 
+    everyone = Actor("reports-cli", sees_all=True)
+    report: dict[str, object]
     try:
         with engine_from_environment().connect() as conn:
             if args.report == "funnel":
                 report = funnel_report(
                     conn, group_by=args.group_by, date_from=args.date_from, date_to=args.date_to
                 )
+                report["review_queue"] = queue.summary(conn, everyone)
+            elif args.report == "review-queue":
+                report = queue.summary(conn, everyone)
             else:
                 report = timing_report(conn, date_from=args.date_from, date_to=args.date_to)
     except ReportRefused as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
-    print(json.dumps(report, indent=2, ensure_ascii=False))
+    print(json.dumps(report, indent=2, ensure_ascii=False, default=str))
     return 0
 
 

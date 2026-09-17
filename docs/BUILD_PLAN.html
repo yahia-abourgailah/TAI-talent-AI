@@ -707,13 +707,17 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
   <div class="phase"><span class="r">Make it safe, then switch over</span><span class="w">Weeks 7&ndash;8 &middot; BRD P6, P10</span></div>
 
   <div class="week">
-    <div class="wk-h"><span class="no">WEEK 7</span><span class="ti">Backups, review list, security</span><span class="prog st part">Person B built &middot; 17 Sep</span></div>
+    <div class="wk-h"><span class="no">WEEK 7</span><span class="ti">Backups, review list, security</span><span class="prog st done">Built &middot; 17 Sep</span></div>
     <div class="lanes">
       <div class="lane A"><p class="who">Person A</p><ul>
-        <li><b>The review list</b>: borderline candidates, flagged CVs, unchecked people, unclear matches &mdash; each with the reason it is there. <span class="r">BR-407</span></li>
-        <li>Decide the number for <b>borderline</b> and get Karim to sign it. The BRD does not say how close is close. <span class="r">BR-310</span></li>
-        <li>Put the full replay into the automatic checks, so any future rule change proves itself. <span class="r">BR-304</span></li>
-        <li>Score the last 200 candidates in both systems and list every difference.</li>
+        <li><span class="st done">Done</span><b>The review list</b>: borderline candidates, flagged CVs, unchecked people, unclear matches &mdash; each with the reason it is there. <span class="r">BR-407</span>
+          <span class="sn">One call, <b>GET /v1/review-queue</b>, lists every open item in your scope, of all five kinds, oldest first, each with a sentence a recruiter reads (&ldquo;We could not read this CV&rdquo;, not the code). The funnel report now carries the open count per kind and <b>how long the oldest item has waited</b>. Scope and locked candidates are handled as before.</span></li>
+        <li><span class="st part">With Karim</span>Decide the number for <b>borderline</b> and get Karim to sign it. The BRD does not say how close is close. <span class="r">BR-310</span>
+          <span class="sn">Built and <b>switched off until signed</b>. The number is stored with the criteria version, never in code, and a signed rule is never changed. Options measured on the workbook: <b>&plusmn;1 is 294 people (6%)</b>; below the line by 1 is only 23; &plusmn;2 is 1,375, because 1,048 people sit at 53. Reading a guessed input the other way is dominated by location (59%). A borderline candidate keeps their tier; the item names the tiers either side.</span></li>
+        <li><span class="st part">Needs runner</span>Put the full replay into the automatic checks, so any future rule change proves itself. <span class="r">BR-304</span>
+          <span class="sn">The CI job now writes a <b>who-moves-tier page</b> (counts from &rarr; to, twenty sheet rows) and a report in the run summary, and <code>replay.compare</code> does the same between two versions. Checked locally: a weight change from 30 to 25 turns it red, with 260 candidates moving tier. It wakes up once Infrastructure registers the <code>talent</code> runner.</span></li>
+        <li><span class="st part">Needs script</span>Score the last 200 candidates in both systems and list every difference.
+          <span class="sn">The tool is built and gives 0 differences against the ported scorer. The real run needs the scorer file from the old laptop.</span></li>
       </ul></div>
       <div class="lane B"><p class="who">Person B</p><ul>
         <li><span class="st done">Done</span>Nightly backups. <b>Then restore one for real.</b> A backup that was never restored is not a backup. <span class="r">NFR-02</span>

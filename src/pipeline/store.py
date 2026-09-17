@@ -485,10 +485,13 @@ def reverse_rejection(
 _REVIEW = """
     SELECT r.id, r.kind, r.application_id, a.candidate_id, a.opening_id, r.at_step, r.reason_code,
            r.proposed_by, r.proposed_at, x.outcome AS resolution, x.reason AS resolution_reason,
-           x.move_id AS resolution_move_id, x.resolved_by, x.resolved_at
+           x.move_id AS resolution_move_id, x.resolved_by, x.resolved_at,
+           rr.label AS rejection_label
     FROM pipeline.review_item r
     JOIN pipeline.application a ON a.id = r.application_id
     LEFT JOIN pipeline.review_resolution x ON x.review_item_id = r.id
+    LEFT JOIN pipeline.rejection_reason rr
+      ON rr.list_version = r.list_version AND rr.code = r.reason_code
 """
 
 

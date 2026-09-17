@@ -24,6 +24,7 @@ from api.fields import Timestamp
 from api.ids import decode, decode_filter, encode
 from api.pages import DEFAULT_LIMIT, MAX_LIMIT, decode_cursor, next_cursor
 from auth import Principal
+from candidates.queue import reason_text
 from pipeline import store
 from pipeline.access import Refused, actor_from_principal, reader_from_principal
 
@@ -52,6 +53,7 @@ class ReviewItemOut(BaseModel):
     requisition_id: str
     at_stage: str
     reason_code: str
+    reason: str
     proposed_by: str
     proposed_at: Timestamp
     resolution: ResolutionOut | None
@@ -86,6 +88,7 @@ def _item(row: Mapping[str, Any]) -> ReviewItemOut:
         requisition_id=encode("requisition", row["opening_id"]),
         at_stage=row["at_step"],
         reason_code=row["reason_code"],
+        reason=reason_text(dict(row)),
         proposed_by=row["proposed_by"],
         proposed_at=row["proposed_at"],
         resolution=resolution,

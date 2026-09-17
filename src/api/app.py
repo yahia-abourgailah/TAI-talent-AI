@@ -24,6 +24,7 @@ from api.ops_routes import router as ops_router
 from api.pipeline_routes import router as pipeline_router
 from api.public_routes import install_upload_guard
 from api.public_routes import router as public_router
+from api.queue_routes import router as queue_router
 from api.report_routes import router as report_router
 from api.review_routes import router as review_router
 from api.routes import router
@@ -122,6 +123,7 @@ def create_app(
     app.include_router(event_router)
     app.include_router(review_router)
     app.include_router(candidate_review_router)
+    app.include_router(queue_router)
     app.include_router(candidate_router)
     app.include_router(report_router)
     app.include_router(withdrawal_router)

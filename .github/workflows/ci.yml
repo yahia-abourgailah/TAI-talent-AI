@@ -61,7 +61,7 @@ jobs:
         with:
           fetch-depth: 0
       - id: diff
-        name: Did this change touch src/scoring?
+        name: Did this change touch the scoring, or the replay that proves it?
         env:
           EVENT: ${{ github.event_name }}
           BASE_REF: ${{ github.base_ref }}
@@ -69,7 +69,7 @@ jobs:
         run: |
           if [ "$EVENT" = "pull_request" ]; then base="origin/$BASE_REF"; else base="$BEFORE"; fi
           # If the comparison point is unknown (new branch, force push), assume scoring changed.
-          if changed=$(git diff --name-only "$base" HEAD -- src/scoring 2>/dev/null); then
+          if changed=$(git diff --name-only "$base" HEAD -- src/scoring src/replay 2>/dev/null); then
             [ -n "$changed" ] && scoring=true || scoring=false
           else
             scoring=true
@@ -82,6 +82,7 @@ jobs:
     if: needs.changes.outputs.scoring == 'true'
     # The master record never leaves company machines, so parity runs only on the self-hosted
     # runner. Until it exists, a scoring change fails here loudly instead of queueing forever.
+    # Setting it up: docs/criteria/PARITY_RUNNER.md.
     runs-on: ${{ vars.PARITY_RUNNER_READY == 'true' && fromJSON('["self-hosted", "talent"]') || 'ubuntu-latest' }}
     steps:
       - name: Require the parity runner
@@ -100,13 +101,20 @@ jobs:
         # Fails when any difference has no matching ruling in src/replay/rulings.py (BR-702).
         run: >-
           python -m replay.baseline --out "$RUNNER_TEMP/baseline" --run-date 2026-09-14
-          --report-copy artifacts/shadow_diff.md --require-parity
-      - name: Publish shadow diff
+          --report-copy artifacts/shadow_diff.md --html-report artifacts/tier_moves.html
+          --require-parity
+      - name: Show who moves tier in the run summary
+        if: always()
+        run: |
+          if [ -f artifacts/shadow_diff.md ]; then cat artifacts/shadow_diff.md >> "$GITHUB_STEP_SUMMARY"; fi
+      - name: Publish shadow diff and the who-moves-tier page
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: shadow-diff
-          path: artifacts/shadow_diff.md
+          path: |
+            artifacts/shadow_diff.md
+            artifacts/tier_moves.html
           if-no-files-found: ignore
 
   integration:

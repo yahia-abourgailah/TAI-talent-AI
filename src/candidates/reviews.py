@@ -3,6 +3,8 @@
   flagged_document      a CV a person must look at: the OCR found hidden content, or reading it
                         failed. The candidate is never told.
   unverified_candidate  a candidate typed in by hand, not yet checked.
+  possible_duplicate    two records the matcher believes are one person.
+  borderline_score      an evaluation close to a tier line, naming the tiers either side (BR-310).
 
 They share pipeline.review_item with proposed rejections but are served on their own path
 (/v1/candidate-review-items), because they carry no application. Scope follows the candidate:
@@ -18,13 +20,14 @@ from sqlalchemy.engine import Connection
 from candidates.reads import VISIBLE
 from pipeline.access import Actor, NotFound, Refused, run
 
-KINDS = ("flagged_document", "unverified_candidate", "possible_duplicate")
+KINDS = ("flagged_document", "unverified_candidate", "possible_duplicate", "borderline_score")
 REVIEW_ITEM_NOT_FOUND = "Review item not found."
 
 _ITEMS = f"""
     SELECT r.id, r.kind, r.candidate_id, r.capture_id, r.reason_code, r.proposed_by,
            r.proposed_at, x.outcome AS resolution, x.reason AS resolution_reason,
            x.resolved_by, x.resolved_at,
+           r.evaluation_id, r.tier_above, r.tier_below,
            r.match_id, m.strength AS match_strength, m.evidence AS match_evidence,
            CASE WHEN m.lower_id = r.candidate_id THEN m.higher_id ELSE m.lower_id END
              AS match_other_candidate_id

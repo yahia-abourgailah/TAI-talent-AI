@@ -3,6 +3,11 @@
     flagged_document      a CV a person must look at: hidden content was found, or reading it
                           failed. reason_code says which.
     unverified_candidate  a candidate typed in by hand and not yet checked.
+    possible_duplicate    two records that may be one person.
+    borderline_score      a score close to a tier line (BR-310): the item names the evaluation and
+                          the tiers either side. The candidate keeps the tier the score gives.
+
+Every item carries `reason`, a sentence a recruiter reads, next to the stable `reason_code`.
 
 These have no application, so they are served here rather than on /v1/review-items, whose frozen
 items always carry one. Both lists share the rvw_ ids. A caller must handle a kind or reason code
@@ -29,6 +34,7 @@ from api.ids import decode, decode_filter, encode
 from api.pages import DEFAULT_LIMIT, MAX_LIMIT, decode_cursor, next_cursor
 from auth import Principal
 from candidates import joins, reviews
+from candidates.queue import reason_text
 from pipeline.access import Refused, actor_from_principal, reader_from_principal
 
 router = APIRouter(prefix="/v1", tags=["review queue"])
@@ -53,6 +59,12 @@ class MatchOut(BaseModel):
     evidence: list[str]
 
 
+class BorderlineOut(BaseModel):
+    evaluation_id: str
+    tier_above: str
+    tier_below: str
+
+
 class CandidateReviewItemOut(BaseModel):
     id: str
     kind: str
@@ -60,6 +72,8 @@ class CandidateReviewItemOut(BaseModel):
     document_id: str | None
     match: MatchOut | None
     reason_code: str
+    reason: str
+    borderline: BorderlineOut | None = None
     proposed_by: str
     proposed_at: Timestamp
     resolution: CandidateResolutionOut | None
@@ -92,6 +106,13 @@ def _item(row: Mapping[str, Any]) -> CandidateReviewItemOut:
             strength=row["match_strength"],
             evidence=list(row["match_evidence"] or []),
         )
+    borderline = None
+    if row.get("evaluation_id") is not None:
+        borderline = BorderlineOut(
+            evaluation_id=encode("evaluation", row["evaluation_id"]),
+            tier_above=row["tier_above"],
+            tier_below=row["tier_below"],
+        )
     return CandidateReviewItemOut(
         id=encode("review_item", row["id"]),
         kind=row["kind"],
@@ -99,6 +120,8 @@ def _item(row: Mapping[str, Any]) -> CandidateReviewItemOut:
         document_id=None if capture is None else encode("document", capture),
         match=match,
         reason_code=row["reason_code"],
+        reason=reason_text(dict(row)),
+        borderline=borderline,
         proposed_by=row["proposed_by"],
         proposed_at=row["proposed_at"],
         resolution=resolution,
@@ -113,7 +136,10 @@ def list_candidate_review_items(
     cursor: Annotated[str | None, Query(max_length=200)] = None,
     status: Annotated[Literal["open", "resolved"], Query()] = "open",
     kind: Annotated[
-        Literal["flagged_document", "unverified_candidate", "possible_duplicate"] | None,
+        Literal[
+            "flagged_document", "unverified_candidate", "possible_duplicate", "borderline_score"
+        ]
+        | None,
         Query(),
     ] = None,
     candidate_id: Annotated[str | None, Query(max_length=40)] = None,

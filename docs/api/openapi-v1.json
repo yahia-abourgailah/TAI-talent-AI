@@ -230,6 +230,29 @@
         "title": "Body_upload_cv_v1_public_cv_uploads_post",
         "type": "object"
       },
+      "BorderlineOut": {
+        "properties": {
+          "evaluation_id": {
+            "title": "Evaluation Id",
+            "type": "string"
+          },
+          "tier_above": {
+            "title": "Tier Above",
+            "type": "string"
+          },
+          "tier_below": {
+            "title": "Tier Below",
+            "type": "string"
+          }
+        },
+        "required": [
+          "evaluation_id",
+          "tier_above",
+          "tier_below"
+        ],
+        "title": "BorderlineOut",
+        "type": "object"
+      },
       "CandidateEntryIn": {
         "properties": {
           "fields": {
@@ -423,6 +446,16 @@
       },
       "CandidateReviewItemOut": {
         "properties": {
+          "borderline": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BorderlineOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "candidate_id": {
             "title": "Candidate Id",
             "type": "string"
@@ -464,6 +497,10 @@
             "title": "Proposed By",
             "type": "string"
           },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
           "reason_code": {
             "title": "Reason Code",
             "type": "string"
@@ -486,6 +523,7 @@
           "document_id",
           "match",
           "reason_code",
+          "reason",
           "proposed_by",
           "proposed_at",
           "resolution"
@@ -1382,6 +1420,9 @@
             "title": "Provisional",
             "type": "boolean"
           },
+          "review_queue": {
+            "$ref": "#/components/schemas/QueueSummaryOut"
+          },
           "stage_list": {
             "title": "Stage List",
             "type": "string"
@@ -1406,7 +1447,8 @@
           "to",
           "groups",
           "arrivals_at_stages_not_in_the_list",
-          "all_candidates"
+          "all_candidates",
+          "review_queue"
         ],
         "title": "FunnelOut",
         "type": "object"
@@ -1836,6 +1878,210 @@
           "next_cursor"
         ],
         "title": "PublicRequisitionPage",
+        "type": "object"
+      },
+      "QueueBorderlineOut": {
+        "properties": {
+          "evaluation_id": {
+            "title": "Evaluation Id",
+            "type": "string"
+          },
+          "tier_above": {
+            "title": "Tier Above",
+            "type": "string"
+          },
+          "tier_below": {
+            "title": "Tier Below",
+            "type": "string"
+          }
+        },
+        "required": [
+          "evaluation_id",
+          "tier_above",
+          "tier_below"
+        ],
+        "title": "QueueBorderlineOut",
+        "type": "object"
+      },
+      "QueueItemOut": {
+        "properties": {
+          "application_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Application Id"
+          },
+          "borderline": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QueueBorderlineOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "candidate_id": {
+            "title": "Candidate Id",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "resolve_at": {
+            "title": "Resolve At",
+            "type": "string"
+          },
+          "waiting_since": {
+            "title": "Waiting Since",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "candidate_id",
+          "application_id",
+          "reason_code",
+          "reason",
+          "borderline",
+          "waiting_since",
+          "resolve_at"
+        ],
+        "title": "QueueItemOut",
+        "type": "object"
+      },
+      "QueueKindCountOut": {
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "oldest_since": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Since"
+          },
+          "oldest_waiting_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Waiting Hours"
+          },
+          "open": {
+            "title": "Open",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "open",
+          "oldest_since",
+          "oldest_waiting_hours"
+        ],
+        "title": "QueueKindCountOut",
+        "type": "object"
+      },
+      "QueuePage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/QueueItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "QueuePage",
+        "type": "object"
+      },
+      "QueueSummaryOut": {
+        "properties": {
+          "kinds": {
+            "items": {
+              "$ref": "#/components/schemas/QueueKindCountOut"
+            },
+            "title": "Kinds",
+            "type": "array"
+          },
+          "oldest_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Kind"
+          },
+          "oldest_waiting_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Waiting Hours"
+          },
+          "open": {
+            "title": "Open",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "open",
+          "oldest_waiting_hours",
+          "oldest_kind",
+          "kinds"
+        ],
+        "title": "QueueSummaryOut",
         "type": "object"
       },
       "ReadingOut": {
@@ -2316,6 +2562,10 @@
             "title": "Proposed By",
             "type": "string"
           },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
           "reason_code": {
             "title": "Reason Code",
             "type": "string"
@@ -2343,6 +2593,7 @@
           "requisition_id",
           "at_stage",
           "reason_code",
+          "reason",
           "proposed_by",
           "proposed_at",
           "resolution"
@@ -3445,7 +3696,8 @@
                   "enum": [
                     "flagged_document",
                     "unverified_candidate",
-                    "possible_duplicate"
+                    "possible_duplicate",
+                    "borderline_score"
                   ],
                   "type": "string"
                 },
@@ -5101,6 +5353,44 @@
         ]
       }
     },
+    "/v1/reports/review-queue": {
+      "get": {
+        "description": "Open items per kind, and how long the oldest has waited. Counts only.",
+        "operationId": "review_queue_report_v1_reports_review_queue_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueSummaryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Review Queue Report",
+        "tags": [
+          "review queue",
+          "reports"
+        ]
+      }
+    },
     "/v1/requisitions": {
       "get": {
         "description": "Requisitions in your scope, newest first.",
@@ -5774,6 +6064,97 @@
           }
         ],
         "summary": "Resolve Review Item",
+        "tags": [
+          "review queue"
+        ]
+      }
+    },
+    "/v1/review-queue": {
+      "get": {
+        "description": "Every open item in your scope, of every kind, oldest first, each with its reason.",
+        "operationId": "review_queue_v1_review_queue_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "negative_verdict",
+                    "flagged_document",
+                    "unverified_candidate",
+                    "possible_duplicate",
+                    "borderline_score"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueuePage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Review Queue",
         "tags": [
           "review queue"
         ]
