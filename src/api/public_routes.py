@@ -35,7 +35,7 @@ from api.deps import blob_store, db_connection
 from api.errors import ApiError, error_response
 from api.fields import Timestamp
 from api.ids import decode, decode_filter, encode
-from api.limits import APPLICATIONS, STATUS_CHECKS, UPLOADS, RateLimiter, Rule
+from api.limits import APPLICATIONS, STATUS_CHECKS, UPLOADS, RateLimiter, Rule, client_address
 from api.pages import DEFAULT_LIMIT, MAX_LIMIT, decode_cursor, next_cursor
 from importer.blobs import BlobStore
 from intake import consent as consent_records
@@ -45,8 +45,12 @@ from pipeline.access import NotFound, Refused
 router = APIRouter(prefix="/v1/public", tags=["public: careers page"])
 
 UPLOAD_PATH = "/v1/public/cv-uploads"
+PUBLIC_PREFIX = "/v1/public/"
 # multipart framing around the file
 _ENVELOPE_BYTES = 64 * 1024
+# A public request that is not a file is a form: an application with its consent is a few
+# kilobytes. Anything larger is refused before it is read into memory.
+MAX_PUBLIC_BODY = 64 * 1024
 _NO_STORE = {"Cache-Control": "no-store"}
 
 Db = Annotated[Connection, Depends(db_connection)]
@@ -71,7 +75,9 @@ class CvUploadStatusOut(BaseModel):
 
 
 def _client(request: Request) -> str:
-    return request.client.host if request.client else "unknown"
+    """Whose request this is. Behind a proxy that is only knowable from a header we are told to
+    trust: TALENT_TRUSTED_PROXY_HOPS, 0 by default."""
+    return client_address(request, request.app.state.settings.trusted_proxy_hops)
 
 
 def _limited(request: Request, rule: Rule) -> None:
@@ -88,13 +94,19 @@ def _limited(request: Request, rule: Rule) -> None:
 
 
 def install_upload_guard(app: FastAPI) -> None:
-    """Refuses an upload by its headers, before the body is read: no size, too big, too often."""
+    """Refuses a public request by its headers, before the body is read: too big, or too often."""
 
     @app.middleware("http")
     async def guard_uploads(
         request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
-        if request.method != "POST" or request.url.path != UPLOAD_PATH:
+        if request.method != "POST" or not request.url.path.startswith(PUBLIC_PREFIX):
+            return await call_next(request)
+        if request.url.path != UPLOAD_PATH:
+            # Everything else a stranger may post is a form, and forms are small.
+            length = request.headers.get("content-length")
+            if length is not None and length.isdigit() and int(length) > MAX_PUBLIC_BODY:
+                return error_response(request, 413, "body_too_large", "That request is too large.")
             return await call_next(request)
         wait = request.app.state.rate_limiter.check(UPLOADS, _client(request))
         if wait is not None:

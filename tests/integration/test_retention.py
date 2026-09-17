@@ -15,9 +15,7 @@ from sqlalchemy.exc import DBAPIError
 
 from ops.retention import RetentionError, due, erase_one, in_force, load_policy, summarise
 
-PROPOSED = (
-    Path(__file__).resolve().parents[2] / "docs" / "retention" / "proposed-2026-09-17.json"
-)
+PROPOSED = Path(__file__).resolve().parents[2] / "docs" / "retention" / "proposed-2026-09-17.json"
 LOADED_BY = "integration-test"
 
 

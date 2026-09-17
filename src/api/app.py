@@ -11,6 +11,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from contextlib import AbstractContextManager
 
 from fastapi import FastAPI, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.engine import Connection
 
 from api import errors
@@ -98,6 +99,20 @@ def create_app(
             },
         )
         return response
+
+    origins = settings.cors_origin_list
+    if origins:
+        # Only the pages we name may call us from a browser: the careers site and the dashboard
+        # (D-WEB-2). No cookies are involved — callers send a bearer token or an upload token — so
+        # credentials stay off, which also keeps a wildcard from ever being usable against us.
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=origins,
+            allow_credentials=False,
+            allow_methods=["GET", "POST", "OPTIONS"],
+            allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Upload-Token"],
+            max_age=600,
+        )
 
     errors.install(app)
     errors.document(app)

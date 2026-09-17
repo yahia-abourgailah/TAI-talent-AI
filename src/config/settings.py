@@ -51,6 +51,19 @@ class Settings(BaseSettings):
     # Empty means backups are not watched from the API.
     backup_dir: str = ""
 
+    # The browsers allowed to call us: the careers page and the CRM dashboard, as exact origins
+    # ("https://careers.theaddress.com"), comma-separated. Empty means no browser on another
+    # origin can call the API at all, which is the right default (D-WEB-2).
+    cors_origins: str = ""
+
+    # How many proxies sit in front of the API. Rate limits are per candidate, so the address must
+    # be the candidate's: with 0, X-Forwarded-For is ignored entirely, because anyone can send it.
+    trusted_proxy_hops: int = Field(default=0, ge=0, le=5)
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
     # Events to the CRM (API plan section 7). Delivery is off while the URL is empty.
     crm_webhook_url: str = ""
     crm_webhook_secret: SecretStr = SecretStr("")
