@@ -55,7 +55,10 @@ def test_the_http_reader_posts_the_file_and_returns_the_answer_untouched():
     def handler(request: httpx.Request) -> httpx.Response:
         seen["url"] = str(request.url)
         seen["key"] = request.headers.get("x-api-key")
-        seen["body_has_file"] = CV in request.read()
+        body = request.read()
+        seen["body_has_file"] = CV in body
+        # The service reads the extension, not the content type, and refuses a name without one.
+        seen["filename"] = b'filename="cv.pdf"' in body
         return httpx.Response(200, content=b'{"fields": {}}', headers={"content-type": "x/y"})
 
     reply = _reader(handler).read(CV, "application/pdf")
@@ -65,6 +68,7 @@ def test_the_http_reader_posts_the_file_and_returns_the_answer_untouched():
         "url": "http://ocr.internal:8100/v1/extract",
         "key": "k",
         "body_has_file": True,
+        "filename": True,
     }
 
 

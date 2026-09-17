@@ -1,6 +1,11 @@
 # The OCR adapter and the answer it expects
 
-**Status: the real contract, read from the service itself on 17 September 2026** (`GET /openapi.json`, which needs no key). The service is up and healthy from our network. **It is not switched on yet: the key we hold is refused** — `403 InvalidAPIKeyError` — so `TALENT_OCR_MODE` stays `fake` until the OCR team gives us a working one. Nothing else stands in the way; the switch is one line.
+**Status: switched on and working, 17 September 2026.** `TALENT_OCR_MODE=api`, against the real service. A CV uploaded on the careers page comes back as a filled form in **about 9 seconds**, end to end, with the age inferred from the graduation year and marked as inferred.
+
+Two things had to be right before it worked, and only one of them was a key:
+
+* **The key.** The first one we were given was refused (`403 InvalidAPIKeyError`) in every header form. The second works.
+* **The filename.** The service chooses its reader from the **filename's extension**, not from the content type, and refuses a name that has none — we were sending the part as `cv`, and every CV came back `UnsupportedFileFormatError` and went to a person. We now send `cv.pdf`, `cv.docx`, `cv.jpg` or `cv.png`, built from the type we sniffed ourselves. **The candidate's own filename is never sent**: it is theirs, and it can say anything at all.
 
 ## One door, two versions
 
@@ -43,15 +48,15 @@ profile, and each value's language is read from its own letters because the serv
 The answer is still stored exactly as it came (BR-107) — the translation happens on the way in, not
 to the stored copy.
 
-### Two things the OCR team must answer
+### What the OCR team still has to answer
 
-1. **A working API key.** Ours is refused in every header form, including the one the service
-   documents. Until then every CV would wait in the review queue rather than be read — which is
-   the right failure, but it is still a failure.
-2. **Hidden content (BR-308).** The answer says nothing about hidden text, and the rule requires
+1. **Hidden content (BR-308).** The answer says nothing about hidden text, and the rule requires
    that a CV with hidden instructions goes to a person. We record `not_reported` rather than
    "none found", because silence is not a clean bill of health, and **no CV is marked safe on it**.
    Does the service look for it, and can it tell us?
+2. **Arabic and mixed CVs.** English is proved end to end. The accuracy set
+   ([CV_TEST_SET.md](CV_TEST_SET.md)) needs real Arabic and mixed files before we can put a number
+   on BR-309, and the rule that matters there is that **a name is never translated**.
 
 | Answer | What we do |
 |---|---|

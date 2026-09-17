@@ -17,6 +17,7 @@ it came (BR-107).
 
 import httpx
 
+from intake.files import EXTENSION
 from intake.ocr import OcrRejected, OcrReply, OcrTimeout, OcrUnavailable
 
 PATH = "/extract"
@@ -45,11 +46,15 @@ class HttpOcrReader:
         )
 
     def read(self, content: bytes, media_type: str) -> OcrReply:
+        # The service chooses its reader from the filename's extension, not from the content type,
+        # and refuses a name without one. The name is built from the type we sniffed ourselves —
+        # never the candidate's own filename, which is theirs and may say anything at all.
+        filename = f"cv.{EXTENSION.get(media_type, 'bin')}"
         try:
             response = self._client.post(
                 self._url,
                 headers=self._headers,
-                files={FILE_PART: ("cv", content, media_type)},
+                files={FILE_PART: (filename, content, media_type)},
             )
         except httpx.TimeoutException:
             raise OcrTimeout("The OCR API did not answer in time.") from None
