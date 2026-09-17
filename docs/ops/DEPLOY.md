@@ -198,6 +198,13 @@ version reads needs two releases (stop using it, then remove it).
 The script refuses to start an image that needs a *newer* schema than the database has. That is
 a deploy, not a rollback.
 
+**Do not go back by deploying an older commit.** `deploy.sh <old commit>` runs *that version's*
+start-up check, and an older check can refuse settings the newer one accepts — it stops before it
+touches anything, so nothing breaks, but you have spent the outage arguing with a check instead of
+serving. `rollback.sh` starts the old image directly and is the way back. (Seen on 17 September:
+deploying the commit before the week-8 merge was refused by its own start-up check, which asked
+the database questions before the database was started.)
+
 If the new version wrote data the old one does not know about (a new kind of review item, say),
 that data stays in the database and waits. Nothing is lost, and rolling forward again shows it.
 

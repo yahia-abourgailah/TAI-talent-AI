@@ -244,8 +244,9 @@ runs on the newer schema. The rollback refuses an image that needs a *newer* sch
 database has — that would be a deploy, not a rollback. To go back further than the schema allows,
 restore a backup (§5).
 
-The full procedure, including the first deploy on a new machine and what to do when the OCR is not
-reachable, is in [DEPLOY.md](DEPLOY.md).
+Both were rehearsed on 17 September on a stack built from nothing — deploy 40 s, rollback 31 s —
+and the timings for a bigger jump are in [DEPLOY.md](DEPLOY.md), along with the first deploy on a
+new machine and what to do when the OCR is not reachable.
 
 ---
 
