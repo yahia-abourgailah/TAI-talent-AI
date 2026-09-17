@@ -26,6 +26,7 @@ from auth import Principal
 from candidates import queue
 from pipeline.access import NotPermitted, actor_from_principal
 from reports import ReportRefused
+from reports.arrivals import arrivals_report
 from reports.funnel import funnel_report
 
 router = APIRouter(prefix="/v1", tags=["reports"])
@@ -144,4 +145,49 @@ def funnel(
         arrivals_at_stages_not_in_the_list=report["arrivals_at_steps_not_in_the_list"],
         all_candidates=ContactabilityOut(**report["all_candidates"]),
         review_queue=summary_out(queue.summary(conn, actor)),
+    )
+
+
+class ArrivalWeekOut(BaseModel):
+    week: str
+    total: int
+    own_page: int
+    by_channel: dict[str, int]
+    scraped_by_sheet: int | None
+
+
+class ArrivalsOut(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    date_from: str | None = Field(alias="from")
+    date_to: str | None = Field(alias="to")
+    weeks: list[ArrivalWeekOut]
+    note: str
+
+
+@router.get("/reports/arrivals", response_model=ArrivalsOut, response_model_by_alias=True)
+def arrivals(
+    principal: Annotated[Principal, Depends(current_principal)],
+    conn: Annotated[Connection, Depends(db_connection)],
+    date_from: Annotated[datetime | None, Query(alias="from")] = None,
+    date_to: Annotated[datetime | None, Query(alias="to")] = None,
+) -> ArrivalsOut:
+    """New candidates per week by where they came from: our own page, a job-post link, typed in
+    by a recruiter, or the scraped import (BR-602). Counts only."""
+    if not actor_from_principal(principal).sees_all:
+        raise NotPermitted("Reports are for a TA lead or an admin.")
+    for name, moment in (("from", date_from), ("to", date_to)):
+        if moment is not None and moment.tzinfo is None:
+            raise ApiError(
+                400, "invalid_request", f"{name} needs a time zone, e.g. 2026-10-05T00:00:00Z."
+            )
+    try:
+        report = arrivals_report(conn, date_from=date_from, date_to=date_to)
+    except ReportRefused as refusal:
+        raise ApiError(400, "invalid_request", str(refusal)) from None
+    return ArrivalsOut(
+        date_from=report["from"],
+        date_to=report["to"],
+        weeks=[ArrivalWeekOut(**week) for week in report["weeks"]],
+        note=report["note"],
     )

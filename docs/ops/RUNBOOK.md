@@ -3,7 +3,11 @@
 For whoever is looking after the Talent Platform today. It assumes you did not build it.
 
 You need: a shell on the platform machine, the environment file at `/etc/talent/`, and the ability
-to run `docker compose`. Nothing here needs Python knowledge.
+to run `docker compose`. Nothing here needs Python knowledge. How the machine was set up, and how
+to deploy or roll back a version, is in [DEPLOY.md](DEPLOY.md).
+
+On the production machine, `docker compose` below means
+`docker compose -f /opt/talent/deploy/compose.prod.yaml --env-file /etc/talent/talent.env`.
 
 **The one rule.** Everything in this system is built so that nothing is ever lost: no table allows
 a delete, and the database itself refuses one. If a fix you are about to make involves deleting
@@ -14,8 +18,8 @@ candidate data, stop and call someone. There is always another way.
 ## 0. Before this machine serves anyone
 
 ```
-PYTHONPATH=src .venv/bin/python -m ops.preflight          # everything it can check from here
-PYTHONPATH=src .venv/bin/python -m ops.preflight --no-db  # configuration only, before the database exists
+PYTHONPATH=src .venv/bin/python -m ops.preflight --env-file /etc/talent/talent.env
+PYTHONPATH=src .venv/bin/python -m ops.preflight --database   # after a deploy: also ask the database
 ```
 
 Run it on a new machine before the first deploy, and after every change to
@@ -160,11 +164,20 @@ You are restoring because something is badly wrong. Read all four steps before s
 
    docker compose exec -T postgres createdb -U talent_owner talent_restored
    docker compose exec -T postgres pg_restore -U talent_owner -d talent_restored \
-       --exit-on-error < "$TALENT_BACKUP_DIR/<file>.dump"
+       --no-owner --exit-on-error < "$TALENT_BACKUP_DIR/<file>.dump"
    ```
-   Do **not** add `--no-owner --no-privileges`: they strip every grant, and you end up with all the
-   data and a platform that cannot read it. `verify --fresh` exists because that failure looks
-   exactly like success.
+   **On a new machine** (the old one is gone), the database server has no roles yet, and the
+   restore stops at its first `GRANT`. Create them first, exactly once:
+   ```
+   docker compose exec -T postgres psql -U talent_owner -d talent -v ON_ERROR_STOP=1 \
+       -v app_password="$TALENT_DB_APP_PASSWORD" -f /talent/roles.sql
+   ```
+   A backup taken before 17 September 2026 carries no grants at all: restored on a new
+   machine, it holds every row and the application may read none of them. Do not rely on one.
+   The nightly backup replaces them within two weeks.
+
+   The roles are the only thing a backup does not carry. `python -m ops.backup drill` proves it: it
+   restores into an empty container with nothing else created (DEPLOY.md, §8).
    Then change the database name in `/etc/talent/*.env` to `talent_restored` and start again:
    ```
    docker compose up -d api worker
@@ -215,21 +228,24 @@ that is what archiving is for.
 ## 7. Deploying a version, and going back
 
 ```
-scripts/deploy.sh 2026.09.20-a1b2c3d        # put this version on
-scripts/deploy.sh 2026.09.20-a1b2c3d --dry  # say what that would do, change nothing
-scripts/rollback.sh                          # back to the version before
+scripts/deploy.sh v2026.09.20        # deploy that git tag or commit
+scripts/rollback.sh                   # start the version that ran before it
 ```
 
-The deploy takes a backup before it migrates, waits for `/ready`, and writes the version into
-`/var/lib/talent/current`, with every deploy and rollback in `history` beside it. If the API does
-not answer, it stops and tells you to roll back rather than leaving you to guess.
+The deploy builds the image from the commit itself, runs the start-up check inside that image with
+the real settings, takes a backup before it migrates, then migrates and swaps the processes. It
+waits for `/ready` and runs the watch before it calls the deploy done, and records what is running
+in `/var/lib/talent`. If the new version does not start or does not answer, it stops and tells you
+the rollback command rather than leaving you to guess.
 
-**A rollback does not undo the database migration.** Ours are forward-only, because undoing one
-would lose decisions people made; every migration adds rather than replaces, so the previous
-version's code runs against the newer schema. That is safe for one version back. For more than
-one, restore a backup (§5) instead.
+**A rollback does not undo the database migration.** Ours only go forward, because undoing one
+would drop what people recorded; every migration adds rather than replaces, so the previous code
+runs on the newer schema. The rollback refuses an image that needs a *newer* schema than the
+database has — that would be a deploy, not a rollback. To go back further than the schema allows,
+restore a backup (§5).
 
-Rehearsed on 17 Sep on a stack built from nothing: deploy 16s, second deploy 26s, **rollback 17s**.
+The full procedure, including the first deploy on a new machine and what to do when the OCR is not
+reachable, is in [DEPLOY.md](DEPLOY.md).
 
 ---
 
@@ -242,7 +258,7 @@ docker compose logs --tail=100 api
 docker compose up -d api
 ```
 
-`/ready` failing with the database means start at §9. Failing with the file store means CV
+`ready` failing with the database means start at §8. Failing with the file store means CV
 uploads and downloads are refused — everything else keeps working.
 
 ---

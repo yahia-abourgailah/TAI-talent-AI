@@ -11,5 +11,5 @@ User=talent
 WorkingDirectory=/opt/talent
 EnvironmentFile=/etc/talent/backup.env
 Environment=PYTHONPATH=src
-ExecStart=/opt/talent/.venv/bin/python -m ops.backup --out ${TALENT_BACKUP_DIR} verify --fresh
+ExecStart=/opt/talent/.venv/bin/python -m ops.backup --out ${TALENT_BACKUP_DIR} drill
 TimeoutStartSec=1800

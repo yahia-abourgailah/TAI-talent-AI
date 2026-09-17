@@ -66,7 +66,7 @@ def load_legacy(path: Path) -> ModuleType:
     return module
 
 
-def _added(row: MasterRow) -> datetime | None:
+def added_on(row: MasterRow) -> datetime | None:
     value = row.values.get("Date Added")
     if isinstance(value, datetime):
         return value
@@ -84,10 +84,10 @@ def _added(row: MasterRow) -> datetime | None:
 def most_recent(sheet: MasterSheet, count: int) -> tuple[list[MasterRow], int]:
     """The newest rows by Date Added, then by sheet row (later rows were added later). Also the
     number of rows with no readable date, which sort as oldest."""
-    undated = sum(_added(row) is None for row in sheet.rows)
+    undated = sum(added_on(row) is None for row in sheet.rows)
     ranked = sorted(
         sheet.rows,
-        key=lambda row: (_added(row) or datetime.min, row.sheet_row),
+        key=lambda row: (added_on(row) or datetime.min, row.sheet_row),
         reverse=True,
     )
     return ranked[:count], undated

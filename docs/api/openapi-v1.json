@@ -215,6 +215,94 @@
         "title": "ApplicationReceivedOut",
         "type": "object"
       },
+      "ArrivalWeekOut": {
+        "properties": {
+          "by_channel": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "By Channel",
+            "type": "object"
+          },
+          "own_page": {
+            "title": "Own Page",
+            "type": "integer"
+          },
+          "scraped_by_sheet": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scraped By Sheet"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "week": {
+            "title": "Week",
+            "type": "string"
+          }
+        },
+        "required": [
+          "week",
+          "total",
+          "own_page",
+          "by_channel",
+          "scraped_by_sheet"
+        ],
+        "title": "ArrivalWeekOut",
+        "type": "object"
+      },
+      "ArrivalsOut": {
+        "properties": {
+          "from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To"
+          },
+          "weeks": {
+            "items": {
+              "$ref": "#/components/schemas/ArrivalWeekOut"
+            },
+            "title": "Weeks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "weeks",
+          "note"
+        ],
+        "title": "ArrivalsOut",
+        "type": "object"
+      },
       "Body_upload_cv_v1_public_cv_uploads_post": {
         "properties": {
           "file": {
@@ -5254,6 +5342,79 @@
         "summary": "Stages",
         "tags": [
           "reference"
+        ]
+      }
+    },
+    "/v1/reports/arrivals": {
+      "get": {
+        "description": "New candidates per week by where they came from: our own page, a job-post link, typed in\nby a recruiter, or the scraped import (BR-602). Counts only.",
+        "operationId": "arrivals_v1_reports_arrivals_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArrivalsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Arrivals",
+        "tags": [
+          "reports"
         ]
       }
     },

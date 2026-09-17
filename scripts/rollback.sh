@@ -1,48 +1,44 @@
 #!/usr/bin/env bash
-# Puts the previous version back.
+# Puts the previous version back: scripts/rollback.sh [image]
 #
-#   scripts/rollback.sh                    # the version before this one
-#   scripts/rollback.sh 2026.09.19-9f8e7d  # a specific one
+# With no argument it starts the image that ran before the last deploy. It never touches the
+# schema. Our migrations only go forward and every one of them adds, so the previous code runs on
+# the newer schema; undoing a migration would mean dropping what people recorded. The script says
+# which schema it leaves in place.
 #
-# The database schema is NOT rolled back: our migrations are forward-only, because undoing one
-# would lose decisions people made. Every migration adds rather than replaces, so the previous code
-# runs against the newer schema. Going back more than one version has not been tested — if you need
-# that, restore a backup instead (docs/ops/RUNBOOK.md §5).
+# It refuses to start an image that needs a newer schema than the database has: that is a
+# deploy, not a rollback.
 set -euo pipefail
+here="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=deploy-lib.sh
+. "$here/deploy-lib.sh"
 
-HOME_DIR="${TALENT_HOME:-$(cd "$(dirname "$0")/.." && pwd)}"
-STATE="${TALENT_STATE_DIR:-/var/lib/talent}"
-IMAGE="${TALENT_IMAGE:-ghcr.io/theaddresstech/talent-platform}"
-READY_URL="http://127.0.0.1:${TALENT_API_PORT:-8090}/ready"
-READY_TRIES="${TALENT_READY_TRIES:-30}"
-cd "$HOME_DIR"
+started=$(date +%s)
+current=$(state current)
+target="${1:-$(state previous)}"
+[ -n "$target" ] || die "nothing to roll back to: no previous deploy is recorded in $TALENT_STATE_DIR"
+[ "$target" != "$current" ] || die "$target is already running"
+docker image inspect "$target" >/dev/null 2>&1 \
+  || die "$target is not on this machine; it was removed, so roll forward with scripts/deploy.sh"
+say "rolling back from ${current:-nothing} to $target"
 
-tag="${1:-$(cat "$STATE/previous" 2>/dev/null || true)}"
-[ -n "$tag" ] || { echo "error: no previous version recorded. Give one: $0 <image tag>" >&2; exit 2; }
-current="$(cat "$STATE/current" 2>/dev/null || echo unknown)"
+schema=$(db_revision)
+needs=$(image_head "$target")
+say "schema: database at ${schema}, $target was built for ${needs}"
+if [ "$schema" != "none" ] && [ -n "$needs" ] && [ "$((10#$needs))" -gt "$((10#$schema))" ]; then
+  die "$target needs schema $needs, newer than the database ($schema). Use scripts/deploy.sh"
+fi
+if [ "$schema" != "$needs" ]; then
+  say "keeping schema $schema: migrations only go forward, and $target runs on it"
+fi
 
-echo "rolling back from $current to $tag (the schema stays where it is)"
-export TALENT_IMAGE="$IMAGE" TALENT_IMAGE_TAG="$tag" \
-       TALENT_ENV_FILE="${TALENT_ENV_FILE:-/etc/talent/talent.env}"
+export TALENT_IMAGE="$target"
+compose up -d --wait api worker || die "$target did not start. Look at: docker compose logs api"
+if [[ ",${COMPOSE_PROFILES:-}," == *",crm,"* ]]; then compose up -d event-delivery; fi
+wait_ready || die "$target is not ready. Look at: docker compose logs api"
+watch_now
 
-docker image inspect "$IMAGE:$tag" >/dev/null 2>&1 || docker pull "$IMAGE:$tag"
-# No migration step: that is the whole difference from a deploy.
-docker compose -f compose.yaml -f compose.prod.yaml up -d --remove-orphans
-
-for attempt in $(seq 1 "$READY_TRIES"); do
-  if curl -fsS --max-time 3 "$READY_URL" >/dev/null 2>&1; then
-    echo "back on $tag after ${attempt} tries"
-    break
-  fi
-  if [ "$attempt" -eq "$READY_TRIES" ]; then
-    echo "error: the API did not come back on $tag. This is the point to restore a backup:" >&2
-    echo "       docs/ops/RUNBOOK.md §5" >&2
-    exit 1
-  fi
-  sleep 2
-done
-
-mkdir -p "$STATE" 2>/dev/null || true
-printf '%s  rolled back to %s by %s\n' "$(date -Is)" "$tag" "${USER:-unknown}" >> "$STATE/history" 2>/dev/null || true
-echo "$tag" > "$STATE/current" 2>/dev/null || true
-echo "Check it: PYTHONPATH=src .venv/bin/python -m ops.watch"
+mark_current "$target"
+[ -n "$current" ] && printf '%s\n' "$current" > "$TALENT_STATE_DIR/previous"
+record rollback "$target" - "$schema"
+say "rolled back to $target in $(( $(date +%s) - started ))s. Schema left at $schema"

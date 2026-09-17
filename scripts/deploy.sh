@@ -1,107 +1,89 @@
 #!/usr/bin/env bash
-# Puts one version of the platform on this machine.
+# Deploys one version of the platform: scripts/deploy.sh <git tag or commit>
 #
-#   scripts/deploy.sh 2026.09.20-a1b2c3d          # deploy that image tag
-#   scripts/deploy.sh 2026.09.20-a1b2c3d --dry    # say what it would do
+#   1. builds the image for that commit, unless it is already here
+#   2. runs the start-up check with the real settings; an error stops here, nothing touched
+#   3. takes a backup, restored and counted, before any migration
+#   4. migrates, then starts the API and the workers on the new image
+#   5. waits for /ready, runs the watch, and records what is running
 #
-# What it does, in order: check the image exists, take a backup, run the migrations, start the new
-# containers, wait until the API answers /readiness, and write the version down. If any step fails,
-# it stops there and tells you how to go back (scripts/rollback.sh).
-#
-# It does NOT undo a migration. Ours are forward-only by design — an undo would lose decisions
-# people made — so a rollback runs the previous code against the newer schema. That is safe for
-# one version, because every migration adds; it is not a licence to skip a version.
+# Migrations only go forward. If this deploy has to be undone, scripts/rollback.sh starts the
+# previous image on the new schema: every migration here adds and never removes, so the old code
+# still runs. The new schema stays. See docs/ops/DEPLOY.md, "Rolling back".
 set -euo pipefail
+here="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=deploy-lib.sh
+. "$here/deploy-lib.sh"
 
-ENV_FILE="${TALENT_ENV_FILE:-/etc/talent/talent.env}"
-HOME_DIR="${TALENT_HOME:-$(cd "$(dirname "$0")/.." && pwd)}"
-STATE="${TALENT_STATE_DIR:-/var/lib/talent}"
-IMAGE="${TALENT_IMAGE:-ghcr.io/theaddresstech/talent-platform}"
-COMPOSE=(docker compose -f compose.yaml -f compose.prod.yaml)
-READY_URL="http://127.0.0.1:${TALENT_API_PORT:-8090}/ready"
-READY_TRIES="${TALENT_READY_TRIES:-30}"
+ref="${1:-}"
+[ -n "$ref" ] || die "usage: scripts/deploy.sh <git tag or commit>"
+started=$(date +%s)
 
-tag="${1:-}"
-dry="${2:-}"
-[ -n "$tag" ] || { echo "usage: $0 <image tag> [--dry]" >&2; exit 2; }
+commit=$(git -C "$TALENT_HOME" rev-parse --verify --quiet "${ref}^{commit}") \
+  || die "$ref is not a commit in $TALENT_HOME (git fetch --tags first?)"
+image="talent-platform:${commit:0:12}"
+say "deploying $ref ($commit) as $image"
 
-say () { printf '%s  %s\n' "$(date +%H:%M:%S)" "$*"; }
-# "none" when nothing has ever been migrated here, which is how a first deploy is told apart from
-# a broken one.
-schema_version () {
-  "${COMPOSE[@]}" exec -T postgres psql -U talent_owner -d talent -tAc \
-    "SELECT coalesce(max(version_num), 'none') FROM alembic_version" 2>/dev/null || echo none
-}
-run () { if [ "$dry" = "--dry" ]; then echo "    would run: $*"; else "$@"; fi; }
-
-cd "$HOME_DIR"
-export TALENT_IMAGE="$IMAGE" TALENT_IMAGE_TAG="$tag" TALENT_ENV_FILE="$ENV_FILE"
-
-say "deploying $IMAGE:$tag"
-[ -f "$ENV_FILE" ] || { echo "error: no environment file at $ENV_FILE" >&2; exit 1; }
-
-say "1/7  is this machine configured?"
-if [ "$dry" != "--dry" ]; then
-  env PYTHONPATH=src "${TALENT_PYTHON:-.venv/bin/python}" -m ops.preflight --no-db || {
-    status=$?
-    [ "$status" -ge 2 ] && { echo "error: fix the configuration before deploying." >&2; exit 1; }
-    say "     warnings above; continuing"
-  }
-fi
-
-say "1b/7 is the image there?"
-if ! docker image inspect "$IMAGE:$tag" >/dev/null 2>&1; then
-  run docker pull "$IMAGE:$tag"
-fi
-
-say "2/7  database, cache and file store"
-run "${COMPOSE[@]}" up -d --wait postgres redis object-storage
-
-say "3/7  backup first, so there is a way back from the migration"
-if [ -z "${TALENT_BACKUP_DIR:-}" ]; then
-  say "     TALENT_BACKUP_DIR is not set: skipping. Set it before the next deploy."
-elif [ "$dry" = "--dry" ]; then
-  echo "    would run: ops.backup take --out $TALENT_BACKUP_DIR"
-elif env PYTHONPATH=src "${TALENT_PYTHON:-.venv/bin/python}" -m ops.backup \
-       --out "$TALENT_BACKUP_DIR" take --keep "${TALENT_BACKUP_KEEP:-14}"; then
-  :
-elif [ "$(schema_version)" = "none" ]; then
-  # Nothing has been migrated here yet, so there is nothing to lose: this is a first deploy.
-  say "     nothing to back up yet — first deploy on this machine"
+# 1. The image, built from the commit itself, never from whatever is in the working folder.
+if docker image inspect "$image" >/dev/null 2>&1; then
+  say "image already built"
 else
-  echo "error: the backup failed and this database holds data. Fix the backup before migrating:" >&2
-  echo "       a migration with no way back is how an afternoon becomes a week." >&2
-  exit 1
+  say "building the image"
+  git -C "$TALENT_HOME" archive --format=tar "$commit" | docker build --quiet -t "$image" - >/dev/null
+fi
+export TALENT_IMAGE="$image"
+
+# 2. The start-up check, in the new image, with the settings exactly as the API will see them.
+say "start-up check"
+compose run --rm --no-deps preflight || die "the start-up check found a problem; nothing was changed"
+
+before=$(db_revision)
+target=$(image_head "$image")
+say "schema: database at ${before}, this version needs ${target}"
+
+# 3. A backup before anything can change the schema. The first deploy has nothing to back up.
+if [ "$before" != "none" ]; then
+  if [ "${TALENT_DEPLOY_SKIP_BACKUP:-}" = "yes-i-am-sure" ]; then
+    say "warning: backup skipped on request"
+  else
+    [ -n "${TALENT_BACKUP_DIR:-}" ] || die "TALENT_BACKUP_DIR is not set; no deploy without a backup"
+    say "backup before migrating"
+    TALENT_BACKUP_DSN="postgresql://talent_owner:${TALENT_DB_OWNER_PASSWORD}@postgres:5432/talent" \
+      tools -m ops.backup --out "$TALENT_BACKUP_DIR" --tools docker:postgres take \
+      --keep "${TALENT_BACKUP_KEEP:-14}" \
+      || die "the backup failed; nothing was changed"
+  fi
 fi
 
-say "4/7  migrations"
-run "${COMPOSE[@]}" run --rm migrate
-
-say "5/7  starting the new version"
-run "${COMPOSE[@]}" up -d --remove-orphans
-
-say "6/7  waiting for the API to answer"
-if [ "$dry" != "--dry" ]; then
-  for attempt in $(seq 1 "$READY_TRIES"); do
-    if curl -fsS --max-time 3 "$READY_URL" >/dev/null 2>&1; then
-      say "     ready after ${attempt} tries"
-      break
-    fi
-    if [ "$attempt" -eq "$READY_TRIES" ]; then
-      echo "error: the API did not become ready. Previous version: $(cat "$STATE/previous" 2>/dev/null || echo unknown)" >&2
-      echo "       go back with: scripts/rollback.sh" >&2
-      exit 1
-    fi
-    sleep 2
-  done
+# 4. Migrate, then swap the processes.
+say "starting the database and cache"
+compose up -d --wait postgres redis
+if [[ ",${COMPOSE_PROFILES:-}," == *",bundled-storage,"* ]]; then
+  compose up -d --wait object-storage
+  compose run --rm bucket-init >/dev/null
 fi
+say "migrating"
+compose run --rm migrate
+after=$(db_revision)
 
-say "7/7  writing down what is running"
-if [ "$dry" != "--dry" ]; then
-  mkdir -p "$STATE"
-  [ -f "$STATE/current" ] && cp "$STATE/current" "$STATE/previous"
-  echo "$tag" > "$STATE/current"
-  printf '%s  deployed %s by %s\n' "$(date -Is)" "$tag" "${USER:-unknown}" >> "$STATE/history"
+previous=$(state current)
+say "starting the API and the workers"
+if ! compose up -d --wait api worker; then
+  record deploy-failed "$image" "$commit" "$after"
+  die "the new version did not start. Roll back with: scripts/rollback.sh"
 fi
+if [[ ",${COMPOSE_PROFILES:-}," == *",crm,"* ]]; then compose up -d event-delivery; fi
 
-say "deployed $tag. Check it: PYTHONPATH=src ${TALENT_PYTHON:-.venv/bin/python} -m ops.watch"
+# 5. Is it serving, and is anything wrong?
+if ! wait_ready; then
+  record deploy-failed "$image" "$commit" "$after"
+  die "the API is not ready. Roll back with: scripts/rollback.sh"
+fi
+watch_now
+
+if [ -n "$previous" ] && [ "$previous" != "$image" ]; then
+  printf '%s\n' "$previous" > "$TALENT_STATE_DIR/previous"
+fi
+mark_current "$image"
+record deploy "$image" "$commit" "$after"
+say "deployed $ref in $(( $(date +%s) - started ))s. Schema ${before} -> ${after}. Previous: ${previous:-none}"

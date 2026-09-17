@@ -1,332 +1,371 @@
-"""Is this machine configured to run the platform? (week 8)
+"""Before anything serves a request: is this machine configured to? (week 8)
 
-    python -m ops.preflight                 # everything it can check from here
-    python -m ops.preflight --no-db         # configuration only, before the database exists
-    python -m ops.preflight --json
+    python -m ops.preflight                               # the environment as it is
+    python -m ops.preflight --env-file /etc/talent/talent.env
+    python -m ops.preflight --strict                      # warnings fail too
+    python -m ops.preflight --database                    # also ask the database, after a deploy
 
-Exit 0 fine, 1 look at this, 2 do not start. Run it on a new machine before the first deploy, and
-after every change to the environment file: finding six problems at once beats finding them one
-failed request at a time, after candidates have started applying.
+Reads the configuration and says, in one list, what is missing or dangerous. Exit 0: nothing
+stops the start (warnings may be listed). Exit 2: at least one problem that must be fixed first.
+With --strict, warnings exit 1. The deploy script runs it before touching anything, and the
+production compose file runs it before the API and the workers start.
 
-Some of these already refuse at start-up — the developer sign-in bypass outside development, the
-stand-in CV reader outside development — and refusing is right. This gathers them into one answer a
-person can read, and adds the ones nothing else would notice: an empty careers-page origin, a proxy
-count that does not match the deployment, a secret still at its example value, backups nobody
-configured.
+It prints setting names and what is wrong with them, never a value: a secret must not reach a
+terminal log because it was wrong.
+
+The configuration checks ask nothing of the database, on purpose: the deploy script runs them
+before the database is even started, and a check that needs one could never run first. `--database`
+adds the questions that only a running database can answer — can the application read what it
+holds, is the schema the one this code expects, are the lists in force — and belongs after a deploy
+rather than before it.
 """
 
 import argparse
-import json
 import os
+import re
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
+from pydantic import ValidationError
+
 from config import Environment, Settings
-from ops.watch import CRITICAL, OK, RANK, WARN, Check, backup_freshness, overall
+from config.settings import AuthMode, OcrMode
 
-EXIT_CODE = {OK: 0, WARN: 1, CRITICAL: 2}
-# Values that mean "nobody has set this yet", whatever they are set to.
-PLACEHOLDERS = {"", "unused", "changeme", "change-me", "secret", "password", "example", "todo"}
-MINIMUM_SECRET = 32
+ERROR, WARN, OK = "error", "warning", "ok"
 
-
-def _worse(first: str, second: str) -> str:
-    return max(first, second, key=lambda name: RANK[name])
-
-
-def _is_real_secret(value: str) -> bool:
-    return value.strip().lower() not in PLACEHOLDERS and len(value.strip()) >= MINIMUM_SECRET
-
-
-def sign_in(settings: Settings) -> Check:
-    """Staff sign in with company accounts, everywhere but a developer's machine."""
-    if settings.auth_mode.value == "dev":
-        # Settings refuses this outside development, so reaching here means we are in development.
-        return Check("sign_in", WARN, "fake development accounts (development only)")
-    missing = [
-        name
-        for name, value in (
-            ("TALENT_OIDC_ISSUER", settings.oidc_issuer),
-            ("TALENT_OIDC_AUDIENCE", settings.oidc_audience),
-        )
-        if not value.strip()
-    ]
-    if missing:
-        return Check(
-            "sign_in", CRITICAL, f"company sign-in is not configured: {', '.join(missing)}"
-        )
-    if urlsplit(settings.oidc_issuer).scheme != "https":
-        return Check("sign_in", CRITICAL, "the identity provider must be an https address")
-    return Check("sign_in", OK, f"company accounts through {urlsplit(settings.oidc_issuer).netloc}")
-
-
-def reading_cvs(settings: Settings) -> Check:
-    """The CV reader. The stand-in is refused outside development by Settings itself."""
-    mode = settings.ocr_mode_in_force.value
-    if mode == "fake":
-        return Check("reading_cvs", WARN, "the stand-in reader, with saved answers (development)")
-    if not settings.ocr_base_url.strip():
-        return Check(
-            "reading_cvs",
-            CRITICAL,
-            "the real reader is in force but TALENT_OCR_BASE_URL is empty: no CV can be read",
-        )
-    if not settings.ocr_api_key.get_secret_value().strip():
-        return Check(
-            "reading_cvs", WARN, "no TALENT_OCR_API_KEY: only right if the reader has none"
-        )
-    return Check("reading_cvs", OK, f"the reader at {urlsplit(settings.ocr_base_url).netloc}")
+# Values that are placeholders, published examples or well-known defaults. Compared lower-case.
+EXAMPLE_VALUES = frozenset(
+    {
+        "",
+        "changeme",
+        "change-me",
+        "change_me",
+        "password",
+        "postgres",
+        "secret",
+        "minioadmin",
+        "access",
+        "secret-key-value",
+        "hunter2",
+        "example",
+        "xxx",
+        "todo",
+    }
+)
+SECRETS = (
+    "TALENT_DB_OWNER_PASSWORD",
+    "TALENT_DB_APP_PASSWORD",
+    "TALENT_BLOB_ACCESS_KEY",
+    "TALENT_BLOB_SECRET_KEY",
+    "TALENT_JWT_SECRET",
+)
+# Accepted by the settings model when empty, but nothing works without them.
+REQUIRED = ("TALENT_DB_DSN", "TALENT_REDIS_URL", "TALENT_BLOB_ENDPOINT")
+MIN_SECRET_LENGTH = 16
+MIN_JWT_SECRET_LENGTH = 32
+# Settings nothing reads any more. Left in a file, they only mislead the next person.
+UNUSED = ("TALENT_EVAL_PATH", "TALENT_VECTOR_URL")
+# The platform calls no language model (CR-01). An address for one is a door nobody needs.
+MODEL_HOSTS = ("TALENT_LLM_BASE_URL", "TALENT_EMBED_BASE_URL")
+LOOPBACK = {"127.0.0.1", "localhost", "::1"}
 
 
-def careers_page(settings: Settings) -> Check:
-    """Which browsers may call us. Empty means the careers page cannot, and will fail on day one."""
-    origins = settings.cors_origin_list
-    if not origins:
-        level = CRITICAL if settings.env is not Environment.DEV else WARN
-        return Check(
-            "careers_page",
-            level,
-            "TALENT_CORS_ORIGINS is empty: no browser on another origin can call the API",
-        )
-    wrong = [
-        origin
-        for origin in origins
-        if urlsplit(origin).scheme not in {"http", "https"}
-        or not urlsplit(origin).netloc
-        or urlsplit(origin).path
-    ]
-    if wrong:
-        return Check(
-            "careers_page",
-            CRITICAL,
-            f"these are not exact origins (scheme and host, no path): {', '.join(wrong)}",
-        )
-    insecure = [origin for origin in origins if urlsplit(origin).scheme == "http"]
-    if insecure and settings.env is not Environment.DEV:
-        return Check(
-            "careers_page", CRITICAL, f"plain http origins outside development: {insecure}"
-        )
-    return Check("careers_page", OK, f"{len(origins)} origin(s) allowed: {', '.join(origins)}")
+@dataclass(frozen=True, slots=True)
+class Finding:
+    level: str
+    setting: str
+    message: str
 
 
-def behind_a_proxy(settings: Settings) -> Check:
-    """Rate limits are per candidate, so the proxy count has to match the deployment."""
-    hops = settings.trusted_proxy_hops
-    if hops == 0 and settings.env is not Environment.DEV:
-        return Check(
-            "behind_a_proxy",
-            WARN,
-            "TALENT_TRUSTED_PROXY_HOPS is 0: right only if nothing sits in front of the API. "
-            "Behind a load balancer every candidate counts as one address",
-            {"hops": hops},
-        )
-    return Check("behind_a_proxy", OK, f"{hops} proxy hop(s) trusted", {"hops": hops})
+def read_env_file(path: Path) -> dict[str, str]:
+    """KEY=VALUE lines. Comments and blank lines are skipped; quotes around a value are removed."""
+    values: dict[str, str] = {}
+    for raw in path.read_text(encoding="utf-8-sig").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip().removeprefix("export ").strip()
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+            value = value[1:-1]
+        values[key] = value
+    return values
 
 
-def secrets_set(settings: Settings) -> Check:
-    """Secrets that are still an example are worse than secrets that are missing."""
-    weak = []
-    for name, value in (
-        ("TALENT_JWT_SECRET", os.environ.get("TALENT_JWT_SECRET", "")),
-        ("TALENT_BLOB_SECRET_KEY", settings.blob_secret_key.get_secret_value()),
-        ("TALENT_DB_DSN", settings.db_dsn.get_secret_value()),
-    ):
-        if not _is_real_secret(value):
-            weak.append(name)
-    if settings.crm_webhook_url and not _is_real_secret(
-        settings.crm_webhook_secret.get_secret_value()
-    ):
-        weak.append("TALENT_CRM_WEBHOOK_SECRET")
-    if weak:
-        level = CRITICAL if settings.env is not Environment.DEV else WARN
-        return Check("secrets", level, f"missing, too short or still an example: {', '.join(weak)}")
-    return Check("secrets", OK, "set, and none of them an example value")
+def _settings(env: Mapping[str, str]) -> tuple[Settings | None, list[Finding]]:
+    fields: dict[str, Any] = {
+        name.removeprefix("TALENT_").lower(): value
+        for name, value in env.items()
+        if name.startswith("TALENT_")
+    }
+    try:
+        return Settings(_env_file=None, **fields), []
+    except ValidationError as exc:
+        findings = []
+        for error in exc.errors():
+            where = ".".join(str(part) for part in error["loc"])
+            message = str(error["msg"]).removeprefix("Value error, ")
+            # A rule across settings has no field of its own; its message names the setting.
+            named = re.search(r"TALENT_[A-Z_]+", message)
+            setting = (
+                f"TALENT_{where.upper()}" if where else named.group(0) if named else "(settings)"
+            )
+            if error["type"] == "missing":
+                message = "is not set"
+            findings.append(Finding(ERROR, setting, message))
+        return None, findings
 
 
-def backups_configured(settings: Settings) -> Check:
-    """Where backups go, and whether last night's happened."""
-    directory = settings.backup_dir or os.environ.get("TALENT_BACKUP_DIR", "")
-    if not directory:
-        level = CRITICAL if settings.env is not Environment.DEV else WARN
-        return Check("backups", level, "TALENT_BACKUP_DIR is not set: nothing is being backed up")
-    path = Path(directory).expanduser()
-    if not path.exists():
-        return Check("backups", CRITICAL, f"{path} does not exist")
-    if not os.access(path, os.W_OK):
-        return Check("backups", CRITICAL, f"{path} cannot be written to by this user")
-    return backup_freshness(path)
+def _https_origin(origin: str) -> str | None:
+    """What is wrong with an allowed browser origin, or None."""
+    if origin == "*" or "*" in origin:
+        return "a wildcard lets any website call the API"
+    parts = urlsplit(origin)
+    if parts.scheme != "https" or not parts.hostname:
+        return "must be an https origin, such as https://careers.example.com"
+    if parts.path not in ("", "/") or parts.query or parts.fragment:
+        return "must be an origin only: no path, query or fragment"
+    return None
 
 
-def alerts_go_somewhere(settings: Settings) -> Check:
-    if os.environ.get("TALENT_ALERT_WEBHOOK_URL", "").strip():
-        return Check("alerts", OK, "a health alert reaches the chat channel")
-    level = WARN if settings.env is Environment.DEV else CRITICAL
-    return Check(
-        "alerts",
-        level,
-        "TALENT_ALERT_WEBHOOK_URL is not set: nothing tells anyone when something breaks",
-    )
+def check(env: Mapping[str, str], *, api_bind: str | None = None) -> list[Finding]:
+    """Every finding for this configuration. `api_bind` is the address the API is published on,
+    when known, so the proxy count can be checked against the deployment."""
+    settings, findings = _settings(env)
+    deployed = env.get("TALENT_ENV", "") in (Environment.STAGING, Environment.PROD)
+    live = ERROR if deployed else WARN
+
+    if settings is not None:
+        if settings.auth_mode is AuthMode.OIDC:
+            issuer = urlsplit(settings.oidc_issuer)
+            if issuer.scheme != "https":
+                findings.append(Finding(live, "TALENT_OIDC_ISSUER", "must be an https URL"))
+        if settings.ocr_mode_in_force is OcrMode.API:
+            if not settings.ocr_base_url:
+                findings.append(
+                    Finding(
+                        live,
+                        "TALENT_OCR_BASE_URL",
+                        "is not set: CV upload cannot work. Set it, or launch with CV upload "
+                        "closed and say so",
+                    )
+                )
+            if not settings.ocr_api_key.get_secret_value():
+                findings.append(Finding(live, "TALENT_OCR_API_KEY", "is not set"))
+
+        origins = settings.cors_origin_list
+        if not origins:
+            findings.append(
+                Finding(
+                    live,
+                    "TALENT_CORS_ORIGINS",
+                    "is empty: the careers page cannot call the API from a browser",
+                )
+            )
+        for origin in origins:
+            problem = _https_origin(origin)
+            if problem and not (not deployed and urlsplit(origin).hostname in LOOPBACK):
+                findings.append(Finding(ERROR, "TALENT_CORS_ORIGINS", f"{origin}: {problem}"))
+
+        if not settings.backup_dir:
+            # Inside the containers this is empty on purpose: the backups are the host's, and the
+            # host's watch and the deploy script check them.
+            findings.append(
+                Finding(
+                    WARN,
+                    "TALENT_BACKUP_DIR",
+                    "is not set here: this process cannot say whether last night's backup ran",
+                )
+            )
+        if not settings.crm_webhook_url:
+            findings.append(
+                Finding(WARN, "TALENT_CRM_WEBHOOK_URL", "is not set: events wait in the feed")
+            )
+
+        hops = settings.trusted_proxy_hops
+        if api_bind is not None:
+            host = api_bind.strip().strip("[]")  # an address, without a port
+            behind_proxy = host in LOOPBACK
+            if behind_proxy and hops == 0 and deployed:
+                findings.append(
+                    Finding(
+                        ERROR,
+                        "TALENT_TRUSTED_PROXY_HOPS",
+                        "is 0, but the API is published on loopback, so a proxy is in front of "
+                        "it: every candidate would share the proxy's rate limit. Set it to the "
+                        "number of proxies",
+                    )
+                )
+            if not behind_proxy and hops > 0:
+                findings.append(
+                    Finding(
+                        ERROR,
+                        "TALENT_TRUSTED_PROXY_HOPS",
+                        f"is {hops}, but the API is published directly on {host}: anyone could "
+                        "choose their own address with X-Forwarded-For. Set it to 0",
+                    )
+                )
+
+    for name in REQUIRED:
+        if name in env and not env[name].strip():
+            findings.append(Finding(live, name, "is empty"))
+    for name in SECRETS:
+        value = env.get(name, "")
+        if value.strip().lower() in EXAMPLE_VALUES:
+            findings.append(Finding(live, name, "is empty or still an example value"))
+        else:
+            wanted = MIN_JWT_SECRET_LENGTH if name == "TALENT_JWT_SECRET" else MIN_SECRET_LENGTH
+            if len(value) < wanted:
+                findings.append(Finding(live, name, f"is shorter than {wanted} characters"))
+    for name in ("TALENT_ALERT_WEBHOOK_URL",):
+        if not env.get(name):
+            findings.append(Finding(WARN, name, "is not set: a failing check will tell nobody"))
+    for name in UNUSED:
+        if name in env:
+            findings.append(Finding(WARN, name, "is not used by anything; remove it"))
+    for name in MODEL_HOSTS:
+        if env.get(name):
+            findings.append(
+                Finding(
+                    WARN,
+                    name,
+                    "is set, but the platform calls no language model (CR-01); remove it",
+                )
+            )
+    if not findings:
+        findings.append(Finding(OK, "(all)", "nothing missing or dangerous"))
+    return findings
 
 
-def erasure_ready(settings: Settings) -> Check:
-    """Erasure runs as the owner, and only under a policy Legal has activated."""
-    if not os.environ.get("TALENT_ERASURE_DSN") and not os.environ.get("TALENT_DB_MIGRATION_DSN"):
-        return Check(
-            "erasure", WARN, "no owner DSN set, so nothing can be erased when it falls due"
-        )
-    return Check("erasure", OK, "the owner DSN is set; a policy still has to be in force (CR-03)")
+def database_findings(env: Mapping[str, str]) -> list[Finding]:
+    """What only a running database can answer. Asked as two roles, because they answer differently.
 
-
-def _database_checks(settings: Settings) -> list[Check]:
-    """Two different questions, asked as two different roles.
-
-    Can the application read what it needs? That is asked as the application, because a database
-    that is up and a database the application can read are not the same thing — a restore with no
-    grants looks exactly like a healthy one from the outside.
-
-    Is the schema the one this code expects? That is asked as the owner, because the application
-    has no business reading the migration table, and does not have the grant to.
+    The application asks whether it can read what is there: a database that is up and a database
+    the application can read are not the same thing, and a restore without grants looks exactly
+    like a healthy one from the outside. The owner asks about the schema, because the application
+    has no business reading the migration table and does not have the grant to.
     """
     from alembic.config import Config
     from alembic.script import ScriptDirectory
     from sqlalchemy import create_engine, text
 
-    checks: list[Check] = []
+    findings: list[Finding] = []
+    dsn = env.get("TALENT_DB_DSN", "")
+    if not dsn:
+        return [Finding(ERROR, "TALENT_DB_DSN", "is not set, so nothing can be asked of it")]
     try:
-        engine = create_engine(settings.db_dsn.get_secret_value(), pool_pre_ping=True)
-        with engine.connect() as conn:
+        with create_engine(dsn, pool_pre_ping=True).connect() as conn:
             candidates = conn.execute(text("SELECT count(*) FROM core.candidate")).scalar_one()
-            checks.append(
-                Check(
-                    "database",
-                    OK,
-                    f"the application can read it: {int(candidates):,} candidate(s)",
-                    {"candidates": int(candidates)},
-                )
-            )
-    except Exception as exc:
-        checks.append(
-            Check(
-                "database",
-                CRITICAL,
-                "the application cannot read it "
-                f"({type(exc).__name__}). A restore with no grants looks like this",
-            )
+        findings.append(
+            Finding(OK, "database", f"the application reads it: {int(candidates):,} candidate(s)")
         )
-        return checks
+    except Exception as exc:
+        return [
+            Finding(
+                ERROR,
+                "database",
+                f"the application cannot read it ({type(exc).__name__}). A restore with no grants "
+                "looks exactly like this",
+            )
+        ]
 
-    owner_dsn = os.environ.get("TALENT_ERASURE_DSN") or os.environ.get("TALENT_DB_MIGRATION_DSN")
+    owner_dsn = env.get("TALENT_ERASURE_DSN") or env.get("TALENT_DB_MIGRATION_DSN")
     head = ScriptDirectory.from_config(Config("alembic.ini")).get_current_head()
     if not owner_dsn:
-        checks.append(
-            Check("schema", WARN, f"not checked: no owner DSN here. The code expects {head}")
-        )
-        return checks
+        return [
+            *findings,
+            Finding(WARN, "schema", f"not checked: no owner DSN here. This code expects {head}"),
+        ]
     try:
-        owner = create_engine(owner_dsn, pool_pre_ping=True)
-        with owner.connect() as conn:
+        with create_engine(owner_dsn, pool_pre_ping=True).connect() as conn:
             at = conn.execute(text("SELECT max(version_num) FROM alembic_version")).scalar_one()
-            checks.append(
-                Check(
-                    "schema",
-                    OK if at == head else CRITICAL,
-                    f"migrated to {at}"
-                    + ("" if at == head else f", but this code expects {head}: run the migrations"),
-                    {"at": at, "head": head},
+            findings.append(
+                Finding(OK, "schema", f"migrated to {at}")
+                if at == head
+                else Finding(
+                    ERROR, "schema", f"is at {at}, but this code expects {head}: run the migrations"
                 )
             )
-            for name, query, missing in (
+            for setting, query, missing, level in (
                 (
                     "step_list",
                     "SELECT pipeline.active_list()",
                     "no step list is in force: nobody can be moved through the pipeline",
+                    ERROR,
                 ),
                 (
                     "consent_wording",
                     "SELECT core.consent_wording_in_force()",
                     "no consent wording is in force: nobody can apply",
+                    ERROR,
                 ),
                 (
                     "retention",
                     "SELECT core.retention_in_force()",
-                    "no retention policy is in force: nothing will ever be erased (OPN-07)",
+                    "no policy is in force: nothing will ever be erased (OPN-07)",
+                    WARN,
                 ),
             ):
                 value = conn.execute(text(query)).scalar_one_or_none()
-                checks.append(
-                    Check(name, OK, str(value))
-                    if value
-                    else Check(name, WARN if name == "retention" else CRITICAL, missing)
+                findings.append(
+                    Finding(OK, setting, str(value)) if value else Finding(level, setting, missing)
                 )
     except Exception as exc:
-        checks.append(
-            Check("schema", CRITICAL, f"cannot be read as the owner: {type(exc).__name__}")
+        findings.append(
+            Finding(ERROR, "schema", f"cannot be read as the owner: {type(exc).__name__}")
         )
-    return checks
+    return findings
 
 
-def run_checks(settings: Settings, *, with_database: bool = True) -> list[Check]:
-    checks = [
-        Check("environment", OK, f"TALENT_ENV={settings.env.value}"),
-        sign_in(settings),
-        reading_cvs(settings),
-        careers_page(settings),
-        behind_a_proxy(settings),
-        secrets_set(settings),
-        backups_configured(settings),
-        alerts_go_somewhere(settings),
-        erasure_ready(settings),
-    ]
-    if with_database:
-        checks += _database_checks(settings)
-    return checks
-
-
-def report(checks: Sequence[Check]) -> dict[str, Any]:
-    return {
-        "status": overall(checks),
-        "checks": [check.as_dict() for check in checks],
-        "runbook": "docs/ops/RUNBOOK.md",
-    }
+def exit_code(findings: Sequence[Finding], strict: bool = False) -> int:
+    levels = {f.level for f in findings}
+    if ERROR in levels:
+        return 2
+    if strict and WARN in levels:
+        return 1
+    return 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        prog="python -m ops.preflight", description=__doc__.splitlines()[0]
+    parser = argparse.ArgumentParser(prog="python -m ops.preflight", description=__doc__)
+    parser.add_argument("--env-file", type=Path, help="read settings from this file")
+    parser.add_argument("--strict", action="store_true", help="warnings fail too")
+    parser.add_argument(
+        "--database",
+        action="store_true",
+        help="also ask the database: the schema, the lists in force, and whether the application "
+        "can read what is there. After a deploy, not before one",
     )
-    parser.add_argument("--no-db", action="store_true", help="configuration only")
-    parser.add_argument("--json", action="store_true")
+    parser.add_argument(
+        "--api-bind",
+        default=os.environ.get("TALENT_API_BIND"),
+        help="where the API is published, e.g. 127.0.0.1 (default: $TALENT_API_BIND)",
+    )
     args = parser.parse_args(argv)
 
-    try:
-        settings = Settings()
-    except Exception as exc:
-        # Settings refuses some combinations outright. That refusal is the most important answer
-        # this command can give, so print it as one rather than as a stack trace.
-        refusal = str(exc).replace("\n", " ")
-        if args.json:
-            print(json.dumps({"status": CRITICAL, "checks": [], "refused": refusal}, indent=2))
-        else:
-            print(f"CRIT  configuration  the platform refuses to start with this: {refusal}")
-        return EXIT_CODE[CRITICAL]
-
-    checks = run_checks(settings, with_database=not args.no_db)
-    if args.json:
-        print(json.dumps(report(checks), indent=2))
-    else:
-        width = max(len(check.name) for check in checks)
-        for check in checks:
-            mark = {OK: "ok  ", WARN: "WARN", CRITICAL: "CRIT"}[check.status]
-            print(f"{mark}  {check.name.ljust(width)}  {check.detail}")
-        answer = overall(checks)
-        print(
-            f"\n{answer}."
-            + ("" if answer == OK else " Fix what is marked before this machine serves anyone.")
-        )
-    return EXIT_CODE[overall(checks)]
+    env = dict(os.environ)
+    if args.env_file is not None:
+        if not args.env_file.is_file():
+            print(f"error: no file at {args.env_file}", file=sys.stderr)
+            return 2
+        env = {**read_env_file(args.env_file), **{k: v for k, v in env.items() if k in ("PATH",)}}
+    findings = check(env, api_bind=args.api_bind)
+    if args.database:
+        findings += database_findings(env)
+    order = {ERROR: 0, WARN: 1, OK: 2}
+    for finding in sorted(findings, key=lambda f: (order[f.level], f.setting)):
+        print(f"{finding.level.upper():<8} {finding.setting:<28} {finding.message}")
+    code = exit_code(findings, args.strict)
+    errors = sum(f.level == ERROR for f in findings)
+    warnings = sum(f.level == WARN for f in findings)
+    verdict = "do not start" if code == 2 else "fix before go-live" if code else "may start"
+    print(f"\n{errors} error(s), {warnings} warning(s): {verdict}.")
+    return code
 
 
 if __name__ == "__main__":

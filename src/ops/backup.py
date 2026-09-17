@@ -4,6 +4,7 @@
     python -m ops.backup verify  --out DIR [--backup FILE]
     python -m ops.backup files   --out DIR
     python -m ops.backup list    --out DIR
+    python -m ops.backup drill   --out DIR [--backup FILE]   # into an empty container (week 8)
 
 A backup nobody has restored is not a backup, it is a file. `take` writes the dump and then
 restores it into a throwaway database and counts the rows back, every time. A dump that cannot be
@@ -49,10 +50,6 @@ SCRATCH_PREFIX = "talent_verify_"
 _GRANT_COUNT = (
     "SELECT count(*) FROM information_schema.role_table_grants WHERE grantee = 'talent_rw'"
 )
-# The empty machine a backup is restored into to prove it can stand on its own.
-FRESH_IMAGE = "postgres:16-alpine"
-FRESH_READY_TRIES = 40
-ROLES_SQL = Path(__file__).resolve().parents[2] / "docker" / "postgres" / "roles.sql"
 
 
 class BackupError(Exception):
@@ -187,6 +184,9 @@ def take(
         server.database,
         "--format",
         DUMP_FORMAT,
+        "--no-owner",
+        # The grants are kept: without them a restore on an empty machine holds every row and
+        # the application may read none of them (found by the week 8 drill).
         password=server.password,
     )
     _write_private(dump_path, body)
@@ -232,6 +232,7 @@ def check(
             *_connection(server, tools),
             "--dbname",
             scratch,
+            "--no-owner",
             "--exit-on-error",
             stdin=body,
             password=server.password,
@@ -267,153 +268,6 @@ def check(
             f"the dump restored into {scratch} is not complete: "
             f"missing {missing or 'none'}, empty {empty or 'none'}, "
             f"grants to the app role {grants}"
-        )
-    return result
-
-
-def _docker(*arguments: str, stdin: bytes | None = None, quiet: bool = False) -> bytes:
-    finished = subprocess.run(  # the arguments are built here, never taken from a request
-        ["docker", *arguments], input=stdin, capture_output=True, check=False
-    )
-    if finished.returncode != 0 and not quiet:
-        tail = finished.stderr.decode("utf-8", "replace").strip().splitlines()
-        raise BackupError(f"docker {arguments[0]} failed: {tail[-1] if tail else 'no output'}")
-    return finished.stdout
-
-
-def check_fresh(
-    dump_path: Path, *, image: str = FRESH_IMAGE, roles_sql: Path | None = None
-) -> dict[str, Any]:
-    """Restores the dump into an empty machine, the way a real rescue would.
-
-    The nightly check restores into a spare database on the server the backup came from, where the
-    roles, the extensions and the permissions already exist. That proves the file is not corrupt.
-    It does not prove the file can stand on its own somewhere else — which is the only restore that
-    matters on the day a disk dies.
-
-    So: a container with nothing in it but Postgres, the roles created from roles.sql exactly as
-    the runbook says, then the restore. Counting the rows is not enough; it also counts the grants,
-    because a restore can bring back every row and leave the application unable to read one.
-    """
-    started = datetime.now(UTC)
-    name = f"talent-restore-check-{started.strftime('%Y%m%d%H%M%S')}"
-    password = secrets.token_urlsafe(16)
-    roles = roles_sql or ROLES_SQL
-    if not roles.exists():
-        raise BackupError(f"no roles file at {roles}: the restore procedure needs it.")
-
-    _docker(
-        "run",
-        "--detach",
-        "--name",
-        name,
-        "--env",
-        f"POSTGRES_PASSWORD={password}",
-        "--env",
-        "POSTGRES_DB=talent",
-        image,
-    )
-    try:
-        # Postgres starts a temporary server while it initialises, then shuts it down and starts
-        # the real one. A single "yes" is not enough, so wait for two in a row, a second apart.
-        answered = 0
-        for attempt in range(FRESH_READY_TRIES):
-            probe = _docker(
-                "exec",
-                name,
-                "psql",
-                "-U",
-                "postgres",
-                "-d",
-                "talent",
-                "-tAc",
-                "SELECT 1",
-                quiet=True,
-            )
-            answered = answered + 1 if probe.strip() == b"1" else 0
-            if answered >= 2:
-                break
-            if attempt + 1 == FRESH_READY_TRIES:
-                raise BackupError(f"the {image} container never became ready")
-            time.sleep(1)
-
-        # The roles are not in the dump — no dump holds them — so the procedure creates them first.
-        _docker(
-            "exec",
-            "-i",
-            name,
-            "psql",
-            "--quiet",
-            "-U",
-            "postgres",
-            "-d",
-            "talent",
-            "-v",
-            "ON_ERROR_STOP=1",
-            "-v",
-            f"app_password={password}",
-            "-f",
-            "-",
-            stdin=roles.read_bytes(),
-        )
-        _docker(
-            "exec",
-            "-i",
-            name,
-            "psql",
-            "--quiet",
-            "-U",
-            "postgres",
-            "-d",
-            "talent",
-            "-v",
-            "ON_ERROR_STOP=1",
-            "-c",
-            "DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'talent_owner') "
-            "THEN CREATE ROLE talent_owner LOGIN SUPERUSER; END IF; END $$",
-        )
-        _docker(
-            "exec",
-            "-i",
-            name,
-            "pg_restore",
-            "-U",
-            "postgres",
-            "-d",
-            "talent",
-            "--exit-on-error",
-            stdin=dump_path.read_bytes(),
-        )
-
-        def ask(query: str) -> str:
-            return (
-                _docker("exec", name, "psql", "-U", "postgres", "-d", "talent", "-tAc", query)
-                .decode("utf-8", "replace")
-                .strip()
-            )
-
-        result: dict[str, Any] = {
-            "restored_into": f"{image} container, built from nothing",
-            "seconds": round((datetime.now(UTC) - started).total_seconds(), 1),
-            "candidates": int(ask("SELECT count(*) FROM core.candidate") or 0),
-            "alembic_revision": ask("SELECT version_num FROM alembic_version"),
-            "grants_to_the_app_role": int(ask(_GRANT_COUNT) or 0),
-            "app_can_read_candidates": ask(
-                "SELECT has_table_privilege('talent_rw', 'core.candidate', 'SELECT')"
-            )
-            == "t",
-        }
-    finally:
-        _docker("rm", "--force", name, quiet=True)
-
-    candidates = int(result["candidates"])
-    grants = int(result["grants_to_the_app_role"])
-    result["ok"] = bool(candidates > 0 and grants > 0 and result["app_can_read_candidates"])
-    if not result["ok"]:
-        raise BackupError(
-            "the dump does not stand on its own: it restored "
-            f"{result['candidates']} candidate(s) with {result['grants_to_the_app_role']} grant(s) "
-            "to the application role. Data with no grants is a platform that cannot read itself."
         )
     return result
 
@@ -482,6 +336,219 @@ def copy_files(store: Any, bucket: str, out: Path) -> dict[str, int]:
     return counts
 
 
+ROLES_SQL = Path(__file__).resolve().parents[2] / "docker" / "postgres" / "roles.sql"
+DRILL_IMAGE = "postgres:16-alpine"
+DRILL_PREFIX = "talent-drill-"
+
+
+def _docker(*arguments: str, stdin: bytes | None = None, check_ok: bool = True) -> str:
+    # Every argument is built here; nothing comes from a request.
+    finished = subprocess.run(["docker", *arguments], input=stdin, capture_output=True, check=False)
+    if check_ok and finished.returncode != 0:
+        lines = finished.stderr.decode("utf-8", "replace").strip().splitlines()
+        raise BackupError(f"docker {arguments[0]} failed: {lines[-1] if lines else 'no output'}")
+    return finished.stdout.decode("utf-8", "replace")
+
+
+def _in_drill(name: str, sql: str, database: str = "talent") -> str:
+    return _docker(
+        "exec",
+        "-i",
+        name,
+        "psql",
+        "-U",
+        "talent_owner",
+        "-d",
+        database,
+        "--no-align",
+        "--tuples-only",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-c",
+        sql,
+    )
+
+
+def drill(
+    dump_path: Path,
+    *,
+    image: str = DRILL_IMAGE,
+    roles_sql: Path = ROLES_SQL,
+    keep_container: bool = False,
+) -> dict[str, Any]:
+    """Restores a dump into a Postgres container that holds nothing but the software (NFR-02).
+
+    The nightly check restores on the same server, where the roles and grants already exist, so a
+    dump that lacks them still restores there. Here nothing exists. The only thing created by
+    hand is what the runbook says to create: the roles, from docker/postgres/roles.sql. Then the
+    rows are counted against the backup's manifest and the application role's permissions are
+    checked, because a restore the application cannot read is not a restore.
+    """
+
+    manifest_path = dump_path.with_suffix(".json")
+    manifest = (
+        json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.exists() else {}
+    )
+    name = DRILL_PREFIX + datetime.now(UTC).strftime("%Y%m%d%H%M%S")
+    started = datetime.now(UTC)
+    body = dump_path.read_bytes()
+    _docker(
+        "run",
+        "--detach",
+        "--name",
+        name,
+        "--network",
+        "none",
+        "--env",
+        "POSTGRES_USER=talent_owner",
+        "--env",
+        f"POSTGRES_PASSWORD={secrets.token_urlsafe(24)}",
+        "--env",
+        "POSTGRES_DB=talent",
+        image,
+    )
+    try:
+        # The image starts a temporary server to initialise, stops it, then starts the real one:
+        # the second "ready" line in the log is the one to wait for.
+        for _ in range(90):
+            logs = subprocess.run(["docker", "logs", name], capture_output=True, check=False)
+            text_out = (logs.stdout + logs.stderr).decode("utf-8", "replace")
+            if text_out.count("ready to accept connections") >= 2:
+                break
+            time.sleep(1)
+        else:
+            raise BackupError(f"the drill container {name} did not start in 90 seconds")
+
+        # First, exactly as dumped, into an empty database: whatever is missing shows here.
+        _in_drill(name, "CREATE DATABASE bare", database="postgres")
+        bare = subprocess.run(
+            [
+                "docker",
+                "exec",
+                "-i",
+                name,
+                "pg_restore",
+                "-U",
+                "talent_owner",
+                "-d",
+                "bare",
+                "--no-owner",
+                "--exit-on-error",
+            ],
+            input=body,
+            capture_output=True,
+            check=False,
+        )
+        bare_error = bare.stderr.decode("utf-8", "replace").strip().splitlines()
+        needs_by_hand = [] if bare.returncode == 0 else [bare_error[-1] if bare_error else "?"]
+
+        # Then as the runbook says: create the roles, then restore.
+        _docker(
+            "exec",
+            "-i",
+            name,
+            "psql",
+            "-U",
+            "talent_owner",
+            "-d",
+            "talent",
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-v",
+            f"app_password={secrets.token_urlsafe(24)}",
+            "-f",
+            "-",
+            stdin=roles_sql.read_bytes(),
+        )
+        restore = subprocess.run(
+            [
+                "docker",
+                "exec",
+                "-i",
+                name,
+                "pg_restore",
+                "-U",
+                "talent_owner",
+                "-d",
+                "talent",
+                "--no-owner",
+                "--exit-on-error",
+            ],
+            input=body,
+            capture_output=True,
+            check=False,
+        )
+        if restore.returncode != 0:
+            lines = restore.stderr.decode("utf-8", "replace").strip().splitlines()
+            raise BackupError(
+                "the dump does not restore into an empty machine even with the roles created: "
+                + (lines[-1] if lines else f"exit {restore.returncode}")
+            )
+
+        schemas = ", ".join(f"'{s}'" for s in COUNTED_SCHEMAS)
+        tables = _in_drill(
+            name,
+            "SELECT format('%I.%I', schemaname, relname) FROM pg_stat_user_tables "
+            f"WHERE schemaname IN ({schemas}) ORDER BY 1",
+        ).split()
+        restored = {t: int(_in_drill(name, f"SELECT count(*) FROM {t}").strip()) for t in tables}
+        expected: dict[str, int] = manifest.get("row_counts") or {}
+        mismatched = {
+            t: {"backup": expected.get(t), "restored": restored.get(t)}
+            for t in sorted(set(expected) | set(restored))
+            if expected.get(t) != restored.get(t)
+        }
+        permissions = {
+            "app_reads_candidates": "SELECT has_table_privilege('talent_app', "
+            "'core.candidate', 'SELECT')",
+            "app_writes_captures": "SELECT has_table_privilege('talent_app', "
+            "'raw.capture', 'INSERT')",
+            "app_cannot_delete_captures": "SELECT NOT has_table_privilege('talent_app', "
+            "'raw.capture', 'DELETE')",
+            "app_cannot_delete_candidates": "SELECT NOT has_table_privilege('talent_app', "
+            "'core.candidate', 'DELETE')",
+            "append_only_triggers_present": "SELECT count(*) > 0 FROM pg_trigger "
+            "WHERE tgname LIKE '%append_only%'",
+        }
+        checks = {k: _in_drill(name, q).strip() == "t" for k, q in permissions.items()}
+        revision = _in_drill(name, "SELECT version_num FROM alembic_version").strip()
+    finally:
+        if not keep_container:
+            _docker("rm", "--force", "--volumes", name, check_ok=False)
+
+    result = {
+        "backup": dump_path.name,
+        "container": name,
+        "image": image,
+        "seconds": round((datetime.now(UTC) - started).total_seconds(), 1),
+        "created_by_hand": ["roles: docker/postgres/roles.sql (talent_rw, talent_app)"],
+        "restore_without_roles": needs_by_hand[0] if needs_by_hand else "restored",
+        "tables": len(restored),
+        "rows": sum(restored.values()),
+        "row_counts_match": not mismatched,
+        "row_count_differences": mismatched,
+        "alembic_revision": revision,
+        "revision_matches": revision == manifest.get("alembic_revision", revision),
+        "permissions": checks,
+        "ok": not mismatched and all(checks.values()),
+    }
+    _write_private(
+        dump_path.with_suffix(".drill.json"),
+        json.dumps(result, indent=2, sort_keys=True).encode("utf-8"),
+    )
+    return result
+
+
+def _chosen(out: Path, backup: str | None) -> Path:
+    if backup:
+        chosen = Path(backup).expanduser()
+        return chosen if chosen.is_absolute() else out / backup
+    dumps = sorted(out.glob("talent-*.dump"), reverse=True)
+    if not dumps:
+        raise BackupError(f"No backup in {out}.")
+    return dumps[0]
+
+
 def _out_directory(value: str | None) -> Path:
     raw = value or os.environ.get("TALENT_BACKUP_DIR") or ""
     if not raw:
@@ -515,11 +582,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     verify = commands.add_parser("verify", help="restore a backup and count what came back")
     verify.add_argument("--backup", help="which one; the newest by default")
-    verify.add_argument(
-        "--fresh",
-        action="store_true",
-        help="restore into an empty container instead of a spare database on this server",
+    drill_command = commands.add_parser(
+        "drill", help="restore a backup into a Postgres container that holds nothing else"
     )
+    drill_command.add_argument("--backup", help="which one; the newest by default")
+    drill_command.add_argument("--image", default=DRILL_IMAGE)
+    drill_command.add_argument("--keep-container", action="store_true")
     commands.add_parser("files", help="copy the original CVs out of the object store")
     commands.add_parser("list", help="what is in the backup directory")
     args = parser.parse_args(argv)
@@ -544,6 +612,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             return 0
 
+        if args.command == "drill":
+            chosen = _chosen(out, args.backup)
+            result = drill(chosen, image=args.image, keep_container=args.keep_container)
+            print(json.dumps(result, indent=2, sort_keys=True))
+            return 0 if result["ok"] else 1
+
         server = Server(_dsn())
         if args.command == "verify":
             dumps = sorted(out.glob("talent-*.dump"), reverse=True)
@@ -555,14 +629,6 @@ def main(argv: Sequence[str] | None = None) -> int:
                 chosen = dumps[0]
             else:
                 raise BackupError(f"No backup in {out}.")
-            if args.fresh:
-                fresh = check_fresh(chosen)
-                print(
-                    f"{chosen.name} restored into an empty {FRESH_IMAGE} in {fresh['seconds']}s: "
-                    f"{fresh['candidates']:,} candidates at {fresh['alembic_revision']}, "
-                    f"{fresh['grants_to_the_app_role']} grant(s) to the application role."
-                )
-                return 0
             result = check(server, tools, chosen)
             print(
                 f"{chosen.name} restored into {result['restored_into']} in {result['seconds']}s: "

@@ -187,7 +187,7 @@ def backup_freshness(
         try:
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             restored = bool((manifest.get("restored") or {}).get("ok"))
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, OSError):
             restored = False
     status = _level(age_hours, warn_hours, critical_hours)
     if not restored:

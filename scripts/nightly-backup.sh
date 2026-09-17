@@ -27,7 +27,7 @@ echo "=== $(date -Is) backup starting"
 # systemd timer does this on its own; this is here for a machine running the script from cron.
 if [ "${TALENT_BACKUP_DRILL_DAY:-Sun}" = "$(date +%a)" ] && [ "${TALENT_BACKUP_DRILL:-1}" = "1" ]; then
   echo "--- weekly restore drill: an empty machine"
-  "$PYTHON" -m ops.backup --out "$TALENT_BACKUP_DIR" verify --fresh || {
+  "$PYTHON" -m ops.backup --out "$TALENT_BACKUP_DIR" drill || {
     echo "error: the newest backup does not stand on its own. This is urgent." >&2
     exit 1
   }

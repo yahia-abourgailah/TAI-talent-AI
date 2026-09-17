@@ -17,7 +17,7 @@ from ops.backup import (
     Tools,
     alembic_revision,
     check,
-    check_fresh,
+    drill,
     listed,
     take,
 )
@@ -70,6 +70,11 @@ def test_a_backup_is_taken_restored_and_counted_back(server_and_tools, tmp_path)
 
     assert listed(tmp_path)[0]["restored"] is True
 
+    # The grants travel with the dump: restored on an empty machine, the application can still
+    # read (found by the week 8 drill, when they did not).
+    contents = tools.run("pg_restore", "--list", stdin=dump.read_bytes()).decode()
+    assert " ACL " in contents
+
 
 def test_a_dump_that_is_not_a_dump_fails_the_check(server_and_tools, tmp_path):
     server, tools = server_and_tools
@@ -83,25 +88,32 @@ def test_a_backup_stands_on_its_own_in_an_empty_machine(server_and_tools, tmp_pa
     """The restore that matters: a machine with nothing on it but Postgres.
 
     The same-server check cannot catch a dump that leans on what is already there — the roles, the
-    grants, the extensions. This one starts from nothing, follows the runbook's own procedure, and
-    counts the grants as well as the rows: data with no grants is a platform that cannot read
-    itself.
+    grants, the extensions. This starts from nothing, creates only what the runbook says to create,
+    and then asks the question that counts: can the application read what came back, and is it
+    still unable to delete it?
     """
     server, tools = server_and_tools
     if not shutil.which("docker"):
         pytest.skip("docker is not available here; the empty-machine restore needs it")
     manifest = take(server, tools, tmp_path, keep=1, verify=False)
 
-    fresh = check_fresh(tmp_path / manifest["file"])
-    assert fresh["ok"] is True
-    assert fresh["candidates"] > 0
-    assert fresh["alembic_revision"] == manifest["alembic_revision"]
-    assert fresh["grants_to_the_app_role"] > 0
-    assert fresh["app_can_read_candidates"] is True
+    proof = drill(tmp_path / manifest["file"])
+    assert proof["ok"] is True
+    assert proof["row_counts_match"] is True and proof["revision_matches"] is True
+    assert proof["alembic_revision"] == manifest["alembic_revision"]
+    assert proof["permissions"]["app_reads_candidates"] is True
+    assert proof["permissions"]["app_cannot_delete_candidates"] is True
+    assert proof["permissions"]["append_only_triggers_present"] is True
+    # The roles are the one thing no dump carries, and the runbook says so.
+    assert any("roles" in line for line in proof["created_by_hand"])
 
 
 def test_a_dump_without_grants_is_reported_as_not_standing_on_its_own(server_and_tools, tmp_path):
-    """What this check exists to catch, proved by making it happen on purpose."""
+    """What this drill exists to catch, proved by making it happen on purpose.
+
+    A dump taken with --no-privileges restores every row and leaves the application unable to read
+    one of them. On the same server it looks perfect, because the grants are already there.
+    """
     server, tools = server_and_tools
     if not shutil.which("docker"):
         pytest.skip("docker is not available here; the empty-machine restore needs it")
@@ -118,5 +130,7 @@ def test_a_dump_without_grants_is_reported_as_not_standing_on_its_own(server_and
     )
     path = tmp_path / "talent-20260101T000000Z.dump"
     path.write_bytes(stripped)
-    with pytest.raises(BackupError, match="does not stand on its own"):
-        check_fresh(path)
+
+    proof = drill(path)
+    assert proof["ok"] is False
+    assert proof["permissions"]["app_reads_candidates"] is False
