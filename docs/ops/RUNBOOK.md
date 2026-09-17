@@ -178,21 +178,42 @@ that is what archiving is for.
 
 ---
 
-## 7. The API is down
+## 7. Deploying a version, and going back
+
+```
+scripts/deploy.sh 2026.09.20-a1b2c3d        # put this version on
+scripts/deploy.sh 2026.09.20-a1b2c3d --dry  # say what that would do, change nothing
+scripts/rollback.sh                          # back to the version before
+```
+
+The deploy takes a backup before it migrates, waits for `/ready`, and writes the version into
+`/var/lib/talent/current`, with every deploy and rollback in `history` beside it. If the API does
+not answer, it stops and tells you to roll back rather than leaving you to guess.
+
+**A rollback does not undo the database migration.** Ours are forward-only, because undoing one
+would lose decisions people made; every migration adds rather than replaces, so the previous
+version's code runs against the newer schema. That is safe for one version back. For more than
+one, restore a backup (§5) instead.
+
+Rehearsed on 17 Sep on a stack built from nothing: deploy 16s, second deploy 26s, **rollback 17s**.
+
+---
+
+## 8. The API is down
 
 ```
 curl -s localhost:8090/health        # the process is up
-curl -s localhost:8090/readiness     # it can reach the database, cache and file store
+curl -s localhost:8090/ready         # it can reach the database, cache and file store
 docker compose logs --tail=100 api
 docker compose up -d api
 ```
 
-`readiness` failing with the database means start at §8. Failing with the file store means CV
+`/ready` failing with the database means start at §9. Failing with the file store means CV
 uploads and downloads are refused — everything else keeps working.
 
 ---
 
-## 8. The database will not start, or is out of space
+## 9. The database will not start, or is out of space
 
 ```
 docker compose logs --tail=100 postgres
@@ -205,7 +226,7 @@ before it corrupts anything, so a full disk is an outage, not a loss.
 
 ---
 
-## 9. Things you must never do
+## 10. Things you must never do
 
 - Delete candidates, fields, moves, evaluations or events. The database refuses; do not look for a
   way around it. A record that must go is archived with a reason, or erased under the retention
@@ -218,7 +239,7 @@ before it corrupts anything, so a full disk is an outage, not a loss.
 
 ---
 
-## 10. Who to call
+## 11. Who to call
 
 | Situation | Who |
 |---|---|
