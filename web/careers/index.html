@@ -4,7 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Careers · The Address</title>
-<link rel="stylesheet" href="../styles.css">
+<!-- One stylesheet for both dev pages. "../" does not reach it: the careers page is its own
+     mount, so the console's own path is used. Both are served only when TALENT_ENV=dev. -->
+<link rel="stylesheet" href="/app/styles.css">
 <style>
   main{max-width:640px}
   .step{background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:16px 18px;margin:0 0 14px}

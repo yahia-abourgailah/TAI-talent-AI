@@ -14,7 +14,9 @@ const LABELS = {
 // answers in 3-15 seconds; if it is slower than this, waiting is our problem, not theirs.
 const PATIENCE_SECONDS = 20;
 
-const state = { job: null, wording: null, upload: null, token: null, polls: 0, reading: false };
+const state = {
+  job: null, wording: null, upload: null, token: null, polls: 0, reading: false, misses: 0,
+};
 const $ = (id) => document.getElementById(id);
 const say = (message, kind = "ok") => {
   $("message").replaceChildren(Object.assign(document.createElement("div"),
@@ -76,9 +78,27 @@ async function upload() {
 }
 
 async function poll() {
-  const found = await api(`/v1/public/cv-uploads/${state.upload}`, {
-    headers: { "X-Upload-Token": state.token },
-  });
+  let found;
+  try {
+    found = await api(`/v1/public/cv-uploads/${state.upload}`, {
+      headers: { "X-Upload-Token": state.token },
+    });
+    state.misses = 0;
+  } catch (failure) {
+    // One failed ask is not an answer: the platform may be restarting, or the connection may have
+    // hiccuped. Only give up after several in a row, and never leave the candidate stuck.
+    state.misses += 1;
+    if (state.misses < 5) {
+      $("cv-status").textContent = "Still reading your CV…";
+      setTimeout(() => guard(poll), 3000);
+      return;
+    }
+    state.reading = false;
+    $("cv-status").textContent =
+      "We have lost track of your CV while reading it. Fill the form in below and send it — the " +
+      "file itself is kept, and a recruiter sees it.";
+    return;
+  }
   if (found.status === "ready" && found.fields) {
     state.reading = false;
     const filled = fillForm(found.fields);
