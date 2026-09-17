@@ -113,6 +113,33 @@ curl -s http://127.0.0.1:8090/v1/public/cv-uploads/upl_1 -H "X-Upload-Token: <to
 .venv/bin/python -m intake.accuracy run --set "$TALENT_CV_TEST_SET" --reader api
 ```
 
+### Week 7: borderline, the review queue, and rule changes
+
+Status and what each job waits on: [docs/pipeline/WEEK7_STATUS.md](docs/pipeline/WEEK7_STATUS.md).
+
+```bash
+# BR-310: the cost of each borderline rule, counts only, for the criteria owner
+.venv/bin/python -m replay.borderline_options --run-date 2026-09-14 \
+  --report-copy docs/criteria/BORDERLINE_OPTIONS.md
+# Only with the signature in hand; no borderline item opens until then
+.venv/bin/python -m scoring.sign_borderline --criteria 2026-08-04 --rule band --points 1 \
+  --signed-by "<criteria owner>" --signed-on <date> --ruling "<what was signed>" --by "<you>"
+
+# BR-407: everything waiting for a person (also GET /v1/review-queue and /v1/reports/review-queue)
+docker compose run --rm api python -m reports review-queue
+
+# BR-304: who moves tier, as a page (CI attaches it to every scoring change)
+.venv/bin/python -m replay.baseline --out ~/TAI-data/baseline --run-date 2026-09-14 \
+  --html-report ~/TAI-data/tier_moves.html --require-parity
+.venv/bin/python -m replay.compare --from 2026-08-04 --to <new version> --html <page>
+
+# The newest 200 rows, the old laptop script against the platform
+.venv/bin/python -m replay.last_200 --legacy-script <scorer file> --out ~/TAI-data/last-200 \
+  --report-copy docs/migration/LAST_200_REPORT.md
+```
+
+The parity job needs the self-hosted runner: [docs/criteria/PARITY_RUNNER.md](docs/criteria/PARITY_RUNNER.md).
+
 ### Database areas
 
 | Schema | Holds | The API may |

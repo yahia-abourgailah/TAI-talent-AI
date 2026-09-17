@@ -10,6 +10,10 @@ overwrites. A disqualification never rejects anyone. It opens a proposed_rejecti
 the agreed reason, for a person to confirm. Routing to the other track is not a rejection and opens
 nothing. A disqualification with no agreed reason opens nothing and is listed as unresolved.
 
+A score close to a tier line opens a borderline_score item naming the tiers either side, and the
+evaluation's flags say so (BR-310). How close is the criteria owner's signed rule for the version
+(core.criteria_borderline); a version with no signed rule opens none.
+
 Nothing written to the run log holds candidate data: ids, codes and counts only. The scorer's own
 reason text quotes the candidate's title or location, so it is matched here and never stored.
 """
@@ -24,6 +28,7 @@ from candidates.withdrawal import is_locked
 from jobs.queue import ReportableError, RunLog
 from pipeline.store import propose_rejection
 from replay.mapping import candidate_from_values, input_sha256
+from scoring.borderline import Borderline, Policy, near_line
 from scoring.rulesets.v2026_08_04 import Candidate
 from scoring.versions import RULESETS
 
@@ -108,6 +113,16 @@ _OPEN_REVIEW_ITEM = text(
       AND NOT EXISTS (SELECT 1 FROM pipeline.review_resolution x WHERE x.review_item_id = r.id)
     """
 )
+_BORDERLINE_RULE = text(
+    "SELECT rule, points FROM core.criteria_borderline WHERE criteria_version_id = :version"
+)
+_OPEN_BORDERLINE_ITEM = text(
+    """
+    INSERT INTO pipeline.review_item
+      (kind, candidate_id, evaluation_id, tier_above, tier_below, reason_code, proposed_by)
+    VALUES ('borderline_score', :candidate, :evaluation, :above, :below, 'near_tier_line', :by)
+    """
+)
 _REASON_IN_FORCE = text(
     "SELECT 1 FROM pipeline.rejection_reason "
     "WHERE list_version = pipeline.active_list() AND code = :reason"
@@ -141,6 +156,20 @@ def score_application(conn: Connection, application_id: int, log: RunLog) -> int
     result = ruleset.score_candidate(candidate, mode=TRACK_MODE[application.track])
     signals = sorted(result.key_signals)
     flags = sorted(result.red_flags)
+    borderline = None
+    if not result.disqualified:
+        policy = borderline_policy(conn, application.criteria_version_id)
+        if policy is None:
+            log.count("borderline_rule_not_signed")
+        else:
+            borderline = near_line(
+                result.overall_score,
+                application.criteria_version_id,
+                TRACK_MODE[application.track],
+                policy,
+            )
+            if borderline is not None:
+                flags.append(borderline.explain(policy, application.criteria_version_id))
     evaluation_id = int(
         conn.execute(
             _INSERT_EVALUATION,
@@ -160,9 +189,33 @@ def score_application(conn: Connection, application_id: int, log: RunLog) -> int
     )
     log.count("evaluations_computed")
 
+    if borderline is not None:
+        _open_borderline(conn, int(application.candidate_id), evaluation_id, borderline)
+        log.count("borderline_items_opened")
     if result.disqualified:
         _review_disqualification(conn, application, result.disqualify_reason, evaluation_id, log)
     return evaluation_id
+
+
+def borderline_policy(conn: Connection, criteria_version: str) -> Policy | None:
+    """The signed borderline rule for a criteria version, or None when nobody has signed one."""
+    row = conn.execute(_BORDERLINE_RULE, {"version": criteria_version}).one_or_none()
+    return None if row is None else Policy(row.rule, int(row.points))
+
+
+def _open_borderline(
+    conn: Connection, candidate_id: int, evaluation_id: int, borderline: Borderline
+) -> None:
+    conn.execute(
+        _OPEN_BORDERLINE_ITEM,
+        {
+            "candidate": candidate_id,
+            "evaluation": evaluation_id,
+            "above": borderline.tier_above,
+            "below": borderline.tier_below,
+            "by": SCORED_BY,
+        },
+    )
 
 
 def _review_disqualification(

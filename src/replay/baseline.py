@@ -8,6 +8,9 @@ Writes, into a directory that must be outside any git repository:
     baseline-<date>.json    run metadata and aggregate counts
     report-<date>.md        the aggregate report, counts only
 
+With --html-report, also a page of who moves tier, stored against replayed, with counts and
+sheet-row numbers only (BR-304). CI attaches it to every scoring change.
+
 The per-row file holds candidate data and is written owner-only. The same workbook, ruleset and
 run date always produce byte-identical files, so a week 2 replay can be compared line by line.
 """
@@ -27,6 +30,7 @@ from replay.mapping import map_row, number, split_items, text
 from replay.report import likely_cause, render_report, summarise
 from replay.results import Outcome, RowResult, apply_rulings
 from replay.rulings import RULINGS, Ruling
+from replay.tier_moves import Move, render_html
 from replay.workbook import MasterSheet, WorkbookError, read_master
 from scoring.rulesets import v2026_08_04 as ruleset
 
@@ -149,6 +153,42 @@ def write_outputs(
     return paths, summary, report
 
 
+def tier_moves_page(
+    sheet: MasterSheet, run_date: date, results: Sequence[RowResult], summary: dict[str, Any]
+) -> str:
+    moves = [
+        Move(r.sheet_row, r.stored.tier, r.replayed.tier, "ruled" if r.ruling else "")
+        for r in results
+        if r.has_stored_score
+    ]
+    unexplained = summary["unexplained_differences"]
+    verdict = (
+        "Parity reached: every stored score is reproduced or covered by a ruling."
+        if summary["parity"]
+        else f"Parity not reached: {unexplained:,} scores differ with no ruling. "
+        "This change cannot merge until the criteria owner rules on each one."
+    )
+    return render_html(
+        title=f"Criteria {RULESET_VERSION} against the stored scores",
+        before_label="the stored scores",
+        after_label=f"criteria {RULESET_VERSION} as it is in this change",
+        facts=[
+            ("Workbook", sheet.file_name),
+            ("Workbook SHA-256", sheet.sha256),
+            ("Run date", run_date.isoformat()),
+            (
+                "Exact score matches",
+                f"{summary['score_matches']:,} of {summary['stored_scores']:,}",
+            ),
+            ("Ruled differences", f"{summary['ruled_differences']:,}"),
+            ("Unexplained differences", f"{unexplained:,}"),
+        ],
+        moves=moves,
+        verdict=verdict,
+        passed=bool(summary["parity"]),
+    )
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m replay.baseline",
@@ -174,6 +214,11 @@ def _parser() -> argparse.ArgumentParser:
         "--report-copy",
         type=Path,
         help="also write the aggregate report here; it holds counts only, so it may be committed",
+    )
+    parser.add_argument(
+        "--html-report",
+        type=Path,
+        help="also write the who-moves-tier page here; counts and sheet rows only",
     )
     parser.add_argument(
         "--require-parity",
@@ -217,6 +262,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.report_copy is not None:
         args.report_copy.parent.mkdir(parents=True, exist_ok=True)
         args.report_copy.write_text(report, encoding="utf-8")
+    if args.html_report is not None:
+        args.html_report.parent.mkdir(parents=True, exist_ok=True)
+        page = tier_moves_page(sheet, args.run_date, results, summary)
+        args.html_report.write_text(page, encoding="utf-8")
 
     scored = summary["stored_scores"]
     print(

@@ -6,6 +6,9 @@ The numbers come from reports.funnel: for each stage, how many applications reac
 were rejected there (by reason) and are still there, counted only from recorded transitions, with
 contactability next to volume. `from` and `to` select arrivals at a stage (from inclusive, to
 exclusive) and need a time zone. A TA lead or an admin reads reports.
+
+Next to the funnel, `review_queue` counts what is waiting for a person, per kind, and how long the
+oldest item has waited (BR-407). It is today's queue, whatever `from` and `to` say.
 """
 
 from datetime import datetime
@@ -18,7 +21,9 @@ from sqlalchemy.engine import Connection
 from api.deps import current_principal, db_connection
 from api.errors import ApiError
 from api.ids import encode
+from api.queue_routes import QueueSummaryOut, summary_out
 from auth import Principal
+from candidates import queue
 from pipeline.access import NotPermitted, actor_from_principal
 from reports import ReportRefused
 from reports.funnel import funnel_report
@@ -66,6 +71,7 @@ class FunnelOut(BaseModel):
     groups: list[FunnelGroupOut]
     arrivals_at_stages_not_in_the_list: int
     all_candidates: ContactabilityOut
+    review_queue: QueueSummaryOut
 
 
 def _group_name(group_by: str | None, name: str) -> str:
@@ -104,7 +110,8 @@ def funnel(
     date_to: Annotated[datetime | None, Query(alias="to")] = None,
 ) -> FunnelOut:
     """Volume and conversion per stage, from recorded transitions, with contactability."""
-    if not actor_from_principal(principal).sees_all:
+    actor = actor_from_principal(principal)
+    if not actor.sees_all:
         raise NotPermitted("Reports are for a TA lead or an admin.")
     for name, moment in (("from", date_from), ("to", date_to)):
         if moment is not None and moment.tzinfo is None:
@@ -136,4 +143,5 @@ def funnel(
         groups=[_group(group_by, group) for group in report["groups"]],
         arrivals_at_stages_not_in_the_list=report["arrivals_at_steps_not_in_the_list"],
         all_candidates=ContactabilityOut(**report["all_candidates"]),
+        review_queue=summary_out(queue.summary(conn, actor)),
     )
