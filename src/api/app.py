@@ -10,6 +10,7 @@ import uuid
 from collections.abc import Awaitable, Callable, Mapping
 from contextlib import AbstractContextManager
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -136,6 +137,22 @@ def create_app(
     # the dashboard belongs to the CRM team and the careers page to the website team, and neither
     # of these has been through their review. Both are plain clients of the API above.
     # Next to the source in a checkout, next to the working directory in the image.
+    class DevPages(StaticFiles):
+        """The console and the careers page, never cached.
+
+        They change every time the image is rebuilt, and a browser holding yesterday's script
+        against today's API is a confusing afternoon: the page misbehaves, the API is innocent,
+        and nothing in the logs says so.
+        """
+
+        def is_not_modified(self, *args: Any, **kwargs: Any) -> bool:
+            return False
+
+        async def get_response(self, path: str, scope: Any) -> Any:
+            response = await super().get_response(path, scope)
+            response.headers["Cache-Control"] = "no-store"
+            return response
+
     console = next(
         (
             path
@@ -145,8 +162,8 @@ def create_app(
         None,
     )
     if settings.env is Environment.DEV and console is not None:
-        app.mount("/careers", StaticFiles(directory=console / "careers", html=True), name="careers")
-        app.mount("/app", StaticFiles(directory=console, html=True), name="console")
+        app.mount("/careers", DevPages(directory=console / "careers", html=True), name="careers")
+        app.mount("/app", DevPages(directory=console, html=True), name="console")
         log.info("development console mounted at /app and /careers")
 
     return app
