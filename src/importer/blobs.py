@@ -29,6 +29,15 @@ class S3BlobStore:
         self._client = client
         self._bucket = bucket
 
+    @property
+    def client(self) -> Any:
+        """The S3 client itself, for the few jobs that list the store rather than read one key."""
+        return self._client
+
+    @property
+    def bucket(self) -> str:
+        return self._bucket
+
     def put_if_absent(self, key: str, body: bytes, media_type: str) -> bool:
         # Keys are content hashes, so two writers racing on one key write the same bytes.
         try:

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the Talent Platform backup every night
+
+[Timer]
+OnCalendar=*-*-* 02:15:00
+# If the machine was off at 02:15, take one as soon as it is back.
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

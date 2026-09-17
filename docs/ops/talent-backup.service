@@ -1,0 +1,17 @@
+# Nightly backup. Install with talent-backup.timer:
+#   sudo cp docs/ops/talent-backup.* /etc/systemd/system/
+#   sudo systemctl enable --now talent-backup.timer
+#   systemctl list-timers talent-backup.timer      # when it next runs
+#   journalctl -u talent-backup.service -n 50      # what the last one did
+[Unit]
+Description=Talent Platform backup: dump, restore it as a check, prune
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+User=talent
+WorkingDirectory=/opt/talent
+EnvironmentFile=/etc/talent/backup.env
+ExecStart=/opt/talent/scripts/nightly-backup.sh
+# A backup that hangs is a backup that did not happen.
+TimeoutStartSec=3600
