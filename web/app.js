@@ -68,8 +68,9 @@ async function loadAccounts() {
       el(
         "button",
         {
-          class: account.key === state.account ? "primary" : "",
-          onclick: () => guard(() => signIn(account.key)),
+          // The endpoint calls the key "account"; it is what /dev/token wants back.
+          class: account.account === state.account ? "primary" : "",
+          onclick: () => guard(() => signIn(account.account)),
           title: account.purpose,
         },
         `${account.name} · ${account.roles.join(", ")}`
@@ -79,6 +80,7 @@ async function loadAccounts() {
 }
 
 async function signIn(account) {
+  if (!account) throw Object.assign(new Error("No account to sign in as."), { code: "no_account" });
   const answer = await api("/dev/token", { method: "POST", body: { account } });
   state.token = answer.access_token;
   state.account = account;
