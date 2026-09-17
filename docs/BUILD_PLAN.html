@@ -211,7 +211,7 @@ footer{margin-top:48px; padding-top:20px; border-top:2px solid var(--ink); font-
     <div class="fact"><dt>Candidates moved</dt><dd>5,140</dd></div>
     <div class="fact"><dt>Big gate</dt><dd>Week 2</dd></div>
     <div class="fact"><dt>OCR</dt><dd>On our own host</dd></div>
-    <div class="fact"><dt>Now</dt><dd>Week 5 built on a stand-in OCR &middot; week 6 built, 500 pairs with TA to check</dd></div>
+    <div class="fact"><dt>Now</dt><dd>Week 6 built &middot; week 7 Person B built &middot; 94 pairs with TA to check</dd></div>
   </dl>
 </header>
 
@@ -447,7 +447,7 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
         <tr><td class="id">NFR-09</td><td>Login, roles, and who did what</td><td class="wk">Weeks 1 &amp; 3</td></tr>
         <tr><td class="id">CR-01</td><td>No candidate data leaves the company</td><td class="wk">Week 8 <span class="chip lo">OCR on our host</span></td></tr>
         <tr><td class="id">CR-02</td><td>Record the legal basis before contacting anyone</td><td class="wk">Week 6</td></tr>
-        <tr><td class="id">CR-03</td><td>Delete candidates after their time is up</td><td class="wk">Week 7 <span class="chip ask">Legal must give the periods &mdash; OPN-07</span></td></tr>
+        <tr><td class="id">CR-03</td><td>Delete candidates after their time is up</td><td class="wk">Week 7 <span class="chip lo">Built</span> <span class="chip ask">waiting on Legal's periods &mdash; OPN-07</span></td></tr>
         <tr><td class="id">CR-04</td><td>A candidate can ask why, and we can answer from saved data</td><td class="wk">Week 2</td></tr>
         <tr><td class="id">CR-05</td><td>No final decision without a human</td><td class="wk">Week 3</td></tr>
         <tr><td class="id">CR-06</td><td>No forbidden copying, no hiding from detection</td><td class="wk">Week 8 <span class="chip lo">By design</span> we build none of it</td></tr>
@@ -707,7 +707,7 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
   <div class="phase"><span class="r">Make it safe, then switch over</span><span class="w">Weeks 7&ndash;8 &middot; BRD P6, P10</span></div>
 
   <div class="week">
-    <div class="wk-h"><span class="no">WEEK 7</span><span class="ti">Backups, review list, security</span></div>
+    <div class="wk-h"><span class="no">WEEK 7</span><span class="ti">Backups, review list, security</span><span class="prog st part">Person B built &middot; 17 Sep</span></div>
     <div class="lanes">
       <div class="lane A"><p class="who">Person A</p><ul>
         <li><b>The review list</b>: borderline candidates, flagged CVs, unchecked people, unclear matches &mdash; each with the reason it is there. <span class="r">BR-407</span></li>
@@ -716,13 +716,22 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
         <li>Score the last 200 candidates in both systems and list every difference.</li>
       </ul></div>
       <div class="lane B"><p class="who">Person B</p><ul>
-        <li>Nightly backups. <b>Then restore one for real.</b> A backup that was never restored is not a backup.</li>
-        <li>Delete candidates when their time is up. The mechanism ships now; <b>legal still owes us the periods</b>. <span class="r">CR-03, OPN-07</span></li>
-        <li>Alerts on failures and queue size. A runbook written for someone who is not you. <span class="r">NFR-05</span></li>
-        <li>Security check on the public upload page &mdash; it takes files from strangers.</li>
+        <li><span class="st done">Done</span>Nightly backups. <b>Then restore one for real.</b> A backup that was never restored is not a backup. <span class="r">NFR-02</span>
+          <span class="sn">Every backup is restored into a database of its own the moment it is taken, and every table counted back; a dump that will not restore fails on the spot. Proved on the real data: 1.4 MB, 81,128 rows, restored and counted in 7 seconds. The files are copied out of the store too, and the watch says out loud when a backup is missing, old, or was never restored.</span></li>
+        <li><span class="st done">Done</span>Delete candidates when their time is up. The mechanism ships now; <b>legal still owes us the periods</b>. <span class="r">CR-03, OPN-07</span>
+          <span class="sn">Erasure is one locked door: it runs as the owner, records what it removed, and is the only thing in the platform that can remove anything &mdash; the application role cannot, flag or no flag. It takes the field values, the original CV and the words in a verdict that quote the person; it leaves the record marked erased, its score, its steps and its consent, so last quarter's numbers stay true (BR-205). <b>Nothing is erased until Legal activates a policy</b>; a proposed one is in <code>docs/retention/</code> for them to correct.</span></li>
+        <li><span class="st done">Done</span>Alerts on failures and queue size. A runbook written for someone who is not you. <span class="r">NFR-05</span>
+          <span class="sn">Five checks &mdash; work waiting, jobs failing, jobs stuck, events the CRM has not taken, last night's backup &mdash; from the command line, from the API for an admin, and every 15 minutes into the chat channel. The runbook is for whoever is on call: what each alert means, the commands to run, how to restore, and what never to do. It already caught something real: tests were leaving stuck jobs in the shared database.</span></li>
+        <li><span class="st done">Done</span>Security check on the public upload page &mdash; it takes files from strangers. 
+          <span class="sn">Three real gaps found and fixed: <b>no CORS at all</b> (so the careers page could not have called us, and a careless fix later is how a wildcard reaches production), <b>rate limits keyed on the load balancer</b> rather than the candidate, and <b>no size limit on public forms</b>. What was already sound is written down too, with what is still owed by the website and OCR teams: <code>docs/security/PUBLIC_INTAKE_REVIEW.md</code>.</span></li>
       </ul></div>
     </div>
-    <div class="check"><b>End of week</b> A backup is restored onto a clean machine and works. <span class="chip med">Risk</span> this is the week that gets eaten if week 2 or week 5 ran late &mdash; and it is the week you least want to lose.</div>
+    <div class="check"><b>End of week</b> <span class="st part">Partly</span>A backup is restored onto a clean machine and works: it is restored and counted back every night, on this machine. <span class="chip med">Risk</span> this is the week that gets eaten if week 2 or week 5 ran late &mdash; and it is the week you least want to lose.</div>
+    <div class="status"><span class="h">Owed to us, 17 Sep</span><ul>
+      <li><b>Legal (OPN-07):</b> the retention periods. The eraser refuses to run until a policy is activated, so nothing is deleted and nothing can be. A proposed set is ready for them to correct.</li>
+      <li><b>Before the careers page is live:</b> the real origin for <code>TALENT_CORS_ORIGINS</code>, the number of proxies in front of the API, and the website team's bot protection.</li>
+      <li><b>Infrastructure:</b> a machine to restore a backup onto, so "works on a clean machine" is proved rather than assumed.</li>
+    </ul></div>
   </div>
 
   <div class="week">
