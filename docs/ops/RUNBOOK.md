@@ -3,7 +3,11 @@
 For whoever is looking after the Talent Platform today. It assumes you did not build it.
 
 You need: a shell on the platform machine, the environment file at `/etc/talent/`, and the ability
-to run `docker compose`. Nothing here needs Python knowledge.
+to run `docker compose`. Nothing here needs Python knowledge. How the machine was set up, and how
+to deploy or roll back a version, is in [DEPLOY.md](DEPLOY.md).
+
+On the production machine, `docker compose` below means
+`docker compose -f /opt/talent/deploy/compose.prod.yaml --env-file /etc/talent/talent.env`.
 
 **The one rule.** Everything in this system is built so that nothing is ever lost: no table allows
 a delete, and the database itself refuses one. If a fix you are about to make involves deleting
@@ -129,8 +133,20 @@ You are restoring because something is badly wrong. Read all four steps before s
    ```
    docker compose exec -T postgres createdb -U talent_owner talent_restored
    docker compose exec -T postgres pg_restore -U talent_owner -d talent_restored \
-       --no-owner --no-privileges --exit-on-error < "$TALENT_BACKUP_DIR/<file>.dump"
+       --no-owner --exit-on-error < "$TALENT_BACKUP_DIR/<file>.dump"
    ```
+   **On a new machine** (the old one is gone), the database server has no roles yet, and the
+   restore stops at its first `GRANT`. Create them first, exactly once:
+   ```
+   docker compose exec -T postgres psql -U talent_owner -d talent -v ON_ERROR_STOP=1 \
+       -v app_password="$TALENT_DB_APP_PASSWORD" -f /talent/roles.sql
+   ```
+   A backup taken before 17 September 2026 carries no grants at all: restored on a new
+   machine, it holds every row and the application may read none of them. Do not rely on one.
+   The nightly backup replaces them within two weeks.
+
+   The roles are the only thing a backup does not carry. `python -m ops.backup drill` proves it: it
+   restores into an empty container with nothing else created (DEPLOY.md, §8).
    Then change the database name in `/etc/talent/*.env` to `talent_restored` and start again:
    ```
    docker compose up -d api worker
@@ -182,12 +198,12 @@ that is what archiving is for.
 
 ```
 curl -s localhost:8090/health        # the process is up
-curl -s localhost:8090/readiness     # it can reach the database, cache and file store
+curl -s localhost:8090/ready         # it can reach the database, cache and file store
 docker compose logs --tail=100 api
 docker compose up -d api
 ```
 
-`readiness` failing with the database means start at §8. Failing with the file store means CV
+`ready` failing with the database means start at §8. Failing with the file store means CV
 uploads and downloads are refused — everything else keeps working.
 
 ---

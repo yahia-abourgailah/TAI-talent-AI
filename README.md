@@ -140,6 +140,23 @@ docker compose run --rm api python -m reports review-queue
 
 The parity job needs the self-hosted runner: [docs/criteria/PARITY_RUNNER.md](docs/criteria/PARITY_RUNNER.md).
 
+### Week 8: going live
+
+Deploying to a real machine, rolling back, and switching the old system off:
+[docs/ops/DEPLOY.md](docs/ops/DEPLOY.md), [docs/ops/SWITCH_OFF.md](docs/ops/SWITCH_OFF.md). Status:
+[docs/ops/WEEK8_STATUS.md](docs/ops/WEEK8_STATUS.md).
+
+```bash
+scripts/deploy.sh <tag>                     # build, check, back up, migrate, start, record
+scripts/rollback.sh                         # the previous image, on the schema as it is
+.venv/bin/python -m ops.preflight --env-file /etc/talent/talent.env --strict
+.venv/bin/python -m ops.backup --out "$TALENT_BACKUP_DIR" drill   # restore into an empty container
+.venv/bin/python -m reports arrivals --master "$TALENT_MASTER_PATH"  # where candidates came from
+```
+
+Where the platform connects to, and the test that keeps it that way:
+[docs/security/EGRESS.md](docs/security/EGRESS.md).
+
 ### Database areas
 
 | Schema | Holds | The API may |

@@ -739,7 +739,7 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
   </div>
 
   <div class="week">
-    <div class="wk-h"><span class="no">WEEK 8</span><span class="ti">Run both, train, switch off</span></div>
+    <div class="wk-h"><span class="no">WEEK 8</span><span class="ti">Run both, train, switch off</span><span class="prog st part">Dry work done &middot; 17 Sep</span></div>
     <div class="lanes">
       <div class="lane A"><p class="who">Person A</p><ul>
         <li>Run both systems side by side for three days on real applications. <b>Any difference stops the switch.</b></li>
@@ -747,10 +747,13 @@ Recruiter gets the candidate  ──►  moves them step by step  ──►  <sp
         <li>Hand over the rules: how to make version 2, replay it and sign it &mdash; so the next change does not need an engineer.</li>
       </ul></div>
       <div class="lane B"><p class="who">Person B</p><ul>
-        <li>Deploy to production. Practise the rollback once, before it is needed.</li>
-        <li><b>Switch off in this order</b>: scrapers, then the Railway portal, then the Google Sheet copy, then delete the outside AI key. Each one only after its replacement works. <span class="r">BR-705</span></li>
+        <li><span class="st part">Needs machine</span>Deploy to production. Practise the rollback once, before it is needed.
+          <span class="sn">The deploy and rollback scripts are written and <b>rehearsed on the laptop</b>: week 6 &rarr; week 7 with two migrations &rarr; back to week 6 in <b>32 seconds</b>, data intact, the old worker scoring on the new schema. Migrations only go forward, so a rollback keeps the new schema. A start-up check refuses a half-configured machine. The restore drill into an <b>empty container</b> found that backups carried no grants: every row came back and the application could read none of them. Fixed. Waiting for the machine.</span></li>
+        <li><span class="st part">Ready</span><b>Switch off in this order</b>: scrapers, then the Railway portal, then the Google Sheet copy, then delete the outside AI key. Each one only after its replacement works. <span class="r">BR-705</span>
+          <span class="sn">A weekly count of where candidates arrive from (our page, job-post link, recruiter, scraped) is built, so the scraper decision has a number. The order, the evidence for each step and the log to fill in are written down.</span></li>
         <li><b>The sheet becomes read-only and is kept</b>, not deleted. It is the proof behind old decisions.</li>
-        <li>Show with logs that no candidate data leaves the network. <b>Proof, not a promise.</b> <span class="r">CR-01, OBJ-03</span></li>
+        <li><span class="st part">Half</span>Show with logs that no candidate data leaves the network. <b>Proof, not a promise.</b> <span class="r">CR-01, OBJ-03</span>
+          <span class="sn">The code side is done: CI fails if any module that is not listed can reach the network. The list has <b>six</b> destinations, not five: the health alerts go to a chat webhook, counts only. The network deny rule and a week of its log wait for the machine.</span></li>
       </ul></div>
     </div>
     <div class="check gate"><b>Go live</b> Every new candidate comes through our own page. Every active candidate has a step. The funnel report is generated, not typed. The sheet is frozen. The three outside services are gone. <b>The laptop is switched off for a full day and nothing stops.</b></div>

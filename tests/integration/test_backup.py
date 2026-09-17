@@ -60,6 +60,11 @@ def test_a_backup_is_taken_restored_and_counted_back(server_and_tools, tmp_path)
 
     assert listed(tmp_path)[0]["restored"] is True
 
+    # The grants travel with the dump: restored on an empty machine, the application can still
+    # read (found by the week 8 drill, when they did not).
+    contents = tools.run("pg_restore", "--list", stdin=dump.read_bytes()).decode()
+    assert " ACL " in contents
+
 
 def test_a_dump_that_is_not_a_dump_fails_the_check(server_and_tools, tmp_path):
     server, tools = server_and_tools

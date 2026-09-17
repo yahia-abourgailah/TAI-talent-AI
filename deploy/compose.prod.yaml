@@ -1,0 +1,160 @@
+# The platform on a real machine (week 8). Run it through scripts/deploy.sh and
+# scripts/rollback.sh, not by hand: they pick the image, take a backup before migrating, and
+# record what is running. The guide is docs/ops/DEPLOY.md.
+#
+# Everything comes from the environment file (default /etc/talent/talent.env), which the scripts
+# pass as --env-file, so its values are also used to fill in this file.
+#
+# One port is published: the API, on TALENT_API_BIND (127.0.0.1 behind a reverse proxy). The
+# database, Redis and object storage are reachable from inside this network only.
+#
+# Object storage is the company's (DEP-05). A machine without it can run the bundled MinIO with
+# COMPOSE_PROFILES=bundled-storage in the environment file.
+
+name: ${COMPOSE_PROJECT_NAME:-talent}
+
+x-app: &app
+  # The deploy script sets TALENT_IMAGE, and tags what it deployed as talent-platform:current, so
+  # a plain `docker compose` (the nightly backup, a restart after a reboot) uses the same image.
+  image: ${TALENT_IMAGE:-talent-platform:current}
+  env_file: ${TALENT_ENV_FILE:-/etc/talent/talent.env}
+  environment: &app-environment
+    TALENT_DB_DSN: postgresql+psycopg://talent_app:${TALENT_DB_APP_PASSWORD:?set TALENT_DB_APP_PASSWORD}@postgres:5432/talent
+    TALENT_REDIS_URL: redis://redis:6379/0
+    TALENT_API_BIND: ${TALENT_API_BIND:-127.0.0.1}
+    # The backups belong to the host's talent user and are watched from the host
+    # (talent-watch.timer). Inside the containers they are not visible, so they are not claimed.
+    TALENT_BACKUP_DIR: ""
+  logging:
+    driver: json-file
+    options: { max-size: "20m", max-file: "5" }
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: talent_owner
+      POSTGRES_PASSWORD: ${TALENT_DB_OWNER_PASSWORD:?set TALENT_DB_OWNER_PASSWORD}
+      POSTGRES_DB: talent
+      TALENT_DB_APP_PASSWORD: ${TALENT_DB_APP_PASSWORD}
+    # On loopback only, for the host's tools: the watch, the erasure and the restore steps.
+    ports:
+      - "127.0.0.1:${TALENT_DB_HOST_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ${TALENT_HOME:-/opt/talent}/docker/postgres/roles.sql:/talent/roles.sql:ro
+      - ${TALENT_HOME:-/opt/talent}/docker/postgres/10-roles.sh:/docker-entrypoint-initdb.d/10-roles.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U talent_owner -d talent"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  object-storage:
+    profiles: ["bundled-storage"]
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z.hotfix.7aa24e772
+    restart: unless-stopped
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: ${TALENT_BLOB_ACCESS_KEY:?set TALENT_BLOB_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${TALENT_BLOB_SECRET_KEY:?set TALENT_BLOB_SECRET_KEY}
+    volumes:
+      - blobdata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # The raw bucket, with object lock (BR-107). Object lock can only be set when a bucket is made.
+  bucket-init:
+    profiles: ["bundled-storage"]
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z.hotfix.7aa24e772
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        mc alias set local http://object-storage:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" &&
+        mc mb --ignore-existing --with-lock "local/${TALENT_BLOB_BUCKET:-talent-raw}"
+    environment:
+      MINIO_ROOT_USER: ${TALENT_BLOB_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${TALENT_BLOB_SECRET_KEY}
+    depends_on:
+      object-storage:
+        condition: service_healthy
+
+  # Says what is missing or dangerous before anything serves a request. Errors stop the start.
+  preflight:
+    <<: *app
+    # A version older than the check (before week 8) has nothing to run, and must still start
+    # when it is rolled back to.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        python -c "import ops.preflight" 2>/dev/null
+        || { echo "this version has no start-up check"; exit 0; };
+        exec python -m ops.preflight
+    restart: "no"
+
+  migrate:
+    <<: *app
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+    environment:
+      <<: *app-environment
+      TALENT_DB_MIGRATION_DSN: postgresql+psycopg://talent_owner:${TALENT_DB_OWNER_PASSWORD}@postgres:5432/talent
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    <<: *app
+    restart: unless-stopped
+    # One process: the public rate limits are counted in its memory. Running more than one needs
+    # the limits moved to Redis first (docs/ops/DEPLOY.md).
+    ports:
+      - "${TALENT_API_BIND:-127.0.0.1}:${TALENT_API_PORT:-8090}:8000"
+    depends_on:
+      preflight:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    <<: *app
+    restart: unless-stopped
+    command: ["python", "-m", "jobs", "work", "--loop"]
+    healthcheck:
+      disable: true
+    depends_on:
+      preflight:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+
+  # Events to the CRM. Add "crm" to COMPOSE_PROFILES once the webhook URL and secret are set.
+  event-delivery:
+    <<: *app
+    profiles: ["crm"]
+    restart: unless-stopped
+    command: ["python", "-m", "integrations.webhooks", "deliver"]
+    healthcheck:
+      disable: true
+    depends_on:
+      preflight:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:
+  blobdata:
