@@ -54,15 +54,16 @@ def test_the_http_reader_posts_the_file_and_returns_the_answer_untouched():
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen["url"] = str(request.url)
-        seen["auth"] = request.headers.get("authorization")
+        seen["key"] = request.headers.get("x-api-key")
         seen["body_has_file"] = CV in request.read()
         return httpx.Response(200, content=b'{"fields": {}}', headers={"content-type": "x/y"})
 
     reply = _reader(handler).read(CV, "application/pdf")
     assert (reply.body, reply.media_type, reply.reader) == (b'{"fields": {}}', "x/y", "ocr-api")
     assert seen == {
-        "url": "http://ocr.internal:8100/v1/ocr",
-        "auth": "Bearer k",
+        # The service's own contract: /extract, and the key in X-API-Key (not Authorization).
+        "url": "http://ocr.internal:8100/v1/extract",
+        "key": "k",
         "body_has_file": True,
     }
 
@@ -76,7 +77,10 @@ def test_the_http_reader_posts_the_file_and_returns_the_answer_untouched():
         (503, OcrUnavailable),
         (400, OcrRejected),
         (415, OcrRejected),
-        (401, OcrRejected),
+        # Our key being wrong says nothing about the CV, so the CV waits rather than being
+        # refused: it is read once somebody fixes the configuration.
+        (401, OcrUnavailable),
+        (403, OcrUnavailable),
     ],
 )
 def test_the_http_reader_sorts_failures_into_retry_or_not(status, error):

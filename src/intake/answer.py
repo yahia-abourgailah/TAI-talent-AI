@@ -90,7 +90,17 @@ class OcrAnswer(BaseModel):
 
 
 def parse_answer(body: bytes) -> OcrAnswer:
-    """The answer, checked. Raises AnswerUnreadable naming what is wrong, never quoting it."""
+    """The answer, checked. Raises AnswerUnreadable naming what is wrong, never quoting it.
+
+    Two shapes arrive here: this one, and the company OCR service's own (intake.cv_extractor),
+    which is translated into this one. The answer is always stored exactly as it came, whichever
+    it is, so a change of reader never rewrites what a CV said.
+    """
+    from intake.cv_extractor import parse as parse_cv_extractor
+
+    translated = parse_cv_extractor(body)
+    if translated is not None:
+        return translated
     try:
         decoded = json.loads(body.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError):

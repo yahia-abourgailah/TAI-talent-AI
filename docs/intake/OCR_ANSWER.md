@@ -1,6 +1,6 @@
 # The OCR adapter and the answer it expects
 
-**Status: a guess.** The OCR API runs on our own host (CR-01). We have not yet received how to call it or a sample answer. Everything below was built from made-up samples, and will be checked against the real API as soon as we have access.
+**Status: the real contract, read from the service itself on 17 September 2026** (`GET /openapi.json`, which needs no key). The service is up and healthy from our network. **It is not switched on yet: the key we hold is refused** — `403 InvalidAPIKeyError` — so `TALENT_OCR_MODE` stays `fake` until the OCR team gives us a working one. Nothing else stands in the way; the switch is one line.
 
 ## One door, two versions
 
@@ -13,13 +13,45 @@ Everything that reads a CV goes through `intake.ocr.OcrReader`. `TALENT_OCR_MODE
 
 The fake returns the saved samples in `src/intake/fake_samples/` (`en`, `ar`, `mixed`, `hidden`). A marker inside a file changes what it does: `FAKE-OCR:slow`, `fail`, `timeout`, `reject` or `garbled`.
 
-## How we call the API (guessed)
+## How we call it
 
 ```
-POST {TALENT_OCR_BASE_URL}/ocr
+POST {TALENT_OCR_BASE_URL}/extract
 Content-Type: multipart/form-data        one part named "file"
-Authorization: Bearer {TALENT_OCR_API_KEY}   only when a key is set
+X-API-Key: {TALENT_OCR_API_KEY}
 ```
+
+The service offers four extraction paths (`/extract`, `/extract_magic`, `/extract_pdf2`,
+`/extract_and_match`). We use `/extract`: it picks the fast parser or the OCR by itself, which is
+the decision we would otherwise have to make per file. Its own numbers: English PDFs 3–5 s, Arabic
+PDFs and images 8–15 s — comfortably inside our 60 s timeout.
+
+### What it answers
+
+```json
+{"name": "…", "email": "…", "phone": "…", "address": "…",
+ "experience": [{"role": "…", "company": "…", "duration": "…"}],
+ "education":  [{"degree": "…", "institution": "…", "year": "…"}],
+ "skills": ["…"], "languages": ["…"], "inferred_skills": ["…"],
+ "links": {"linkedin": {"url": "…", "source": "…", "page": 1}}}
+```
+
+`src/intake/cv_extractor.py` translates that into the one shape the platform reads, and the rules
+it applies are ours, not the service's: the newest job is the current one, the newest study gives
+the degree and the graduation year, `address` is the location as written, a LinkedIn link is the
+profile, and each value's language is read from its own letters because the service does not say.
+The answer is still stored exactly as it came (BR-107) — the translation happens on the way in, not
+to the stored copy.
+
+### Two things the OCR team must answer
+
+1. **A working API key.** Ours is refused in every header form, including the one the service
+   documents. Until then every CV would wait in the review queue rather than be read — which is
+   the right failure, but it is still a failure.
+2. **Hidden content (BR-308).** The answer says nothing about hidden text, and the rule requires
+   that a CV with hidden instructions goes to a person. We record `not_reported` rather than
+   "none found", because silence is not a clean bill of health, and **no CV is marked safe on it**.
+   Does the service look for it, and can it tell us?
 
 | Answer | What we do |
 |---|---|
@@ -27,7 +59,9 @@ Authorization: Bearer {TALENT_OCR_API_KEY}   only when a key is set
 | 408, 425, 429, 5xx, timeout, no connection | Try again after 30 s, 2 min, then 10 min, up to `TALENT_OCR_MAX_ATTEMPTS` (4) attempts, then send the CV to a person |
 | Any other 4xx | Send the CV to a person straight away (`ocr_rejected`) |
 
-When the real contract differs, change `PATH` and `FILE_PART` in `src/intake/ocr_http.py`, plus the parser in `src/intake/answer.py`.
+A key that is wrong or missing (401, 403) is treated as the service being unavailable, not as the
+CV being bad: the CV waits and is read once the configuration is fixed. Nothing about a candidate
+is lost because of our own settings.
 
 ## Limits (NFR-01)
 
