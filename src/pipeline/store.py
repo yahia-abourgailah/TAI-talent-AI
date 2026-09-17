@@ -269,7 +269,7 @@ def get_application(conn: Connection, actor: Actor, application_id: int) -> dict
         conn,
         text(
             f"SELECT {_APPLICATION} FROM pipeline.application_state "
-            f"WHERE id = :id AND {not_locked('candidate_id')} "
+            f"WHERE id = :id AND {not_locked('application_state.candidate_id')} "
             "AND (:sees_all OR owner_recruiter = :subject)"
         ),
         {"id": application_id, **actor.scope()},
@@ -295,7 +295,7 @@ def list_applications(
         text(
             f"""
             SELECT {_APPLICATION} FROM pipeline.application_state
-            WHERE {not_locked("candidate_id")}
+            WHERE {not_locked("application_state.candidate_id")}
               AND (:sees_all OR owner_recruiter = :subject)
               AND (CAST(:before AS bigint) IS NULL OR id < :before)
               AND (CAST(:opening AS bigint) IS NULL OR opening_id = :opening)

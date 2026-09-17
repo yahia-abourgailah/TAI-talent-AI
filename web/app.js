@@ -237,6 +237,13 @@ async function openCandidate(id) {
         { class: `pill ${field.verification_status === "verified" ? "ok" : "warn"}` },
         text(field.verification_status, "unchecked")
       ),
+      field.state === "not_recorded" || field.verification_status === "verified"
+        ? ""
+        : el("span", { class: "row" },
+            el("button", { onclick: () => guard(() => checkField(id, name, null)) }, "Correct"),
+            el("button", { onclick: () => guard(() => checkField(id, name, field.value)) },
+              "Right as it is")
+          ),
     ],
   }));
   $("candidate-detail").replaceChildren(
@@ -251,7 +258,10 @@ async function openCandidate(id) {
           "Record “stop keeping my data”")
       ),
       el("h2", {}, "Fields"),
-      table(["field", "value", "where it came from", "checked"], fields, "Nothing recorded."),
+      el("p", { class: "muted", style: "margin-top:0" },
+        "A typed-in candidate is checked field by field: the old row is always kept beside the " +
+        "new one. Once nothing is left unchecked, the review item closes by itself."),
+      table(["field", "value", "where it came from", "checked", ""], fields, "Nothing recorded."),
       el("h2", {}, "Evaluations"),
       table(
         ["evaluation", "score", "tier", "outcome", "flags", "when"],
@@ -269,6 +279,21 @@ async function openCandidate(id) {
       )
     )
   );
+}
+
+async function checkField(candidateId, field, current) {
+  let value = current;
+  if (current === null) {
+    value = prompt(`What is the right ${field}?`, "");
+    if (value === null || !value.trim()) return;
+  }
+  await api(`/v1/candidates/${candidateId}/fields/${field}/verification`, {
+    method: "POST",
+    idempotent: true,
+    body: { value: current === null ? value.trim() : null },
+  });
+  say(`${field} checked.`);
+  await openCandidate(candidateId);
 }
 
 async function typeInCandidate() {
@@ -415,7 +440,11 @@ async function loadQueue() {
           row.id,
           el("span", { class: "pill warn" }, row.kind),
           row.reason,
-          text(row.candidate_id || row.application_id),
+          row.candidate_id
+            ? el("button", { class: "quiet", onclick: (event) => { event.stopPropagation();
+                show("candidates"); guard(() => openCandidate(row.candidate_id)); } },
+                row.candidate_id)
+            : text(row.application_id),
           when(row.waiting_since),
           el("span", { class: "row" },
             el("button", { onclick: (event) => { event.stopPropagation();
@@ -431,6 +460,15 @@ async function loadQueue() {
 }
 
 async function resolve(item, decision) {
+  if (item.kind === "unverified_candidate" && decision === "checked") {
+    say(
+      "Check the fields first: a typed-in candidate is cleared field by field, and this item " +
+      "closes itself when none is left unchecked. Opening the candidate now.",
+      "err"
+    );
+    show("candidates");
+    return openCandidate(item.candidate_id);
+  }
   const body = { decision };
   if (decision === "dismiss") {
     body.reason = prompt("Why are you dismissing it?");

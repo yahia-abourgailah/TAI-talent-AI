@@ -9,7 +9,13 @@ from fastapi.testclient import TestClient
 
 from api.app import create_app
 from auth import Principal
-from pipeline.access import Actor, NotPermitted, actor_from_principal, reader_from_principal
+from pipeline.access import (
+    Actor,
+    NotPermitted,
+    actor_from_principal,
+    not_locked,
+    reader_from_principal,
+)
 
 SRC = Path(__file__).resolve().parents[2] / "src"
 ROUTES = (
@@ -127,3 +133,11 @@ def test_no_code_path_moves_an_application_as_anything_but_a_person():
         values = statement.split("VALUES", 1)[1]
         assert "PERSON" in values or "'person'" in values, name
         assert "system" not in values, name
+
+
+def test_the_lock_filter_refuses_a_column_that_does_not_name_its_table():
+    """An unqualified column binds to the lock subquery, not to the row being filtered, and every
+    row disappears as soon as anybody is locked. It is refused rather than reviewed for."""
+    assert "a.candidate_id" in not_locked("a.candidate_id")
+    with pytest.raises(ValueError, match="needs the table"):
+        not_locked("candidate_id")

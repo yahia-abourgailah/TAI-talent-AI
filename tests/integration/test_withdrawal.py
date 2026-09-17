@@ -141,6 +141,54 @@ def test_a_recruiter_records_a_withdrawal_through_the_api(api_client, make_candi
     assert client.get(f"/v1/candidates/cand_{candidate}", headers=lead).status_code == 200
 
 
+def test_locking_one_candidate_hides_only_that_candidates_applications(api_client, make_candidate):
+    """The filter must name its table.
+
+    An unqualified column inside the lock's subquery binds to the subquery itself, so the test
+    becomes "is anyone at all locked" and every application disappears for everyone. It passed
+    every other test in this file, because they all look at the locked candidate's own records.
+    """
+    client, connection = api_client
+    lead = sign_in(client, "ta-lead")
+    opening = client.post(
+        "/v1/requisitions",
+        json={
+            "brand": "Made Up Brand",
+            "department": "Sales",
+            "track": "A",
+            "headcount": 1,
+            "team": "team-a",
+            "title": "Made Up Role",
+        },
+        headers={**lead, "Idempotency-Key": str(uuid.uuid4())},
+    ).json()
+
+    applications = []
+    for name in ("Stays Visible", "Asks To Go"):
+        candidate = make_candidate(connection, full_name=name)
+        answer = client.post(
+            "/v1/applications",
+            json={"requisition_id": opening["id"], "candidate_id": f"cand_{candidate}"},
+            headers={**lead, "Idempotency-Key": str(uuid.uuid4())},
+        )
+        assert answer.status_code == 201, answer.text
+        applications.append((candidate, answer.json()["id"]))
+    (_stays, visible_id), (goes, hidden_id) = applications
+
+    client.post(
+        f"/v1/candidates/cand_{goes}/withdrawals",
+        json={"asked_how": "phone"},
+        headers={**lead, "Idempotency-Key": str(uuid.uuid4())},
+    )
+
+    listed = client.get("/v1/applications", headers=lead).json()["items"]
+    ids = {row["id"] for row in listed}
+    assert visible_id in ids, "locking one candidate must not hide everybody else"
+    assert hidden_id not in ids
+    assert client.get(f"/v1/applications/{visible_id}", headers=lead).status_code == 200
+    assert client.get(f"/v1/applications/{hidden_id}", headers=lead).status_code == 404
+
+
 def test_a_recruiter_cannot_lock_a_record_they_cannot_see(api_client, make_candidate):
     client, connection = api_client
     candidate = make_candidate(connection, full_name="Hidden Left Alone")

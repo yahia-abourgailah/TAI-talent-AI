@@ -39,6 +39,18 @@ NOT_LOCKED = """
 
 
 def not_locked(column: str) -> str:
+    """`column` must name its table — "a.candidate_id", not "candidate_id".
+
+    An unqualified name inside the subquery resolves to the subquery's own column, so
+    `lock.candidate_id = candidate_id` compares the row with itself: it is true as soon as any
+    candidate anywhere is locked, and every row disappears for everyone. That is not a subtle
+    difference in behaviour, so it is refused here rather than reviewed for.
+    """
+    if "." not in column:
+        raise ValueError(
+            f"not_locked({column!r}) needs the table: an unqualified column binds to the "
+            "subquery and hides every row once anyone is locked."
+        )
     return NOT_LOCKED.format(column=column)
 
 
