@@ -40,7 +40,16 @@ export TALENT_IMAGE="$IMAGE" TALENT_IMAGE_TAG="$tag" TALENT_ENV_FILE="$ENV_FILE"
 say "deploying $IMAGE:$tag"
 [ -f "$ENV_FILE" ] || { echo "error: no environment file at $ENV_FILE" >&2; exit 1; }
 
-say "1/7  is the image there?"
+say "1/7  is this machine configured?"
+if [ "$dry" != "--dry" ]; then
+  env PYTHONPATH=src "${TALENT_PYTHON:-.venv/bin/python}" -m ops.preflight --no-db || {
+    status=$?
+    [ "$status" -ge 2 ] && { echo "error: fix the configuration before deploying." >&2; exit 1; }
+    say "     warnings above; continuing"
+  }
+fi
+
+say "1b/7 is the image there?"
 if ! docker image inspect "$IMAGE:$tag" >/dev/null 2>&1; then
   run docker pull "$IMAGE:$tag"
 fi

@@ -11,6 +11,21 @@ candidate data, stop and call someone. There is always another way.
 
 ---
 
+## 0. Before this machine serves anyone
+
+```
+PYTHONPATH=src .venv/bin/python -m ops.preflight          # everything it can check from here
+PYTHONPATH=src .venv/bin/python -m ops.preflight --no-db  # configuration only, before the database exists
+```
+
+Run it on a new machine before the first deploy, and after every change to
+`/etc/talent/talent.env`. It answers one question — is this machine configured to run the platform
+— and names every problem at once: no identity provider, a careers-page origin nobody set, a proxy
+count that does not match, a secret still at its example value, backups going nowhere, a schema
+older than the code. Exit 0 fine, 1 look at this, 2 do not start.
+
+---
+
 ## 1. Is anything wrong?
 
 ```
