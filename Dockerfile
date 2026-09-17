@@ -14,6 +14,8 @@ RUN pip install .
 
 COPY alembic.ini ./
 COPY migrations ./migrations
+# The development console and the example careers page. Mounted only when TALENT_ENV=dev.
+COPY web ./web
 
 USER talent
 EXPOSE 8000

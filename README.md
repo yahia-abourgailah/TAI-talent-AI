@@ -26,6 +26,23 @@ docker compose up --build
 
 The API answers on `http://127.0.0.1:8090` — `/health`, `/ready`, `/docs`. It is the only published port; the database, cache and object storage stay inside the compose network.
 
+### Trying it by hand
+
+Two pages come with the platform **in development only** (they are not served when `TALENT_ENV` is anything else, and a test holds that):
+
+| Page | What it is |
+|---|---|
+| <http://127.0.0.1:8090/app/> | The console: sign in as a fake account, create a requisition, type a candidate in, watch them get scored, move them through the steps, work the review queue, read the funnel |
+| <http://127.0.0.1:8090/careers/> | An example careers page: pick a job, upload a CV, check what we read from it, agree to be contacted, apply |
+
+A round trip that shows most of the platform in two minutes:
+
+1. Open the console, sign in as **Dev TA Lead**, and create a requisition with *on the careers page: yes*.
+2. Open the careers page, pick that job, fill in a name and a phone number, agree, and send it.
+3. Back in the console: the candidate is in **Pipeline**, already scored with a tier, and the review queue explains anything waiting for a person.
+
+The real dashboard is the CRM team's and the real careers page is the website team's; these are for trying the API, and neither has been through their review.
+
 Sign-in uses the company identity provider (`TALENT_OIDC_ISSUER`, `TALENT_OIDC_AUDIENCE`). On a dev machine, set `TALENT_AUTH_MODE=dev` to sign in as a fake account instead. The tokens are checked exactly like real ones, and the API refuses to start in dev mode outside dev.
 
 ```bash

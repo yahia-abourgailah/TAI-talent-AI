@@ -9,9 +9,11 @@ import time
 import uuid
 from collections.abc import Awaitable, Callable, Mapping
 from contextlib import AbstractContextManager
+from pathlib import Path
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.engine import Connection
 
 from api import errors
@@ -129,4 +131,22 @@ def create_app(
     app.include_router(withdrawal_router)
     app.include_router(ops_router)
     app.include_router(public_router)
+
+    # A console for trying the platform by hand, and an example careers page. Development only:
+    # the dashboard belongs to the CRM team and the careers page to the website team, and neither
+    # of these has been through their review. Both are plain clients of the API above.
+    # Next to the source in a checkout, next to the working directory in the image.
+    console = next(
+        (
+            path
+            for path in (Path(__file__).resolve().parents[2] / "web", Path.cwd() / "web")
+            if (path / "careers").is_dir()
+        ),
+        None,
+    )
+    if settings.env is Environment.DEV and console is not None:
+        app.mount("/careers", StaticFiles(directory=console / "careers", html=True), name="careers")
+        app.mount("/app", StaticFiles(directory=console, html=True), name="console")
+        log.info("development console mounted at /app and /careers")
+
     return app
