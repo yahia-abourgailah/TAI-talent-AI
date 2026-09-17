@@ -106,10 +106,18 @@ as it is taken — a backup nobody restored is not a backup.
 
 ```
 PYTHONPATH=src .venv/bin/python -m ops.backup --out "$TALENT_BACKUP_DIR" list
-PYTHONPATH=src .venv/bin/python -m ops.backup --out "$TALENT_BACKUP_DIR" verify   # newest one
-systemctl list-timers talent-backup.timer
+PYTHONPATH=src .venv/bin/python -m ops.backup --out "$TALENT_BACKUP_DIR" verify           # newest one
+PYTHONPATH=src .venv/bin/python -m ops.backup --out "$TALENT_BACKUP_DIR" verify --fresh   # into an empty machine
+systemctl list-timers talent-backup.timer talent-restore-drill.timer
 journalctl -u talent-backup.service -n 50
 ```
+
+Two different checks, and the difference matters. The nightly one restores into a spare database
+**on this server**, where the roles and permissions already exist: it proves the file is not
+corrupt. `--fresh` starts a container with nothing in it, creates the roles the way step 3 below
+does, restores, and counts the **grants** as well as the rows — it proves the file can stand on
+its own somewhere else. That is the restore you will actually be doing at 3am. It runs weekly on
+its own timer.
 
 ### Restoring for real
 
@@ -124,13 +132,24 @@ You are restoring because something is badly wrong. Read all four steps before s
    ```
    docker compose stop api worker
    ```
-3. **Restore into a new database, never over the live one**, then point the platform at it. The
-   check command does the restore for you into a scratch database; for a real one:
+3. **Restore into a new database, never over the live one**, then point the platform at it.
+   **On a machine that has never run this platform, create the roles first** — no database dump
+   contains roles, and without them the data comes back with no permissions and the application
+   cannot read a single row:
    ```
+   # only on a fresh machine: the roles the grants in the dump refer to
+   docker compose exec -T postgres psql -U postgres -v ON_ERROR_STOP=1 \
+       -v app_password='<the app password from /etc/talent>' -f - < docker/postgres/roles.sql
+   docker compose exec -T postgres psql -U postgres -c \
+       "CREATE ROLE talent_owner LOGIN SUPERUSER"
+
    docker compose exec -T postgres createdb -U talent_owner talent_restored
    docker compose exec -T postgres pg_restore -U talent_owner -d talent_restored \
-       --no-owner --no-privileges --exit-on-error < "$TALENT_BACKUP_DIR/<file>.dump"
+       --exit-on-error < "$TALENT_BACKUP_DIR/<file>.dump"
    ```
+   Do **not** add `--no-owner --no-privileges`: they strip every grant, and you end up with all the
+   data and a platform that cannot read it. `verify --fresh` exists because that failure looks
+   exactly like success.
    Then change the database name in `/etc/talent/*.env` to `talent_restored` and start again:
    ```
    docker compose up -d api worker

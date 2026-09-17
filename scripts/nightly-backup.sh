@@ -23,4 +23,14 @@ echo "=== $(date -Is) backup starting"
 "$PYTHON" -m ops.backup --out "$TALENT_BACKUP_DIR" files || {
   echo "warning: the CV files were not copied. The database backup is still good." >&2
 }
+# Once a week, prove the newest backup can be rebuilt on a machine with nothing on it. The
+# systemd timer does this on its own; this is here for a machine running the script from cron.
+if [ "${TALENT_BACKUP_DRILL_DAY:-Sun}" = "$(date +%a)" ] && [ "${TALENT_BACKUP_DRILL:-1}" = "1" ]; then
+  echo "--- weekly restore drill: an empty machine"
+  "$PYTHON" -m ops.backup --out "$TALENT_BACKUP_DIR" verify --fresh || {
+    echo "error: the newest backup does not stand on its own. This is urgent." >&2
+    exit 1
+  }
+fi
+
 echo "=== $(date -Is) backup finished"

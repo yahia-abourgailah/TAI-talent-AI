@@ -1,0 +1,10 @@
+[Unit]
+Description=Restore the newest backup into an empty machine, every week
+
+[Timer]
+OnCalendar=Sun 04:00:00
+Persistent=true
+RandomizedDelaySec=600
+
+[Install]
+WantedBy=timers.target

@@ -24,9 +24,11 @@ import hashlib
 import json
 import os
 import re
+import secrets
 import shlex
 import subprocess
 import sys
+import time
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -42,6 +44,15 @@ KEEP_DEFAULT = 14
 # Restoring over a live database is how a good backup ruins an afternoon. The check restores into a
 # database of its own and drops it again.
 SCRATCH_PREFIX = "talent_verify_"
+# A restore is only good if the application can read what came back, so every check counts the
+# grants the app role holds. Zero means the data is there and the platform is dead.
+_GRANT_COUNT = (
+    "SELECT count(*) FROM information_schema.role_table_grants WHERE grantee = 'talent_rw'"
+)
+# The empty machine a backup is restored into to prove it can stand on its own.
+FRESH_IMAGE = "postgres:16-alpine"
+FRESH_READY_TRIES = 40
+ROLES_SQL = Path(__file__).resolve().parents[2] / "docker" / "postgres" / "roles.sql"
 
 
 class BackupError(Exception):
@@ -165,6 +176,10 @@ def take(
     name = _timestamp()
     dump_path = out / f"{name}.dump"
 
+    # With owner and privileges, on purpose. Without them the data restores and the platform is
+    # still dead: every GRANT is missing, so the application role cannot read a single row. The
+    # roles themselves are not in a database dump, so the restore procedure creates them first
+    # (docs/ops/RUNBOOK.md §5), and check_fresh proves that procedure works.
     body = tools.run(
         "pg_dump",
         *_connection(server, tools),
@@ -172,8 +187,6 @@ def take(
         server.database,
         "--format",
         DUMP_FORMAT,
-        "--no-owner",
-        "--no-privileges",
         password=server.password,
     )
     _write_private(dump_path, body)
@@ -219,14 +232,13 @@ def check(
             *_connection(server, tools),
             "--dbname",
             scratch,
-            "--no-owner",
-            "--no-privileges",
             "--exit-on-error",
             stdin=body,
             password=server.password,
         )
         restored = row_counts(server, tools, scratch)
         revision = alembic_revision(server, tools, scratch)
+        grants = int(_psql(server, tools, scratch, _GRANT_COUNT).strip() or 0)
     finally:
         _psql(server, tools, "postgres", f'DROP DATABASE IF EXISTS "{scratch}" WITH (FORCE)')
 
@@ -240,6 +252,7 @@ def check(
     }
     result = {
         "restored_into": scratch,
+        "grants_to_the_app_role": grants,
         "seconds": round((datetime.now(UTC) - started).total_seconds(), 1),
         "tables": len(restored),
         "rows": sum(restored.values()),
@@ -247,12 +260,160 @@ def check(
         "tables_missing": missing,
         "tables_empty": empty,
         "rows_written_since_the_dump": written_since,
-        "ok": not missing and not empty,
+        "ok": not missing and not empty and grants > 0,
     }
     if not result["ok"]:
         raise BackupError(
             f"the dump restored into {scratch} is not complete: "
-            f"missing {missing or 'none'}, empty {empty or 'none'}"
+            f"missing {missing or 'none'}, empty {empty or 'none'}, "
+            f"grants to the app role {grants}"
+        )
+    return result
+
+
+def _docker(*arguments: str, stdin: bytes | None = None, quiet: bool = False) -> bytes:
+    finished = subprocess.run(  # the arguments are built here, never taken from a request
+        ["docker", *arguments], input=stdin, capture_output=True, check=False
+    )
+    if finished.returncode != 0 and not quiet:
+        tail = finished.stderr.decode("utf-8", "replace").strip().splitlines()
+        raise BackupError(f"docker {arguments[0]} failed: {tail[-1] if tail else 'no output'}")
+    return finished.stdout
+
+
+def check_fresh(
+    dump_path: Path, *, image: str = FRESH_IMAGE, roles_sql: Path | None = None
+) -> dict[str, Any]:
+    """Restores the dump into an empty machine, the way a real rescue would.
+
+    The nightly check restores into a spare database on the server the backup came from, where the
+    roles, the extensions and the permissions already exist. That proves the file is not corrupt.
+    It does not prove the file can stand on its own somewhere else — which is the only restore that
+    matters on the day a disk dies.
+
+    So: a container with nothing in it but Postgres, the roles created from roles.sql exactly as
+    the runbook says, then the restore. Counting the rows is not enough; it also counts the grants,
+    because a restore can bring back every row and leave the application unable to read one.
+    """
+    started = datetime.now(UTC)
+    name = f"talent-restore-check-{started.strftime('%Y%m%d%H%M%S')}"
+    password = secrets.token_urlsafe(16)
+    roles = roles_sql or ROLES_SQL
+    if not roles.exists():
+        raise BackupError(f"no roles file at {roles}: the restore procedure needs it.")
+
+    _docker(
+        "run",
+        "--detach",
+        "--name",
+        name,
+        "--env",
+        f"POSTGRES_PASSWORD={password}",
+        "--env",
+        "POSTGRES_DB=talent",
+        image,
+    )
+    try:
+        # Postgres starts a temporary server while it initialises, then shuts it down and starts
+        # the real one. A single "yes" is not enough, so wait for two in a row, a second apart.
+        answered = 0
+        for attempt in range(FRESH_READY_TRIES):
+            probe = _docker(
+                "exec",
+                name,
+                "psql",
+                "-U",
+                "postgres",
+                "-d",
+                "talent",
+                "-tAc",
+                "SELECT 1",
+                quiet=True,
+            )
+            answered = answered + 1 if probe.strip() == b"1" else 0
+            if answered >= 2:
+                break
+            if attempt + 1 == FRESH_READY_TRIES:
+                raise BackupError(f"the {image} container never became ready")
+            time.sleep(1)
+
+        # The roles are not in the dump — no dump holds them — so the procedure creates them first.
+        _docker(
+            "exec",
+            "-i",
+            name,
+            "psql",
+            "--quiet",
+            "-U",
+            "postgres",
+            "-d",
+            "talent",
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-v",
+            f"app_password={password}",
+            "-f",
+            "-",
+            stdin=roles.read_bytes(),
+        )
+        _docker(
+            "exec",
+            "-i",
+            name,
+            "psql",
+            "--quiet",
+            "-U",
+            "postgres",
+            "-d",
+            "talent",
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-c",
+            "DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'talent_owner') "
+            "THEN CREATE ROLE talent_owner LOGIN SUPERUSER; END IF; END $$",
+        )
+        _docker(
+            "exec",
+            "-i",
+            name,
+            "pg_restore",
+            "-U",
+            "postgres",
+            "-d",
+            "talent",
+            "--exit-on-error",
+            stdin=dump_path.read_bytes(),
+        )
+
+        def ask(query: str) -> str:
+            return (
+                _docker("exec", name, "psql", "-U", "postgres", "-d", "talent", "-tAc", query)
+                .decode("utf-8", "replace")
+                .strip()
+            )
+
+        result: dict[str, Any] = {
+            "restored_into": f"{image} container, built from nothing",
+            "seconds": round((datetime.now(UTC) - started).total_seconds(), 1),
+            "candidates": int(ask("SELECT count(*) FROM core.candidate") or 0),
+            "alembic_revision": ask("SELECT version_num FROM alembic_version"),
+            "grants_to_the_app_role": int(ask(_GRANT_COUNT) or 0),
+            "app_can_read_candidates": ask(
+                "SELECT has_table_privilege('talent_rw', 'core.candidate', 'SELECT')"
+            )
+            == "t",
+        }
+    finally:
+        _docker("rm", "--force", name, quiet=True)
+
+    candidates = int(result["candidates"])
+    grants = int(result["grants_to_the_app_role"])
+    result["ok"] = bool(candidates > 0 and grants > 0 and result["app_can_read_candidates"])
+    if not result["ok"]:
+        raise BackupError(
+            "the dump does not stand on its own: it restored "
+            f"{result['candidates']} candidate(s) with {result['grants_to_the_app_role']} grant(s) "
+            "to the application role. Data with no grants is a platform that cannot read itself."
         )
     return result
 
@@ -352,8 +513,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     take_command.add_argument(
         "--no-verify", action="store_true", help="skip the restore check (not for scheduled runs)"
     )
-    verify = commands.add_parser("verify", help="restore a backup into a scratch database")
+    verify = commands.add_parser("verify", help="restore a backup and count what came back")
     verify.add_argument("--backup", help="which one; the newest by default")
+    verify.add_argument(
+        "--fresh",
+        action="store_true",
+        help="restore into an empty container instead of a spare database on this server",
+    )
     commands.add_parser("files", help="copy the original CVs out of the object store")
     commands.add_parser("list", help="what is in the backup directory")
     args = parser.parse_args(argv)
@@ -389,11 +555,20 @@ def main(argv: Sequence[str] | None = None) -> int:
                 chosen = dumps[0]
             else:
                 raise BackupError(f"No backup in {out}.")
+            if args.fresh:
+                fresh = check_fresh(chosen)
+                print(
+                    f"{chosen.name} restored into an empty {FRESH_IMAGE} in {fresh['seconds']}s: "
+                    f"{fresh['candidates']:,} candidates at {fresh['alembic_revision']}, "
+                    f"{fresh['grants_to_the_app_role']} grant(s) to the application role."
+                )
+                return 0
             result = check(server, tools, chosen)
             print(
                 f"{chosen.name} restored into {result['restored_into']} in {result['seconds']}s: "
                 f"{result['rows']:,} rows across {result['tables']} tables, at "
-                f"{result['alembic_revision']}."
+                f"{result['alembic_revision']}, {result['grants_to_the_app_role']} grant(s) to the "
+                "application role."
             )
             return 0
 

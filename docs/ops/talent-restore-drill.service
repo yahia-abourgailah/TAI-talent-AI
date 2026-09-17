@@ -1,0 +1,15 @@
+# Weekly proof that the newest backup can be restored onto a machine with nothing on it.
+#   sudo cp docs/ops/talent-restore-drill.* /etc/systemd/system/
+#   sudo systemctl enable --now talent-restore-drill.timer
+[Unit]
+Description=Talent Platform restore drill: rebuild the newest backup in an empty container
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+User=talent
+WorkingDirectory=/opt/talent
+EnvironmentFile=/etc/talent/backup.env
+Environment=PYTHONPATH=src
+ExecStart=/opt/talent/.venv/bin/python -m ops.backup --out ${TALENT_BACKUP_DIR} verify --fresh
+TimeoutStartSec=1800
