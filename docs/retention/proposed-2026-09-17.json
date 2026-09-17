@@ -1,0 +1,33 @@
+{
+  "version": "proposed-2026-09-17",
+  "provisional": true,
+  "source": "Proposed by the platform team. Legal and the CPO decide (OPN-07, CR-03).",
+  "note": "Periods run from the candidate's last activity: the newest of the day we recorded them, their last application, their last stage move, their last evaluation and their last consent. Nothing is erased while a candidate is still in the process.",
+  "rules": [
+    {
+      "applies_to": "no_application",
+      "months": 12,
+      "note": "Sourced from a job board or a profile; never applied to us and never gave consent. We hold data they did not hand us, so this is the shortest period."
+    },
+    {
+      "applies_to": "in_process",
+      "months": null,
+      "note": "No period: a candidate still being considered is not erased. Their clock starts on the day they are rejected, hired or withdraw."
+    },
+    {
+      "applies_to": "rejected",
+      "months": 24,
+      "note": "Long enough to approach them again for a later opening, and to answer a complaint about how they were treated."
+    },
+    {
+      "applies_to": "hired",
+      "months": 24,
+      "note": "After that the employment file in HR is the record, not this system."
+    },
+    {
+      "applies_to": "withdrawn",
+      "months": 1,
+      "note": "They asked us to stop keeping their data. The record locks the moment it is recorded; the month is only so a request recorded against the wrong person can be lifted."
+    }
+  ]
+}

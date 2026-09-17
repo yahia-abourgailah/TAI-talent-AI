@@ -145,7 +145,40 @@ back is safe to repeat.
 
 ---
 
-## 6. The API is down
+## 6. Erasing candidates whose time is up
+
+Nothing is erased today: Legal owes us the retention periods (OPN-07), and until a policy is
+activated the command refuses to run. When they answer, the periods are loaded as a version and
+put in force — they are never edited afterwards, a change is a new version.
+
+```
+PYTHONPATH=src .venv/bin/python -m ops.retention policy     --file docs/retention/<version>.json --by "<your name>" --activate
+PYTHONPATH=src .venv/bin/python -m ops.retention due         # who falls due, ids and counts
+PYTHONPATH=src .venv/bin/python -m ops.retention erase --by "<your name>"           # says what it would do
+PYTHONPATH=src .venv/bin/python -m ops.retention erase --by "<your name>" --confirm # does it
+```
+
+It runs as the owner role (`TALENT_ERASURE_DSN`), because the application role cannot erase
+anything and must not be able to. Without `--confirm` it only reports.
+
+A candidate who asks to be forgotten now, rather than waiting for their period, is done one at a
+time and recorded as a request, not as retention:
+
+```
+PYTHONPATH=src .venv/bin/python -m ops.retention erase --candidate 4821 --reason request     --by "<your name>" --confirm
+```
+
+**What erasure removes:** every field value, the original CV and the reader's answer to it, and the
+text inside an evaluation that quotes the person. **What it keeps:** the record marked erased, its
+score and tier, the steps it moved through, the consent it gave, and the erasure itself. That is
+deliberate — it honours the erasure without making last quarter's numbers a lie.
+
+It cannot be undone. Take a backup first (§5), and never erase because a record "looks wrong" —
+that is what archiving is for.
+
+---
+
+## 7. The API is down
 
 ```
 curl -s localhost:8090/health        # the process is up
@@ -154,12 +187,12 @@ docker compose logs --tail=100 api
 docker compose up -d api
 ```
 
-`readiness` failing with the database means start at §7. Failing with the file store means CV
+`readiness` failing with the database means start at §8. Failing with the file store means CV
 uploads and downloads are refused — everything else keeps working.
 
 ---
 
-## 7. The database will not start, or is out of space
+## 8. The database will not start, or is out of space
 
 ```
 docker compose logs --tail=100 postgres
@@ -172,7 +205,7 @@ before it corrupts anything, so a full disk is an outage, not a loss.
 
 ---
 
-## 8. Things you must never do
+## 9. Things you must never do
 
 - Delete candidates, fields, moves, evaluations or events. The database refuses; do not look for a
   way around it. A record that must go is archived with a reason, or erased under the retention
@@ -185,7 +218,7 @@ before it corrupts anything, so a full disk is an outage, not a loss.
 
 ---
 
-## 9. Who to call
+## 10. Who to call
 
 | Situation | Who |
 |---|---|
