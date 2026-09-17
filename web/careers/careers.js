@@ -10,7 +10,11 @@ const LABELS = {
   education: "Education", years_experience: "Years of experience",
 };
 
-const state = { job: null, wording: null, upload: null, token: null, polls: 0 };
+// How long a candidate is asked to wait before the form is theirs to fill. The reader usually
+// answers in 3-15 seconds; if it is slower than this, waiting is our problem, not theirs.
+const PATIENCE_SECONDS = 20;
+
+const state = { job: null, wording: null, upload: null, token: null, polls: 0, reading: false };
 const $ = (id) => document.getElementById(id);
 const say = (message, kind = "ok") => {
   $("message").replaceChildren(Object.assign(document.createElement("div"),
@@ -75,27 +79,57 @@ async function poll() {
   const found = await api(`/v1/public/cv-uploads/${state.upload}`, {
     headers: { "X-Upload-Token": state.token },
   });
-  if (found.status === "processing" && state.polls++ < 30) {
-    $("cv-status").textContent = `Reading it… (${state.polls})`;
-    return setTimeout(() => guard(poll), 1000);
-  }
   if (found.status === "ready" && found.fields) {
-    fillForm(found.fields);
-    $("cv-status").textContent = "Read. Please check what we got — the blue fields came from your CV.";
-  } else {
+    state.reading = false;
+    const filled = fillForm(found.fields);
+    $("cv-status").textContent = filled
+      ? "Read. Please check what we have — the highlighted boxes came from your CV."
+      : "We read it but found nothing to fill in. Please add your details below.";
+    return;
+  }
+  if (found.status === "failed") {
+    state.reading = false;
     $("cv-status").textContent =
-      "We could not read it, so please fill the form in yourself. Your CV is kept either way.";
+      "We could not read this one, so please fill the form in yourself. Your CV is kept and a " +
+      "recruiter will see it.";
+    return;
+  }
+
+  state.polls += 1;
+  if (state.polls === PATIENCE_SECONDS) {
+    // Still reading. That is our problem to wait on, not the candidate's: the form is theirs now,
+    // and if the reader answers while they are still here, the empty boxes fill themselves.
+    $("cv-status").textContent =
+      "Your CV is still being read — no need to wait. Fill the form in below and send it; we " +
+      "keep reading in the background, and anything you leave empty is filled in if it arrives.";
+    $("fields").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } else if (state.polls < PATIENCE_SECONDS) {
+    $("cv-status").textContent = `Reading it… (${state.polls}s)`;
+  }
+  if (state.polls < 180) {
+    state.reading = true;
+    setTimeout(() => guard(poll), state.polls < PATIENCE_SECONDS ? 1000 : 5000);
+  } else {
+    state.reading = false;
+    $("cv-status").textContent =
+      "Your CV has not come back. Fill the form in yourself — the file is kept, and a recruiter " +
+      "sees it either way.";
   }
 }
 
 function fillForm(fields) {
+  let filled = 0;
   for (const name of FIELDS) {
     const field = fields[name];
     const input = $(`f-${name}`);
     if (!input || !field || field.value === null || field.value === undefined) continue;
+    // Never write over what the candidate typed while they were waiting for us.
+    if (input.value.trim()) continue;
     input.value = field.value;
     input.parentElement.classList.add("prefilled");
+    filled += 1;
   }
+  return filled;
 }
 
 /* 3 · the form */
