@@ -2,6 +2,8 @@
 fields, and a disqualification only ever opens a review item. Made-up candidates; all rolled back.
 """
 
+import uuid
+
 import pytest
 from sqlalchemy import text
 
@@ -264,3 +266,62 @@ def test_a_score_on_arrival_is_an_event_and_reads_with_its_outcome(
         .all()
     )
     assert kinds == ([] if outcome == "passed" else ["negative_verdict"])
+
+
+def test_an_evaluation_can_show_the_sums_behind_its_score(api_client, make_candidate):
+    """BR-307: an old decision is explained from what was saved, not from anyone's memory.
+
+    The evaluation keeps the score, the tier and the reasons in words. The arithmetic is not kept,
+    so it is worked out again from what is recorded — and the answer says whether that still comes
+    to the same total.
+    """
+    client, connection = api_client
+    application = _apply(connection, make_candidate, PROFILE)
+    _score(connection, application["id"])
+
+    candidate = f"cand_{application['candidate_id']}"
+    evaluation = client.get(
+        f"/v1/candidates/{candidate}/evaluations", headers=sign_in(client, "ta-lead")
+    ).json()["items"][0]
+
+    explained = client.get(
+        f"/v1/evaluations/{evaluation['id']}/explanation", headers=sign_in(client, "ta-lead")
+    )
+    assert explained.status_code == 200, explained.text
+    found = explained.json()
+
+    assert found["matches_stored"] is True
+    assert found["total"] == int(evaluation["score"])
+    assert found["tier"] == evaluation["tier"]
+    # The parts add up to the total, with whatever the criteria applied without a number of its own.
+    assert (
+        sum(part["points"] for part in found["parts"]) + found["other_adjustments"]
+        == found["total"]
+    )
+    assert {part["part"] for part in found["parts"]} >= {"location_score", "education_score"}
+    assert found["signals"], "a score says what earned it"
+
+
+def test_the_explanation_says_when_the_record_has_changed_since(api_client, make_candidate):
+    """A corrected field gives a different total today. The stored score stays the decision."""
+    client, connection = api_client
+    headers = sign_in(client, "ta-lead")
+    application = _apply(connection, make_candidate, PROFILE)
+    _score(connection, application["id"])
+    candidate = f"cand_{application['candidate_id']}"
+    evaluation = client.get(f"/v1/candidates/{candidate}/evaluations", headers=headers).json()[
+        "items"
+    ][0]
+
+    # Somebody checks the location and finds it wrong: not Cairo at all.
+    corrected = client.post(
+        f"/v1/candidates/{candidate}/fields/location/verification",
+        json={"value": "Alexandria"},
+        headers={**headers, "Idempotency-Key": str(uuid.uuid4())},
+    )
+    assert corrected.status_code == 201, corrected.text
+
+    found = client.get(f"/v1/evaluations/{evaluation['id']}/explanation", headers=headers).json()
+    assert found["matches_stored"] is False
+    assert found["stored_score"] == evaluation["score"]
+    assert found["total"] != evaluation["score"]

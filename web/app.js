@@ -363,19 +363,27 @@ async function openCandidate(id) {
       table(["field", "value", "where it came from", "checked", ""], fields, "Nothing recorded."),
       el("h2", {}, "Evaluations"),
       table(
-        ["evaluation", "score", "tier", "outcome", "flags", "when"],
+        ["evaluation", "score", "tier", "outcome", "why it scored that", "when", ""],
         (evaluations.items || []).map((row) => ({
           cells: [
             row.id,
             text(row.score),
             el("span", { class: "pill info" }, text(row.tier)),
             text(row.outcome),
-            (row.flags || []).join("; ") || "—",
+            el("span", {},
+              ...(row.signals || []).map((signal) =>
+                el("span", { class: "pill", style: "margin:0 4px 4px 0" }, signal)),
+              ...(row.flags || []).map((flag) =>
+                el("span", { class: "pill bad", style: "margin:0 4px 4px 0" }, flag)),
+              (row.signals || []).length || (row.flags || []).length ? null : "—"
+            ),
             when(row.evaluated_at || row.recorded_at),
+            el("button", { onclick: () => guard(() => explainScore(row.id)) }, "Show the sums"),
           ],
         })),
         "Not scored yet: scoring happens when the candidate is added to a requisition."
-      )
+      ),
+      el("div", { id: "explanation" })
     )
   );
 }
@@ -420,6 +428,45 @@ async function typeInCandidate() {
       "typed-in candidate before anyone contacts them.");
   await listCandidates();
   await openCandidate(created.id);
+}
+
+async function explainScore(evaluationId) {
+  const found = await api(`/v1/evaluations/${evaluationId}/explanation`);
+  const rows = found.parts.map((part) => ({
+    cells: [part.says, el("span", { class: "mono" }, part.points > 0 ? `+${part.points}` : part.points)],
+  }));
+  rows.push({
+    cells: [
+      "Other bonuses and penalties the criteria apply",
+      el("span", { class: "mono" },
+        found.other_adjustments > 0 ? `+${found.other_adjustments}` : found.other_adjustments),
+    ],
+  });
+  rows.push({
+    cells: [
+      el("b", {}, `Total (tier ${found.tier})`),
+      el("b", { class: "mono" }, String(found.total)),
+    ],
+  });
+  $("explanation").replaceChildren(
+    el("div", { class: "card" },
+      el("h2", { style: "margin-top:0" }, `How ${evaluationId} reached ${found.total}`),
+      el("p", { class: "muted", style: "margin-top:0" },
+        `Criteria ${found.criteria_version}, ${found.track} track. ` +
+        (found.matches_stored
+          ? "Run again just now over what is recorded, and it comes to the same as the score on " +
+            "record."
+          : `The score on record is ${text(found.stored_score)}: a field has been corrected ` +
+            "since, so today's values give a different total. The record keeps the decision that " +
+            "was made with what we knew then.")),
+      found.disqualified
+        ? el("p", {}, el("span", { class: "pill bad" }, "disqualified"), " ",
+            found.disqualify_reason || "")
+        : null,
+      table(["what the criteria weighed", "points"], rows, "")
+    )
+  );
+  $("explanation").scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 async function applyCandidate(candidateId) {

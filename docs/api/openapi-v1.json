@@ -1355,6 +1355,114 @@
         "title": "EventPage",
         "type": "object"
       },
+      "ExplanationOut": {
+        "properties": {
+          "criteria_version": {
+            "title": "Criteria Version",
+            "type": "string"
+          },
+          "disqualified": {
+            "title": "Disqualified",
+            "type": "boolean"
+          },
+          "disqualify_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disqualify Reason"
+          },
+          "evaluation_id": {
+            "title": "Evaluation Id",
+            "type": "string"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Flags",
+            "type": "array"
+          },
+          "matches_stored": {
+            "title": "Matches Stored",
+            "type": "boolean"
+          },
+          "other_adjustments": {
+            "title": "Other Adjustments",
+            "type": "integer"
+          },
+          "parts": {
+            "items": {
+              "$ref": "#/components/schemas/ScorePartOut"
+            },
+            "title": "Parts",
+            "type": "array"
+          },
+          "signals": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Signals",
+            "type": "array"
+          },
+          "stored_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stored Score"
+          },
+          "stored_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stored Tier"
+          },
+          "tier": {
+            "title": "Tier",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "track": {
+            "title": "Track",
+            "type": "string"
+          }
+        },
+        "required": [
+          "evaluation_id",
+          "criteria_version",
+          "track",
+          "stored_score",
+          "stored_tier",
+          "parts",
+          "other_adjustments",
+          "total",
+          "tier",
+          "disqualified",
+          "disqualify_reason",
+          "signals",
+          "flags",
+          "matches_stored"
+        ],
+        "title": "ExplanationOut",
+        "type": "object"
+      },
       "FieldCheckIn": {
         "properties": {
           "value": {
@@ -2727,6 +2835,29 @@
           "next_cursor"
         ],
         "title": "ReviewItemPage",
+        "type": "object"
+      },
+      "ScorePartOut": {
+        "properties": {
+          "part": {
+            "title": "Part",
+            "type": "string"
+          },
+          "points": {
+            "title": "Points",
+            "type": "integer"
+          },
+          "says": {
+            "title": "Says",
+            "type": "string"
+          }
+        },
+        "required": [
+          "part",
+          "says",
+          "points"
+        ],
+        "title": "ScorePartOut",
         "type": "object"
       },
       "StageCountsOut": {
@@ -4806,6 +4937,54 @@
           }
         ],
         "summary": "Get Evaluation",
+        "tags": [
+          "evaluations"
+        ]
+      }
+    },
+    "/v1/evaluations/{evaluation_id}/explanation": {
+      "get": {
+        "description": "Where the score came from, part by part.\n\nThe evaluation keeps the score, the tier and the reasons in words; the arithmetic behind them\nis not kept, so the same criteria version is run again over what is recorded about the\ncandidate now. Nothing is written. When a field has been corrected since, the total here will\ndiffer from the stored one and `matches_stored` says so: the score on record was reached with\nwhat we knew then, and it stays the decision.",
+        "operationId": "explain_evaluation_v1_evaluations__evaluation_id__explanation_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "evaluation_id",
+            "required": true,
+            "schema": {
+              "title": "Evaluation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExplanationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error: see the code (API plan section 5)"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Explain Evaluation",
         "tags": [
           "evaluations"
         ]

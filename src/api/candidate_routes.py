@@ -28,6 +28,7 @@ from importer.blobs import BlobStore
 from intake import manual
 from intake.files import EXTENSION
 from pipeline.access import actor_from_principal, reader_from_principal
+from scoring.explain import explain
 
 router = APIRouter(prefix="/v1")
 
@@ -81,6 +82,30 @@ class EvaluationOut(BaseModel):
     flags: list[str]
     evaluated_at: Timestamp | None
     recorded_at: Timestamp
+
+
+class ScorePartOut(BaseModel):
+    part: str
+    says: str
+    points: int
+
+
+class ExplanationOut(BaseModel):
+    evaluation_id: str
+    criteria_version: str
+    track: str
+    stored_score: float | None
+    stored_tier: str | None
+    parts: list[ScorePartOut]
+    other_adjustments: int
+    total: int
+    tier: str
+    disqualified: bool
+    disqualify_reason: str | None
+    signals: list[str]
+    flags: list[str]
+    # False when the record has changed since: the stored score was reached with what we knew then.
+    matches_stored: bool
 
 
 class EvaluationList(BaseModel):
@@ -200,6 +225,35 @@ def get_evaluation(evaluation_id: str, principal: Signed, conn: Db) -> Evaluatio
     """One evaluation, with everything needed to explain it (BR-307, CR-04)."""
     actor = reader_from_principal(principal)
     return _evaluation(reads.get_evaluation(conn, actor, decode("evaluation", evaluation_id)))
+
+
+@router.get("/evaluations/{evaluation_id}/explanation", tags=["evaluations"])
+def explain_evaluation(evaluation_id: str, principal: Signed, conn: Db) -> ExplanationOut:
+    """Where the score came from, part by part.
+
+    The evaluation keeps the score, the tier and the reasons in words; the arithmetic behind them
+    is not kept, so the same criteria version is run again over what is recorded about the
+    candidate now. Nothing is written. When a field has been corrected since, the total here will
+    differ from the stored one and `matches_stored` says so: the score on record was reached with
+    what we knew then, and it stays the decision.
+    """
+    actor = reader_from_principal(principal)
+    evaluation = reads.get_evaluation(conn, actor, decode("evaluation", evaluation_id))
+    candidate = reads.get_candidate(conn, actor, int(evaluation["candidate_id"]))
+    # The reads layer hands back one row per field, each with where it came from.
+    values = {str(row["field"]): row["value"] for row in candidate["fields"]}
+    try:
+        found = explain(values, str(evaluation["criteria_version_id"]), reads.track(evaluation))
+    except KeyError as unknown:
+        raise ApiError(409, "no_scorer", str(unknown)) from None
+    stored = reads.score(evaluation)
+    return ExplanationOut(
+        evaluation_id=encode("evaluation", evaluation["id"]),
+        stored_score=stored,
+        stored_tier=evaluation["tier"],
+        matches_stored=stored is not None and int(stored) == found.total,
+        **found.as_dict(),
+    )
 
 
 class CandidateSearchIn(BaseModel):

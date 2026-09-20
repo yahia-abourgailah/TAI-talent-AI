@@ -74,6 +74,7 @@ The `/v1` surface below is **built and frozen** (week 4). From here on it change
 | GET | `/v1/candidates`, `/v1/candidates/{candidate_id}` | Candidates in scope; one candidate with where each field came from |
 | POST | `/v1/candidates/search` | Find candidates by name, email or phone, sent in the body |
 | GET | `/v1/candidates/{candidate_id}/evaluations`, `/v1/evaluations/{evaluation_id}` | Evaluations and the reasons behind them |
+| GET | `/v1/evaluations/{evaluation_id}/explanation` | Where the score came from, part by part: the same criteria version run again over what is recorded, with `matches_stored` when a field has been corrected since (BR-307, CR-04) |
 | GET | `/v1/events` | The event feed (section 7) |
 | POST | `/v1/candidates` | Week 5. A candidate typed in by a recruiter: manual, unchecked, with the recruiter's name |
 | POST | `/v1/candidates/{candidate_id}/fields/{field}/verification` | Week 5. A person checked one field: a new verified row, and the old row stays |
