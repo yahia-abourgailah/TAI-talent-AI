@@ -289,12 +289,16 @@ async function openCandidate(id) {
         ? el("span", { class: "pill" }, "not recorded")
         : text(field.value),
       text(field.source),
+      // The API calls it "verification"; reading the wrong key is how a checked field goes on
+      // looking unchecked, and a button that worked looks like a button that did nothing.
       el(
         "span",
-        { class: `pill ${field.verification_status === "verified" ? "ok" : "warn"}` },
-        text(field.verification_status, "unchecked")
+        { class: `pill ${field.verification === "verified" ? "ok" : "warn"}` },
+        field.verification === "verified"
+          ? `checked by ${text(field.verified_by, "a person")}`
+          : text(field.verification, "unchecked")
       ),
-      field.state === "not_recorded" || field.verification_status === "verified"
+      field.state === "not_recorded" || field.verification === "verified"
         ? ""
         : el("span", { class: "row" },
             el("button", { onclick: () => guard(() => checkField(id, name, null)) }, "Correct"),
