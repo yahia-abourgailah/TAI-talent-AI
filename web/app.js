@@ -66,11 +66,12 @@ const text = (value, fallback = "—") =>
 const when = (value) => (value ? new Date(value).toLocaleString() : "—");
 
 function say(message, kind = "ok") {
-  // The banner lives at the top of the page and the tables are long: an answer nobody can see is
-  // the same as no answer, which is how "nothing happened" gets reported for a button that worked.
+  // The banner lives at the top and the tables run well past it. An error has to be seen, so it
+  // brings the reader up; a success must not, or every click throws them out of the row they were
+  // working in — which is worse than not seeing "checked" confirmed.
   $("message").replaceChildren(el("div", { class: `msg ${kind}` }, message));
-  $("message").scrollIntoView({ behavior: "smooth", block: "nearest" });
-  if (kind === "ok") setTimeout(() => $("message").replaceChildren(), 4000);
+  if (kind === "err") $("message").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  else setTimeout(() => $("message").replaceChildren(), 4000);
 }
 
 /* --- talking to the API ------------------------------------------------------------------- */
@@ -381,7 +382,10 @@ async function checkField(candidateId, field, current) {
           ? " Nothing is left unchecked, so the review item closed itself."
           : "")
   );
+  // Stay where they were: checking a field is a row of work, not a reason to lose your place.
+  const where = window.scrollY;
   await openCandidate(candidateId);
+  window.scrollTo({ top: where });
 }
 
 async function typeInCandidate() {
