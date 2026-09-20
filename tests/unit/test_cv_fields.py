@@ -5,7 +5,7 @@ from datetime import date
 
 import pytest
 
-from intake.answer import AnswerUnreadable, language_of, parse_answer
+from intake.answer import AnswerField, AnswerUnreadable, OcrAnswer, language_of, parse_answer
 from intake.cv_fields import STORED_FIELDS, map_answer, tidy_digits, tidy_phone
 from intake.fake_ocr import sample_answer
 
@@ -156,3 +156,36 @@ def test_languages_and_digits():
     assert language_of("+20 100") is None
     assert tidy_digits("٢٠٢٣ ۱۲") == "2023 12"
     assert tidy_phone("0020 100-000-0001") == tidy_phone("+20 1000000001") == "1000000001"
+
+
+def test_an_age_that_would_have_them_working_as_a_child_is_not_recorded():
+    """A CV whose newest degree is recent and whose career is long: the arithmetic gives an age
+    that cannot be true, so no age is recorded rather than a wrong one (BR-703, OPN-02)."""
+    answer = OcrAnswer(
+        schema="test",
+        document={},
+        fields={
+            "education": AnswerField(text="MBA, Marketing"),
+            "graduation_year": AnswerField(text="2025"),
+            "years_experience": AnswerField(text="19", inference="inferred"),
+        },
+    )
+    fields = map_answer(answer, date(2026, 9, 20)).by_name()
+    assert fields["years_experience"].value == "19"
+    assert fields["age"].value is None
+    assert fields["age"].status == "not_recorded"
+
+
+def test_an_age_the_arithmetic_can_support_is_still_recorded():
+    answer = OcrAnswer(
+        schema="test",
+        document={},
+        fields={
+            "education": AnswerField(text="B.Sc. in Computer Science"),
+            "graduation_year": AnswerField(text="2006"),
+            "years_experience": AnswerField(text="19", inference="inferred"),
+        },
+    )
+    fields = map_answer(answer, date(2026, 9, 20)).by_name()
+    assert fields["age"].value == "42"
+    assert fields["age"].inference == "inferred"

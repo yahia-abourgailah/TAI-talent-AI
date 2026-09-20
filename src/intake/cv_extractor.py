@@ -16,8 +16,11 @@ are the platform's, not the service's:
   * the newest job is the current one, so experience[0] gives the title and the employer;
   * the service gives each job's dates and never a total, so the years are added up here
     (intake.experience) and marked **inferred**: it is our arithmetic, not the candidate's word;
-  * education[0] gives the degree, and its year is the graduation year — nothing else is inferred
-    here, and the age rule stays where it is (intake.cv_fields, OPN-02);
+  * education[0] gives the degree — the newest is the highest;
+  * the graduation year is the **earliest** year any degree was finished: a master's ten years
+    later does not change when somebody left university, and that is what the age rule works
+    from (intake.cv_fields, OPN-02). A degree written as a range ("October2023 - December 2025")
+    is finished in the last year it names;
   * `address` is the candidate's location as written: never translated, never re-spelled;
   * a LinkedIn link, if there is one, is the profile;
   * the language of each value is read from its letters, because the service does not say.
@@ -28,6 +31,8 @@ and a CV is never marked safe on silence. This is the first question for the OCR
 """
 
 import json
+import re
+from datetime import date
 from typing import Any
 
 from intake.answer import (
@@ -40,6 +45,13 @@ from intake.answer import (
 from intake.experience import total_years
 
 SCHEMA = "cv-extractor/1.0.0"
+EARLIEST_DEGREE = 1950
+CURRENT_YEAR = date.today().year
+_YEAR = re.compile(r"(?:19|20)\d{2}")
+_OTHER_DIGITS = "".join(chr(0x0660 + i) for i in range(10)) + "".join(
+    chr(0x06F0 + i) for i in range(10)
+)
+_DIGITS = str.maketrans(_OTHER_DIGITS, "0123456789" * 2)
 PROFILE_SOURCES = ("linkedin", "github", "portfolio", "website")
 MAX_TEXT = 2000
 
@@ -78,6 +90,35 @@ def _profile(links: Any) -> AnswerField | None:
     return None
 
 
+def _finished_in(written: str) -> int | None:
+    """The year a degree was finished, from however the CV wrote it. A range ends when it ends."""
+    years = [int(found) for found in _YEAR.findall(written.translate(_DIGITS))]
+    inside = [year for year in years if EARLIEST_DEGREE <= year <= CURRENT_YEAR + 6]
+    return max(inside) if inside else None
+
+
+def _graduation_year(education: Any) -> AnswerField | None:
+    """When they left university: the earliest degree finished, not the newest.
+
+    Someone who took an MBA in 2025 did not graduate in 2025, and the age worked out from that
+    year would make a career of twenty years look like a career of one (OPN-02).
+    """
+    if not isinstance(education, list):
+        return None
+    finished = [
+        year
+        for year in (
+            _finished_in(str(entry.get("year") or ""))
+            for entry in education
+            if isinstance(entry, dict)
+        )
+        if year is not None
+    ]
+    if not finished:
+        return None
+    return AnswerField(text=str(min(finished)), language=None, inference="stated")
+
+
 def _years(experience: Any) -> AnswerField | None:
     """How long they have worked, added up from the jobs' own dates. Never a guess: when no job's
     dates can be read, there is no total and the field is not recorded (BR-703)."""
@@ -102,7 +143,7 @@ def translate(payload: dict[str, Any]) -> OcrAnswer:
         "current_title": _field(newest_job.get("role")),
         "current_employer": _field(newest_job.get("company")),
         "education": _field(newest_study.get("degree")),
-        "graduation_year": _field(newest_study.get("year")),
+        "graduation_year": _graduation_year(payload.get("education")),
         "profile_url": _profile(payload.get("links")),
         "years_experience": _years(payload.get("experience")),
     }

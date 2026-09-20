@@ -14,7 +14,8 @@ language it was written in. The rules:
                     is no age.
   Inferred          A value worked out rather than read says so. Age comes from, in order: the age
                     the CV states (stated); the date of birth (inferred); the graduation year, with
-                    the criteria's own rule (inferred, OPN-02). Years of experience are added up
+                    the criteria's own rule (inferred, OPN-02) — and never when the answer would
+                    have them working before they were 16. Years of experience are added up
                     from the jobs' own dates when the CV gives no total (inferred; the reader says
                     which). Nothing else is inferred.
 
@@ -65,6 +66,9 @@ TEXT_FIELDS = frozenset(
 )
 
 MIN_AGE, MAX_AGE = 14, 90
+# Nobody starts a career younger than this. An age worked out from a degree that leaves less than
+# this between being born and the first job is an artefact of the arithmetic, not an age.
+MIN_WORKING_AGE = 16
 MAX_YEARS_EXPERIENCE = 60
 EARLIEST_GRADUATION = 1950
 
@@ -220,6 +224,15 @@ def map_answer(answer: OcrAnswer, today: date) -> Mapped:
             worked_out_age = _age_from_graduation(int(graduation), education)
             if worked_out_age is not None and MIN_AGE <= worked_out_age <= MAX_AGE:
                 age = float(worked_out_age)
+    if (
+        age is not None
+        and age_inference == INFERRED
+        and years is not None
+        and age - years < MIN_WORKING_AGE
+    ):
+        # Someone with twenty years behind them did not graduate last year, whatever the CV says
+        # about their latest degree. We do not know their age, so we do not record one (BR-703).
+        age = None
     values["age"] = as_field("age", age, age_inference)
 
     mapped.fields = [values[name] for name in STORED_FIELDS]

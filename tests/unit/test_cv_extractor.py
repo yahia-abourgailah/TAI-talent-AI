@@ -122,3 +122,37 @@ def test_jobs_with_dates_nobody_can_read_leave_no_total():
         {"name": "Made Up Person", "experience": [{"role": "Agent", "duration": "a while"}]}
     )
     assert "years_experience" not in answer.fields
+
+
+def test_the_graduation_year_is_the_earliest_degree_however_it_is_written():
+    """A real CV: an MBA written as a range, and the first degree as a bare year."""
+    answer = translate(
+        {
+            "name": "Made Up Person",
+            "education": [
+                {"degree": "MBA, Marketing", "year": "October2023 - December 2025"},
+                {"degree": "B.Sc. in Computer Science", "year": "2006"},
+            ],
+        }
+    )
+    assert answer.fields["graduation_year"].text == "2006"
+    assert answer.fields["education"].text == "MBA, Marketing", "the newest degree is the highest"
+
+
+@pytest.mark.parametrize(
+    ("written", "year"),
+    [
+        ("2016 - 2020", "2020"),
+        ("Sep 2016 to Jun 2020", "2020"),
+        ("2020", "2020"),
+        ("٢٠٢٠", "2020"),
+    ],
+)
+def test_one_degree_is_finished_in_the_last_year_it_names(written, year):
+    answer = translate({"education": [{"degree": "B.Sc.", "year": written}]})
+    assert answer.fields["graduation_year"].text == year
+
+
+def test_a_degree_with_no_year_leaves_no_graduation_year():
+    answer = translate({"education": [{"degree": "B.Sc.", "year": "first class honours"}]})
+    assert "graduation_year" not in answer.fields
