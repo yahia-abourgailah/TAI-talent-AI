@@ -12,6 +12,7 @@ for every grouping and date range. Everything rolls back.
 import pytest
 from sqlalchemy import text
 
+from candidates.archive import archive_candidate
 from pipeline.access import Actor
 from pipeline.store import create_application, create_opening, move_application
 from reports import ReportRefused
@@ -198,3 +199,39 @@ def test_contactability_of_all_candidates_is_reported_beside_volume(conn, world)
     everyone = report["all_candidates"]
     assert everyone["candidates"] >= 5
     assert everyone["contactable"] >= 2
+
+
+def test_a_record_that_was_put_away_is_not_counted(conn, world, make_candidate):
+    """Archiving is how a record that should not be there is taken out of the work (BR-205).
+    A report that still counts it reports work nobody did."""
+    before = _report(conn, world)["all"]
+    counted = conn.execute(
+        text("SELECT a.candidate_id FROM pipeline.application a WHERE a.opening_id = :o LIMIT 1"),
+        {"o": world["one"]["id"]},
+    ).scalar_one()
+
+    archive_candidate(conn, int(counted), "Test data (Q-13)", "integration-test")
+
+    after = _report(conn, world)["all"]
+    assert after["applications"] == before["applications"] - 1
+    assert after["candidates"] == before["candidates"] - 1
+
+
+def test_a_candidate_who_asked_us_to_stop_is_not_counted(conn, world):
+    """A locked record is out of every working view, and a count is a view (BR-504)."""
+    before = _report(conn, world)["all"]
+    counted = conn.execute(
+        text("SELECT a.candidate_id FROM pipeline.application a WHERE a.opening_id = :o LIMIT 1"),
+        {"o": world["two"]["id"]},
+    ).scalar_one()
+    conn.execute(
+        text(
+            "INSERT INTO core.consent_withdrawal "
+            "(candidate_id, asked_how, asked_at, recorded_by) "
+            "VALUES (:c, 'phone', clock_timestamp(), 'integration-test')"
+        ),
+        {"c": counted},
+    )
+
+    after = _report(conn, world)["all"]
+    assert after["applications"] == before["applications"] - 1

@@ -10,6 +10,9 @@ Monday, UTC), under the channel of the capture it was made from:
     recruiter_typed   typed in by a recruiter
     scraped_import    migrated from TAI_Master: every one of these was found by the scrapers
 
+Archived and locked records are left out: a count is a view, and those are out of the working
+views everywhere else.
+
 The migrated rows all carry the week they were imported, not the week they were scraped. The
 scrapers still feed the sheet, not the platform, so the scraped count per week comes from the
 sheet's own Date Added column when a workbook is given (`scraped_by_sheet`). That is the
@@ -40,7 +43,11 @@ _ARRIVALS = text(
            EXISTS (SELECT 1 FROM core.consent k WHERE k.candidate_id = c.id) AS applied
     FROM core.candidate c
     JOIN raw.capture m ON m.id = c.capture_id
-    WHERE (CAST(:from AS timestamptz) IS NULL OR c.created_at >= :from)
+    -- Put away or locked is out of the work, so out of the count too (BR-205, BR-504).
+    WHERE c.archived_at IS NULL
+      AND NOT EXISTS (SELECT 1 FROM core.consent_withdrawal w
+                      WHERE w.candidate_id = c.id AND w.lifted_at IS NULL)
+      AND (CAST(:from AS timestamptz) IS NULL OR c.created_at >= :from)
       AND (CAST(:to AS timestamptz) IS NULL OR c.created_at < :to)
     """
 )

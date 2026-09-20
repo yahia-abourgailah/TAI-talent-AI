@@ -82,6 +82,16 @@
             "title": "Allowed Transitions",
             "type": "array"
           },
+          "arrived_from": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArrivedFromOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "candidate_id": {
             "title": "Candidate Id",
             "type": "string"
@@ -301,6 +311,58 @@
           "note"
         ],
         "title": "ArrivalsOut",
+        "type": "object"
+      },
+      "ArrivedFromOut": {
+        "description": "How this application reached us (BR-602).\n\n`job_post`     through a published link: the channel and code say which one.\n`careers_page` on our own page, with no link.\n`recruiter`    nobody applied — a recruiter put this candidate on this requisition.",
+        "properties": {
+          "channel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "source": {
+            "enum": [
+              "job_post",
+              "careers_page",
+              "recruiter"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "tracking_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tracking Code"
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "title": "ArrivedFromOut",
         "type": "object"
       },
       "AssessmentOut": {
