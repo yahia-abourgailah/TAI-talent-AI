@@ -12,8 +12,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api.app import create_app
+from candidates.archive import archive_candidate
 from config import Settings
 from pipeline.dev_candidate import create_demo_candidate
+
+from .conftest import sign_in
 
 FORWARD = (
     "new",
@@ -342,3 +345,49 @@ def test_reference_reasons_come_from_the_list_in_force(api):
     assert "withdrew_other" in {reason["code"] for reason in rejection.json()["items"]}
     override = client.get("/v1/reference/reasons", params={"kind": "override"}, headers=headers)
     assert override.json()["items"] == []
+
+
+def test_an_archived_candidates_application_leaves_the_working_list(api_client, make_candidate):
+    """Archiving puts a record away with a reason (BR-205). An application nobody should be
+    working is not part of a working list, so the filter follows the candidate."""
+    client, connection = api_client
+    headers = sign_in(client, "ta-lead")
+    opening = client.post(
+        "/v1/requisitions",
+        json={
+            "brand": "Made Up Brand",
+            "department": "Sales",
+            "track": "A",
+            "headcount": 1,
+            "team": "team-a",
+            "title": "Sales Agent",
+        },
+        headers={**headers, "Idempotency-Key": str(uuid.uuid4())},
+    ).json()
+
+    applications = {}
+    for name in ("Stays In Play", "Put Away"):
+        candidate = make_candidate(connection, full_name=name)
+        answer = client.post(
+            "/v1/applications",
+            json={"requisition_id": opening["id"], "candidate_id": f"cand_{candidate}"},
+            headers={**headers, "Idempotency-Key": str(uuid.uuid4())},
+        )
+        assert answer.status_code == 201, answer.text
+        applications[name] = (candidate, answer.json()["id"])
+
+    put_away, hidden = applications["Put Away"]
+    archive_candidate(connection, put_away, "A test record, not a person", "integration-test")
+
+    working = {
+        row["id"]
+        for row in client.get(
+            "/v1/applications", params={"archived": "false"}, headers=headers
+        ).json()["items"]
+    }
+    assert applications["Stays In Play"][1] in working
+    assert hidden not in working
+
+    # Asked for, they are still there: archiving hides nothing from someone looking for it.
+    every = {row["id"] for row in client.get("/v1/applications", headers=headers).json()["items"]}
+    assert hidden in every

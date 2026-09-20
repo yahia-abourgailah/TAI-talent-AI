@@ -3466,6 +3466,24 @@
               ],
               "title": "Owner Id"
             }
+          },
+          {
+            "description": "Follows the candidate: false leaves out archived candidates' applications",
+            "in": "query",
+            "name": "archived",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Follows the candidate: false leaves out archived candidates' applications",
+              "title": "Archived"
+            }
           }
         ],
         "responses": {

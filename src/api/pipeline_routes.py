@@ -388,6 +388,12 @@ def list_applications(
     requisition_id: Annotated[str | None, Query(max_length=40)] = None,
     stage: Annotated[str | None, Query(pattern=r"^[a-z][a-z_]{0,39}$")] = None,
     owner_id: Annotated[str | None, Query(max_length=200)] = None,
+    archived: Annotated[
+        bool | None,
+        Query(
+            description="Follows the candidate: false leaves out archived candidates' applications"
+        ),
+    ] = None,
 ) -> ApplicationPage:
     """Applications in your scope, newest first: your own, or all of them for a TA lead."""
     rows = store.list_applications(
@@ -398,6 +404,7 @@ def list_applications(
         opening_id=decode_filter("requisition", "requisition_id", requisition_id),
         stage=stage,
         owner=owner_id,
+        archived=archived,
     )
     allowed = store.allowed_moves(conn)
     return ApplicationPage(

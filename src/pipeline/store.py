@@ -288,14 +288,24 @@ def list_applications(
     opening_id: int | None = None,
     stage: str | None = None,
     owner: str | None = None,
+    archived: bool | None = None,
 ) -> list[dict[str, Any]]:
-    """Newest first, ids below `before`, filtered by opening, current step or owner."""
+    """Newest first, ids below `before`, filtered by opening, current step or owner.
+
+    `archived` follows the candidate: archiving one puts them away with a reason (BR-205), and an
+    application nobody should be working is not part of a working list. Left out, both are listed.
+    """
     return run(
         conn,
         text(
             f"""
             SELECT {_APPLICATION} FROM pipeline.application_state
             WHERE {not_locked("application_state.candidate_id")}
+              AND (CAST(:archived AS boolean) IS NULL OR EXISTS (
+                SELECT 1 FROM core.candidate c
+                WHERE c.id = application_state.candidate_id
+                  AND (c.archived_at IS NOT NULL) = :archived
+              ))
               AND (:sees_all OR owner_recruiter = :subject)
               AND (CAST(:before AS bigint) IS NULL OR id < :before)
               AND (CAST(:opening AS bigint) IS NULL OR opening_id = :opening)
@@ -310,6 +320,7 @@ def list_applications(
             "opening": opening_id,
             "stage": stage,
             "owner": owner,
+            "archived": archived,
             **actor.scope(),
         },
     )

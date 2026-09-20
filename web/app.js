@@ -196,7 +196,7 @@ async function loadRequisitions() {
 async function openRequisition(id) {
   const [requisition, applications] = await Promise.all([
     api(`/v1/requisitions/${id}`),
-    api(`/v1/applications?requisition_id=${id}&limit=50`),
+    api(`/v1/applications?requisition_id=${id}&limit=50&archived=false`),
   ]);
   $("requisition-detail").replaceChildren(
     el("div", { class: "card" },
@@ -523,7 +523,9 @@ async function withdrawCandidate(candidateId) {
 
 async function loadApplications() {
   const stage = $("p-stage").value;
-  const page = await api(`/v1/applications?limit=50${stage ? `&stage=${stage}` : ""}`);
+  const page = await api(
+    `/v1/applications?limit=50&archived=false${stage ? `&stage=${stage}` : ""}`
+  );
   $("applications").replaceChildren(
     table(
       ["application", "candidate", "requisition", "stage", "since", "outcome"],

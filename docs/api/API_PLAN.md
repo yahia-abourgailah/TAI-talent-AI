@@ -274,6 +274,7 @@ All endpoints need a bearer token, and results are filtered to the caller's scop
 
 - `GET /v1/candidates` returns summaries. Filters: `requisition_id`, `owner_id`.
 - `GET /v1/candidates/{candidate_id}` returns every field with its source and verification (BR-201, BR-202). A field nobody recorded is `{"value": null, "state": "not_recorded"}`; the API never fills in a guess (BR-703).
+- `GET /v1/applications` takes `archived=true|false`, following the candidate: archiving a candidate puts their applications out of the working list too, because an application nobody should be working is not part of one.
 - `GET /v1/candidates` takes `archived=true|false`: a record archived with a reason (BR-205) is out of the way, and a list that still shows it has not put anything away. Left out entirely, both are listed.
 - `GET /v1/candidates` takes `source` (repeatable): `tai_master`, `cv_upload`, `manual_entry`, `public_apply`. `?source=cv_upload&source=public_apply` is everyone who has arrived since the migration, without the 5,140 that came from the sheet — which is what a recruiter's working list usually means. A source nobody records is a 400, not an empty page.
 - `GET /v1/candidates` carries `full_name` on each row — the name as it stands, so a list says who each row is about. It is the only value a list holds: a field with where it came from and whether anyone checked it comes from fetching the one candidate.
