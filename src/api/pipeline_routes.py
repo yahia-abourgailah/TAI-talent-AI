@@ -10,7 +10,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Header, Query, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.engine import Connection
 
 from api import idempotency
@@ -131,6 +131,19 @@ class RequisitionIn(BaseModel):
     title: Text | None = None
     location: Text | None = None
     public: bool = False
+    # How a candidate for this job is judged. `sales` is the criteria version, as always. `other`
+    # is judged against `description`, by reading the CV against it, for a person to act on — and
+    # a job of that kind must say what it asks for (BR-305).
+    job_type: Literal["sales", "other"] = "sales"
+    description: Annotated[str, Field(min_length=40, max_length=8000)] | None = None
+
+    @model_validator(mode="after")
+    def _other_jobs_say_what_they_ask_for(self) -> "RequisitionIn":
+        if self.job_type == "other" and not (self.description or "").strip():
+            raise ValueError(
+                "a job that is not sales needs a description: it is what the CV is read against"
+            )
+        return self
 
 
 class CloseRequisitionIn(BaseModel):
@@ -155,6 +168,8 @@ class RequisitionOut(BaseModel):
     title: str | None
     location: str | None
     public: bool
+    job_type: str
+    description: str | None
 
 
 class RequisitionPage(BaseModel):
@@ -181,6 +196,8 @@ def _requisition(row: Mapping[str, Any]) -> RequisitionOut:
         title=row["title"],
         location=row["location"],
         public=row["public"],
+        job_type=row["job_type"],
+        description=row["description"],
     )
 
 
@@ -207,6 +224,8 @@ def create_requisition(
             title=body.title,
             location=body.location,
             public=body.public,
+            job_type=body.job_type,
+            description=body.description,
         )
         return _requisition(row)
 

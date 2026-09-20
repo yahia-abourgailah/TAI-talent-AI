@@ -65,6 +65,14 @@ class BorderlineOut(BaseModel):
     tier_below: str
 
 
+class AssessmentOut(BaseModel):
+    """A CV read against one job by the model (BR-305). No tier: an AI never sets one (BR-306)."""
+
+    evaluation_id: str
+    application_id: str | None
+    score: int | None
+
+
 class CandidateReviewItemOut(BaseModel):
     id: str
     kind: str
@@ -74,6 +82,7 @@ class CandidateReviewItemOut(BaseModel):
     reason_code: str
     reason: str
     borderline: BorderlineOut | None = None
+    assessment: AssessmentOut | None = None
     proposed_by: str
     proposed_at: Timestamp
     resolution: CandidateResolutionOut | None
@@ -107,11 +116,19 @@ def _item(row: Mapping[str, Any]) -> CandidateReviewItemOut:
             evidence=list(row["match_evidence"] or []),
         )
     borderline = None
-    if row.get("evaluation_id") is not None:
+    if row["kind"] == "borderline_score" and row.get("evaluation_id") is not None:
         borderline = BorderlineOut(
             evaluation_id=encode("evaluation", row["evaluation_id"]),
             tier_above=row["tier_above"],
             tier_below=row["tier_below"],
+        )
+    assessment = None
+    if row["kind"] == "ai_assessment" and row.get("evaluation_id") is not None:
+        assessed = row.get("assessed_application_id")
+        assessment = AssessmentOut(
+            evaluation_id=encode("evaluation", row["evaluation_id"]),
+            application_id=None if assessed is None else encode("application", assessed),
+            score=None if row.get("assessed_score") is None else int(row["assessed_score"]),
         )
     return CandidateReviewItemOut(
         id=encode("review_item", row["id"]),
@@ -122,6 +139,7 @@ def _item(row: Mapping[str, Any]) -> CandidateReviewItemOut:
         reason_code=row["reason_code"],
         reason=reason_text(dict(row)),
         borderline=borderline,
+        assessment=assessment,
         proposed_by=row["proposed_by"],
         proposed_at=row["proposed_at"],
         resolution=resolution,
@@ -137,7 +155,11 @@ def list_candidate_review_items(
     status: Annotated[Literal["open", "resolved"], Query()] = "open",
     kind: Annotated[
         Literal[
-            "flagged_document", "unverified_candidate", "possible_duplicate", "borderline_score"
+            "flagged_document",
+            "unverified_candidate",
+            "possible_duplicate",
+            "borderline_score",
+            "ai_assessment",
         ]
         | None,
         Query(),

@@ -24,6 +24,7 @@ KINDS = (
     "unverified_candidate",
     "possible_duplicate",
     "borderline_score",
+    "ai_assessment",
 )
 
 # What a recruiter reads, by kind and reason code. A proposed rejection names the reason from the
@@ -55,6 +56,10 @@ KIND_TEXT: dict[str, str] = {
     "unverified_candidate": "The candidate's details are not checked yet.",
     "possible_duplicate": "This may be the same person as another record.",
     "borderline_score": "The score is close to a tier line.",
+    "ai_assessment": (
+        "A CV was read against what this job asks for. Read it and decide; nothing was decided "
+        "for you."
+    ),
 }
 
 
@@ -63,6 +68,17 @@ def reason_text(item: dict[str, Any]) -> str:
     if kind == "proposed_rejection":
         label = item.get("rejection_label")
         return f"The scoring proposes a rejection: {label}." if label else KIND_TEXT[kind]
+    if kind == "ai_assessment":
+        score = item.get("assessed_score")
+        if score is None:
+            return (
+                "A CV needs reading against what this job asks for: nothing usable came back. "
+                "Read it yourself."
+            )
+        return (
+            f"A CV was read against what this job asks for and came out at {int(score)} out of "
+            "100. Read it and decide; nothing was decided for you."
+        )
     if kind == "borderline_score":
         return (
             f"The score is close to a tier line, between {item['tier_above']} and "
@@ -72,12 +88,15 @@ def reason_text(item: dict[str, Any]) -> str:
 
 
 _OPEN = f"""
-    SELECT r.id, r.kind, r.reason_code, c.id AS candidate_id, r.application_id, r.evaluation_id,
-           r.tier_above, r.tier_below, r.proposed_by, r.proposed_at, rr.label AS rejection_label
+    SELECT r.id, r.kind, r.reason_code, c.id AS candidate_id,
+           coalesce(r.application_id, e.application_id) AS application_id, r.evaluation_id,
+           r.tier_above, r.tier_below, e.score AS assessed_score,
+           r.proposed_by, r.proposed_at, rr.label AS rejection_label
     FROM pipeline.review_item r
     LEFT JOIN pipeline.application a ON a.id = r.application_id
     -- items written before migration 0010 carry their candidate only through the application
     JOIN core.candidate c ON c.id = coalesce(r.candidate_id, a.candidate_id)
+    LEFT JOIN core.evaluation e ON e.id = r.evaluation_id
     LEFT JOIN pipeline.rejection_reason rr
       ON rr.list_version = r.list_version AND rr.code = r.reason_code
     WHERE NOT EXISTS (SELECT 1 FROM pipeline.review_resolution x WHERE x.review_item_id = r.id)

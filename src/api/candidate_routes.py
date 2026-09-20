@@ -68,10 +68,14 @@ class CandidateOut(BaseModel):
 class EvaluationOut(BaseModel):
     id: str
     candidate_id: str
+    # The application this reading was made for, when it was made for one: an AI assessment reads
+    # a CV against one job's description, and says nothing about any other job (BR-305).
+    application_id: str | None = None
     criteria_version: str
     origin: str
     model_version: str | None
     prompt_version: str | None
+    # entry, headhunt, or not_applicable for an assessment, which is on neither track.
     track: str
     outcome: str
     score: float | None
@@ -137,6 +141,11 @@ def _evaluation(row: dict[str, Any]) -> EvaluationOut:
     return EvaluationOut(
         id=encode("evaluation", row["id"]),
         candidate_id=encode("candidate", row["candidate_id"]),
+        application_id=(
+            None
+            if row.get("application_id") is None
+            else encode("application", row["application_id"])
+        ),
         criteria_version=row["criteria_version_id"],
         origin=row["origin"],
         model_version=row["model_version"],

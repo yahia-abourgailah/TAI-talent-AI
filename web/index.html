@@ -53,7 +53,19 @@
         <div><label for="r-location">Location</label><input id="r-location" value="New Cairo"></div>
         <div><label for="r-public">On the careers page</label>
           <select id="r-public"><option value="true">yes</option><option value="false">no</option></select></div>
+        <div><label for="r-jobtype">Kind of job</label>
+          <select id="r-jobtype">
+            <option value="sales">sales — scored by the criteria</option>
+            <option value="other">other — the CV is read against the description</option>
+          </select></div>
         <div><button class="primary" id="r-create">Create</button></div>
+      </div>
+      <div id="r-description-row" class="hidden">
+        <label for="r-description">What the job asks for</label>
+        <textarea id="r-description" rows="4" placeholder="3+ years of Python, models in production, a degree in computer science…"></textarea>
+        <p class="muted">A job that is not sales is not scored by the sales criteria. Each CV is
+          read against these words by the company's own model, and what comes back is an opinion
+          for you to read — never a tier, never a rejection.</p>
       </div>
     </div>
     <div class="card scroll" id="requisitions"></div>
@@ -134,6 +146,7 @@
           <option value="unverified_candidate">typed in by hand</option>
           <option value="possible_duplicate">possible duplicate</option>
           <option value="borderline_score">borderline score</option>
+          <option value="ai_assessment">CV read against a job</option>
         </select></div>
         <div><button id="q-reload">Reload</button></div>
       </div>

@@ -38,6 +38,7 @@ QueueKind = Literal[
     "unverified_candidate",
     "possible_duplicate",
     "borderline_score",
+    "ai_assessment",
 ]
 
 
@@ -98,13 +99,15 @@ def _line(row: dict[str, Any]) -> QueueItemOut:
     item_id = encode("review_item", row["id"])
     application = row["application_id"]
     borderline = None
-    if row["evaluation_id"] is not None:
+    if row["kind"] == "borderline_score" and row["evaluation_id"] is not None:
         borderline = QueueBorderlineOut(
             evaluation_id=encode("evaluation", row["evaluation_id"]),
             tier_above=row["tier_above"],
             tier_below=row["tier_below"],
         )
-    path = "review-items" if application is not None else "candidate-review-items"
+    # A proposed rejection is resolved on its application; every other kind is resolved on the
+    # candidate, even an assessment, which names the application it was about but is not one.
+    path = "review-items" if row["kind"] == "proposed_rejection" else "candidate-review-items"
     return QueueItemOut(
         id=item_id,
         kind=KIND_OUT.get(row["kind"], row["kind"]),

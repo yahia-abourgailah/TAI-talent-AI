@@ -45,6 +45,7 @@ CRM = "the CRM webhook (ids and codes only)"
 REDIS = "Redis (queue and limits, no candidate data)"
 IDENTITY = "the company identity provider (staff sign-in, no candidate)"
 ALERTS = "the alert chat webhook (counts and job kinds only)"
+MODEL = "the company language model (a CV and a job description, on our own host)"
 OWN_API = "our own API, from an operator's tool"
 NOWHERE = "nothing: signs development tokens locally"
 
@@ -54,6 +55,7 @@ ALLOWED: dict[str, dict[str, str]] = {
     "infra/probes.py": {"boto3": OBJECT_STORAGE, "botocore": OBJECT_STORAGE, "redis": REDIS},
     "infra/dev_storage.py": {"botocore": OBJECT_STORAGE},
     "intake/ocr_http.py": {"httpx": OCR},
+    "assess/model.py": {"httpx": MODEL},
     "integrations/webhooks.py": {"httpx": CRM},
     "auth/oidc.py": {"urllib.request": IDENTITY, "jwt": IDENTITY},
     "auth/dev_identity.py": {"jwt": NOWHERE},
@@ -64,7 +66,7 @@ ALLOWED: dict[str, dict[str, str]] = {
 # Packages in pyproject that can reach the network, and why each is there.
 ALLOWED_DEPENDENCIES = {
     "boto3": OBJECT_STORAGE,
-    "httpx": f"{OCR}; {CRM}; {ALERTS}",
+    "httpx": f"{OCR}; {CRM}; {ALERTS}; {MODEL}",
     "pyjwt": IDENTITY,
     "redis": REDIS,
 }

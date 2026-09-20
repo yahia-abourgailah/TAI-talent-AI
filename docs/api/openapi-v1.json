@@ -303,6 +303,44 @@
         "title": "ArrivalsOut",
         "type": "object"
       },
+      "AssessmentOut": {
+        "description": "A CV read against one job by the model (BR-305). No tier: an AI never sets one (BR-306).",
+        "properties": {
+          "application_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Application Id"
+          },
+          "evaluation_id": {
+            "title": "Evaluation Id",
+            "type": "string"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          }
+        },
+        "required": [
+          "evaluation_id",
+          "application_id",
+          "score"
+        ],
+        "title": "AssessmentOut",
+        "type": "object"
+      },
       "Body_upload_cv_v1_public_cv_uploads_post": {
         "properties": {
           "file": {
@@ -534,6 +572,16 @@
       },
       "CandidateReviewItemOut": {
         "properties": {
+          "assessment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssessmentOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "borderline": {
             "anyOf": [
               {
@@ -1152,6 +1200,17 @@
       },
       "EvaluationOut": {
         "properties": {
+          "application_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Application Id"
+          },
           "call_priority": {
             "anyOf": [
               {
@@ -2411,11 +2470,33 @@
             "title": "Department",
             "type": "string"
           },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 8000,
+                "minLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
           "headcount": {
             "exclusiveMinimum": 0.0,
             "maximum": 10000.0,
             "title": "Headcount",
             "type": "integer"
+          },
+          "job_type": {
+            "default": "sales",
+            "enum": [
+              "sales",
+              "other"
+            ],
+            "title": "Job Type",
+            "type": "string"
           },
           "location": {
             "anyOf": [
@@ -2545,12 +2626,27 @@
             "title": "Department",
             "type": "string"
           },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
           "headcount": {
             "title": "Headcount",
             "type": "integer"
           },
           "id": {
             "title": "Id",
+            "type": "string"
+          },
+          "job_type": {
+            "title": "Job Type",
             "type": "string"
           },
           "location": {
@@ -2613,7 +2709,9 @@
           "closed_by",
           "title",
           "location",
-          "public"
+          "public",
+          "job_type",
+          "description"
         ],
         "title": "RequisitionOut",
         "type": "object"
@@ -3951,7 +4049,8 @@
                     "flagged_document",
                     "unverified_candidate",
                     "possible_duplicate",
-                    "borderline_score"
+                    "borderline_score",
+                    "ai_assessment"
                   ],
                   "type": "string"
                 },
@@ -6535,7 +6634,8 @@
                     "flagged_document",
                     "unverified_candidate",
                     "possible_duplicate",
-                    "borderline_score"
+                    "borderline_score",
+                    "ai_assessment"
                   ],
                   "type": "string"
                 },

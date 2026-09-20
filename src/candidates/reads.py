@@ -45,7 +45,8 @@ VISIBLE = f"""
 """
 
 _EVALUATION = (
-    "e.id, e.candidate_id, e.criteria_version_id, e.origin, e.score, e.tier, e.recommendation, "
+    "e.id, e.candidate_id, e.application_id, e.criteria_version_id, e.origin, e.score, e.tier, "
+    "e.recommendation, "
     "e.call_priority, e.signals, e.flags, e.flags_text, e.model_version, e.prompt_version, "
     "e.evaluated_at, e.recorded_at"
 )
@@ -170,7 +171,13 @@ def get_evaluation(conn: Connection, actor: Actor, evaluation_id: int) -> dict[s
 
 def outcome(evaluation: dict[str, Any]) -> str:
     """failed_gate when a disqualification is recorded, otherwise passed. A failed gate is never a
-    rejection: a person confirms it (BR-405)."""
+    rejection: a person confirms it (BR-405).
+
+    An assessment of a job that is not sales passes no gate and fails none: no rules ran, so
+    "passed" would be a verdict nobody reached (BR-305, BR-703).
+    """
+    if evaluation.get("origin") == "ai":
+        return "not_applicable"
     flags = evaluation.get("flags") or []
     flagged = any(str(flag).startswith("DISQUALIFIED") for flag in flags)
     return (
@@ -181,7 +188,13 @@ def outcome(evaluation: dict[str, Any]) -> str:
 
 
 def track(evaluation: dict[str, Any]) -> str:
-    """Track B verdicts carry T tiers (replay.mapping.track)."""
+    """Track B verdicts carry T tiers (replay.mapping.track).
+
+    An assessment of a job that is not sales is on neither track: no rules ran, so there is no
+    track to name and none is invented (BR-703).
+    """
+    if evaluation.get("origin") == "ai":
+        return "not_applicable"
     return "headhunt" if str(evaluation.get("tier") or "").upper().startswith("T") else "entry"
 
 

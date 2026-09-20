@@ -35,6 +35,8 @@ GOOD = {
     "TALENT_CRM_WEBHOOK_URL": "https://crm.example.com/hook",
     "TALENT_CRM_WEBHOOK_SECRET": SECRET,
     "TALENT_ALERT_WEBHOOK_URL": "https://chat.internal/hook",
+    "TALENT_VLLM_BASE_URL": "https://vllm.internal/v1",
+    "TALENT_VLLM_API_KEY": SECRET,
 }
 
 
@@ -53,6 +55,8 @@ def test_a_complete_production_configuration_passes():
         ({"TALENT_AUTH_MODE": "dev"}, "TALENT_AUTH_MODE"),
         ({"TALENT_OIDC_ISSUER": ""}, "TALENT_OIDC_ISSUER"),
         ({"TALENT_OCR_MODE": "fake"}, "TALENT_OCR_MODE"),
+        # A CV to a model over plain http is a CV on the wire (CR-01).
+        ({"TALENT_VLLM_BASE_URL": "http://vllm.internal/v1"}, "TALENT_VLLM_BASE_URL"),
         ({"TALENT_OCR_BASE_URL": ""}, "TALENT_OCR_BASE_URL"),
         ({"TALENT_CORS_ORIGINS": ""}, "TALENT_CORS_ORIGINS"),
         ({"TALENT_CORS_ORIGINS": "*"}, "TALENT_CORS_ORIGINS"),
@@ -177,3 +181,13 @@ def test_no_dsn_at_all_says_which_setting_is_missing():
 
     (finding,) = database_findings({})
     assert (finding.level, finding.setting) == (ERROR, "TALENT_DB_DSN")
+
+
+def test_no_model_is_a_warning_not_a_failure():
+    """A job that is not sales then waits for a person, which is a working state, not a broken
+    one (BR-305)."""
+    findings = check(
+        {**GOOD, "TALENT_VLLM_BASE_URL": "", "TALENT_VLLM_API_KEY": ""}, api_bind="127.0.0.1"
+    )
+    assert "TALENT_VLLM_BASE_URL" not in _errors({**GOOD, "TALENT_VLLM_BASE_URL": ""})
+    assert any(f.setting == "TALENT_VLLM_BASE_URL" and f.level == WARN for f in findings)

@@ -68,6 +68,17 @@ class Settings(BaseSettings):
     crm_webhook_url: str = ""
     crm_webhook_secret: SecretStr = SecretStr("")
 
+    # Reading a CV against a job that the criteria version cannot score (BR-305). The company's
+    # language model, on the same host as the CV reader, so nothing leaves (CR-01). Empty means a
+    # job of kind "other" cannot be assessed, and its applications wait for a person instead.
+    vllm_base_url: str = ""
+    vllm_api_key: SecretStr = SecretStr("")
+    vllm_model: str = "gemma-4"
+    vllm_timeout_seconds: float = Field(default=60.0, gt=0, le=300)
+    # One assessment at a time: the model serves the chatbots too, and a hiring assessment is never
+    # worth slowing down a customer conversation (NFR-01).
+    vllm_max_concurrency: int = Field(default=1, ge=1, le=8)
+
     # Reading CVs (NFR-01, NFR-04). Unset means the fake OCR in dev and the real API elsewhere.
     # The limits are safe defaults until the OCR team gives its real numbers.
     ocr_mode: OcrMode | None = None
@@ -82,6 +93,14 @@ class Settings(BaseSettings):
         if self.ocr_mode is not None:
             return self.ocr_mode
         return OcrMode.FAKE if self.env is Environment.DEV else OcrMode.API
+
+    @model_validator(mode="after")
+    def _check_model_host(self) -> Self:
+        if self.vllm_base_url:
+            parts = urlsplit(self.vllm_base_url)
+            if parts.scheme not in {"http", "https"} or not parts.hostname:
+                raise ValueError("TALENT_VLLM_BASE_URL must be an http or https URL.")
+        return self
 
     @model_validator(mode="after")
     def _check_ocr(self) -> Self:

@@ -15,7 +15,7 @@ from pipeline.access import Actor, NotFound, NotPermitted, Refused, not_locked, 
 _OPENING = (
     "id, brand, department, track, headcount, status, owner_recruiter, team, "
     "criteria_version_id, created_at, created_by, closed_at, closed_reason, closed_by, "
-    "title, location, public"
+    "title, location, public, job_type, description"
 )
 _APPLICATION = (
     "id, opening_id, candidate_id, owner_recruiter, team, reopens_application_id, created_at, "
@@ -108,8 +108,16 @@ def create_opening(
     title: str | None = None,
     location: str | None = None,
     public: bool = False,
+    job_type: str = "sales",
+    description: str | None = None,
 ) -> dict[str, Any]:
-    """Uses the criteria version given, or the one in force when none is given."""
+    """Uses the criteria version given, or the one in force when none is given.
+
+    `job_type` decides how a candidate for it is judged: `sales` by the criteria version, as
+    always; `other` by its own description, read against the CV, for a person to act on. A job of
+    kind `other` must say what it asks for — the database insists, because an assessment nobody
+    can check against the job is not evidence of anything (BR-305).
+    """
     owner = owner_recruiter or actor.subject
     if not actor.sees_all and owner != actor.subject:
         raise NotPermitted("A recruiter creates requisitions they own.")
@@ -119,9 +127,9 @@ def create_opening(
             f"""
             INSERT INTO pipeline.opening
               (brand, department, track, headcount, owner_recruiter, team, criteria_version_id,
-               created_by, title, location, public)
+               created_by, title, location, public, job_type, description)
             SELECT :brand, :department, :track, :headcount, :owner, :team, cv.id, :by,
-                   :title, :location, :public
+                   :title, :location, :public, :job_type, :description
             FROM (
               SELECT id FROM core.criteria_version
               WHERE CASE WHEN CAST(:criteria AS text) IS NULL THEN effective_from <= current_date
@@ -143,6 +151,8 @@ def create_opening(
             "title": title,
             "location": location,
             "public": public,
+            "job_type": job_type,
+            "description": description,
         },
     )
     if not rows:
@@ -384,6 +394,60 @@ def propose_rejection(
             "VALUES (:application, :reason, :by) RETURNING id"
         ),
         {"application": application_id, "reason": reason_code, "by": proposed_by},
+    )
+    return int(row["id"])
+
+
+REVIEW_KIND_AI = "ai_assessment"
+AI_REASON = "needs_a_person"
+
+
+def open_ai_review_item(
+    conn: Connection, application_id: int, evaluation_id: int | None, proposed_by: str
+) -> int | None:
+    """A CV read against a job, waiting for a person (BR-305, CR-05).
+
+    The item is about the candidate, like every kind that is not a proposed rejection, and is
+    served on /v1/candidate-review-items; which job was read is on the evaluation it points at.
+
+    One open item per application: a retry, or the same CV read again, does not stack another line
+    on somebody's queue. `evaluation_id` is None when there was nothing usable to attach — the CV
+    still goes to a person, with no score beside it, and then one open item per candidate is as
+    close as we can get, because nothing records which job that one was about.
+    """
+    open_already = conn.execute(
+        text(
+            """
+            SELECT r.id FROM pipeline.review_item r
+            LEFT JOIN core.evaluation e ON e.id = r.evaluation_id
+            WHERE r.kind = :kind
+              AND r.candidate_id = (SELECT candidate_id FROM pipeline.application WHERE id = :app)
+              AND (e.application_id = :app OR (CAST(:evaluation AS bigint) IS NULL
+                                               AND r.evaluation_id IS NULL))
+              AND NOT EXISTS (
+                SELECT 1 FROM pipeline.review_resolution x WHERE x.review_item_id = r.id
+              )
+            """
+        ),
+        {"app": application_id, "kind": REVIEW_KIND_AI, "evaluation": evaluation_id},
+    ).first()
+    if open_already is not None:
+        return None
+    (row,) = run(
+        conn,
+        text(
+            "INSERT INTO pipeline.review_item "
+            "(kind, candidate_id, evaluation_id, reason_code, proposed_by) "
+            "SELECT :kind, a.candidate_id, :evaluation, :reason, :by "
+            "FROM pipeline.application a WHERE a.id = :app RETURNING id"
+        ),
+        {
+            "kind": REVIEW_KIND_AI,
+            "app": application_id,
+            "evaluation": evaluation_id,
+            "reason": AI_REASON,
+            "by": proposed_by,
+        },
     )
     return int(row["id"])
 

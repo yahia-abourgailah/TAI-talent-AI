@@ -16,6 +16,8 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import DBAPIError
 
+from assess.worker import JOB_KIND as ASSESS_APPLICATION
+from assess.worker import handle as assess_application
 from importer.tai_master import JOB_KIND as TAI_MASTER_IMPORT
 from importer.tai_master import handle as import_tai_master
 from intake import reading
@@ -26,6 +28,7 @@ from scoring.platform import handle as score_application
 HANDLERS: dict[str, Handler] = {
     TAI_MASTER_IMPORT: import_tai_master,
     SCORE_APPLICATION: score_application,
+    ASSESS_APPLICATION: assess_application,
     reading.JOB_KIND: reading.handle,
 }
 

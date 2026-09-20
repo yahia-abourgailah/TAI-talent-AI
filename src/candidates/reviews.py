@@ -5,6 +5,8 @@
   unverified_candidate  a candidate typed in by hand, not yet checked.
   possible_duplicate    two records the matcher believes are one person.
   borderline_score      an evaluation close to a tier line, naming the tiers either side (BR-310).
+  ai_assessment         a CV read against a job that is not sales, waiting for a person (BR-305).
+                        It names the evaluation, which names the application it was made for.
 
 They share pipeline.review_item with proposed rejections but are served on their own path
 (/v1/candidate-review-items), because they carry no application. Scope follows the candidate:
@@ -20,7 +22,13 @@ from sqlalchemy.engine import Connection
 from candidates.reads import VISIBLE
 from pipeline.access import Actor, NotFound, Refused, run
 
-KINDS = ("flagged_document", "unverified_candidate", "possible_duplicate", "borderline_score")
+KINDS = (
+    "flagged_document",
+    "unverified_candidate",
+    "possible_duplicate",
+    "borderline_score",
+    "ai_assessment",
+)
 REVIEW_ITEM_NOT_FOUND = "Review item not found."
 
 _ITEMS = f"""
@@ -28,6 +36,7 @@ _ITEMS = f"""
            r.proposed_at, x.outcome AS resolution, x.reason AS resolution_reason,
            x.resolved_by, x.resolved_at,
            r.evaluation_id, r.tier_above, r.tier_below,
+           e.application_id AS assessed_application_id, e.score AS assessed_score,
            r.match_id, m.strength AS match_strength, m.evidence AS match_evidence,
            CASE WHEN m.lower_id = r.candidate_id THEN m.higher_id ELSE m.lower_id END
              AS match_other_candidate_id
@@ -35,6 +44,7 @@ _ITEMS = f"""
     JOIN core.candidate c ON c.id = r.candidate_id
     LEFT JOIN pipeline.review_resolution x ON x.review_item_id = r.id
     LEFT JOIN core.candidate_match m ON m.id = r.match_id
+    LEFT JOIN core.evaluation e ON e.id = r.evaluation_id
     WHERE r.kind IN {tuple(KINDS)!r} AND {VISIBLE}
 """
 

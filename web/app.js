@@ -175,7 +175,7 @@ async function loadRequisitions() {
   const page = await api("/v1/requisitions?limit=50");
   $("requisitions").replaceChildren(
     table(
-      ["id", "title", "brand", "department", "track", "status", "on the page"],
+      ["id", "title", "brand", "department", "track", "kind", "status", "on the page"],
       page.items.map((row) => ({
         cells: [
           row.id,
@@ -183,6 +183,7 @@ async function loadRequisitions() {
           row.brand,
           row.department,
           row.track,
+          row.job_type === "other" ? "other" : "sales",
           el("span", { class: `pill ${row.status === "open" ? "ok" : ""}` }, row.status),
           row.public ? "yes" : "no",
         ],
@@ -203,7 +204,12 @@ async function openRequisition(id) {
       el("h2", { style: "margin-top:0" }, `${text(requisition.title)} · ${requisition.id}`),
       el("p", { class: "muted" },
         `${requisition.brand} · ${requisition.department} · track ${requisition.track} · ` +
-        `${requisition.headcount} to hire · owner ${text(requisition.owner_id)}`),
+        `${requisition.headcount} to hire · owner ${text(requisition.owner_id)} · ` +
+        `${requisition.job_type === "other" ? "not sales: CVs are read against the description"
+                                            : "sales: scored by the criteria"}`),
+      requisition.description
+        ? el("p", { class: "muted", style: "white-space:pre-wrap" }, text(requisition.description))
+        : null,
       el("div", { class: "row" },
         el("button", { onclick: () => guard(() => makeJobPost(id)) }, "New job post link"),
         requisition.status === "open"
@@ -366,10 +372,17 @@ async function openCandidate(id) {
         ["evaluation", "score", "tier", "outcome", "why it scored that", "when", ""],
         (evaluations.items || []).map((row) => ({
           cells: [
-            row.id,
+            row.origin === "ai"
+              ? el("span", {}, row.id, " ",
+                  el("span", { class: "pill info" }, "read by the model"))
+              : row.id,
             text(row.score),
-            el("span", { class: "pill info" }, text(row.tier)),
-            text(row.outcome),
+            // An assessment carries no tier and never will: BR-306 keeps that a person's decision.
+            row.origin === "ai"
+              ? el("span", { class: "muted" }, "—")
+              : el("span", { class: "pill info" }, text(row.tier)),
+            row.origin === "ai" ? el("span", { class: "muted" }, "for a person to decide")
+                                : text(row.outcome),
             el("span", {},
               ...(row.signals || []).map((signal) =>
                 el("span", { class: "pill", style: "margin:0 4px 4px 0" }, signal)),
@@ -378,7 +391,10 @@ async function openCandidate(id) {
               (row.signals || []).length || (row.flags || []).length ? null : "—"
             ),
             when(row.evaluated_at || row.recorded_at),
-            el("button", { onclick: () => guard(() => explainScore(row.id)) }, "Show the sums"),
+            row.origin === "ai"
+              ? el("span", { class: "muted" },
+                  `${text(row.model_version)} · ${text(row.application_id)}`)
+              : el("button", { onclick: () => guard(() => explainScore(row.id)) }, "Show the sums"),
           ],
         })),
         "Not scored yet: scoring happens when the candidate is added to a requisition."
@@ -761,11 +777,16 @@ $("r-create").addEventListener("click", () =>
       team: $("r-team").value.trim(),
       location: $("r-location").value.trim() || null,
       public: $("r-public").value === "true",
+      job_type: $("r-jobtype").value,
+      description: $("r-description").value.trim() || null,
     };
     const created = await api("/v1/requisitions", { method: "POST", idempotent: true, body });
     say(`Created ${created.id}.`);
     await loadRequisitions();
   })
+);
+$("r-jobtype").addEventListener("change", () =>
+  $("r-description-row").classList.toggle("hidden", $("r-jobtype").value !== "other")
 );
 $("c-search").addEventListener("click", () => guard(searchCandidates));
 $("n-create").addEventListener("click", () => guard(typeInCandidate));

@@ -14,6 +14,7 @@
 |---|---|---|---|---|
 | **Object storage** | The original CVs and submissions (BR-107) | Yes, inside our network | `TALENT_BLOB_ENDPOINT` | `src/importer/blobs.py`, `src/infra/probes.py`, `src/infra/dev_storage.py` |
 | **The OCR host** | Reading CVs | Yes, on our own host (CR-01) | `TALENT_OCR_BASE_URL` | `src/intake/ocr_http.py` |
+| **The company language model** | Reading a CV against a job that the criteria version cannot score (BR-305) | Yes, on the same host as the OCR, inside the company (CR-01) | `TALENT_VLLM_BASE_URL` | `src/assess/model.py` |
 | **The CRM webhook** | Telling the dashboard something happened | Ids and codes only | `TALENT_CRM_WEBHOOK_URL` | `src/integrations/webhooks.py` |
 | **Redis** | Queue and limits | No | `TALENT_REDIS_URL` | `src/infra/probes.py` |
 | **The company identity provider** | Staff sign-in: discovery and signing keys | No. Our own people's accounts, never a candidate's | `TALENT_OIDC_ISSUER` | `src/auth/oidc.py` |
@@ -57,3 +58,21 @@ Once the machine exists:
 | From | To | Denied attempts | Log kept at |
 |---|---|---|---|
 | — | — | — | — |
+
+## What the model is sent, and what it is not
+
+A CV read against a job is the one place a candidate's words are given to a language model. What
+goes: the job's own description, and the CV as the reader extracted it — title, employer, years,
+education, location, and the CV's text. What does not: the candidate's **name**, and nothing about
+age, sex, marital status, nationality, religion or a photograph is asked for or weighed (CR-07).
+The name is withheld rather than merely forbidden, because the surest way to keep something out of
+an answer is not to send it.
+
+It runs on `vllm.addressinv.com` — the same machine as the CV reader, inside the company — so this
+is not an outside AI service and CR-01 holds. Nothing from an answer is logged, and the answer
+itself is kept as it came.
+
+The model serves the chatbots too, so the platform asks for one assessment at a time with a
+timeout, and waits rather than queueing behind itself (NFR-01). **It never decides anything**: the
+score cannot become a tier, the database refuses to store one on an AI evaluation, and a person
+reads every assessment before anything happens (BR-306, CR-05).
