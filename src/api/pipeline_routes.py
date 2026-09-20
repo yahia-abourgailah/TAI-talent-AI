@@ -333,6 +333,20 @@ class ApplicationIn(BaseModel):
     owner_id: Text | None = None
 
 
+class ArrivedFromOut(BaseModel):
+    """How this application reached us (BR-602).
+
+    `job_post`     through a published link: the channel and code say which one.
+    `careers_page` on our own page, with no link.
+    `recruiter`    nobody applied — a recruiter put this candidate on this requisition.
+    """
+
+    source: Literal["job_post", "careers_page", "recruiter"]
+    channel: str | None = None
+    tracking_code: str | None = None
+    label: str | None = None
+
+
 class ApplicationOut(BaseModel):
     id: str
     requisition_id: str
@@ -348,6 +362,7 @@ class ApplicationOut(BaseModel):
     allowed_transitions: list[str]
     created_at: Timestamp
     created_by: str
+    arrived_from: ArrivedFromOut | None = None
 
 
 class ApplicationPage(BaseModel):
@@ -382,6 +397,21 @@ class TransitionHistory(BaseModel):
     items: list[TransitionOut]
 
 
+def _arrived_from(row: Mapping[str, Any]) -> ArrivedFromOut:
+    if row.get("tracking_code"):
+        return ArrivedFromOut(
+            source="job_post",
+            # A code whose job post has been read back gives the channel; a code from a post we
+            # cannot find is still the code the candidate arrived with, and is shown as it is.
+            channel=row.get("arrival_channel"),
+            tracking_code=row["tracking_code"],
+            label=row.get("arrival_label"),
+        )
+    if row.get("applied_themselves"):
+        return ArrivedFromOut(source="careers_page")
+    return ArrivedFromOut(source="recruiter")
+
+
 def _application(row: Mapping[str, Any], allowed: Mapping[str, list[str]]) -> ApplicationOut:
     reopens = row["reopens_application_id"]
     return ApplicationOut(
@@ -399,6 +429,7 @@ def _application(row: Mapping[str, Any], allowed: Mapping[str, list[str]]) -> Ap
         allowed_transitions=[] if row["outcome"] else allowed.get(row["current_step"], []),
         created_at=row["created_at"],
         created_by=row["created_by"],
+        arrived_from=_arrived_from(row),
     )
 
 

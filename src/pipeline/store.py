@@ -20,7 +20,18 @@ _OPENING = (
 )
 _APPLICATION = (
     "id, opening_id, candidate_id, owner_recruiter, team, reopens_application_id, created_at, "
-    "created_by, current_step, moves, step_since, step_by, outcome"
+    "created_by, current_step, moves, step_since, step_by, outcome, "
+    # Where this application came from (BR-602). The consent the candidate gave carries the job
+    # post's code when they arrived through a link; a job post carries the channel it was made
+    # for. No consent at all means nobody applied: a recruiter put them on this requisition.
+    "(SELECT k.tracking_code FROM core.consent k "
+    " WHERE k.application_id = application_state.id ORDER BY k.id LIMIT 1) AS tracking_code, "
+    "(SELECT p.channel FROM core.consent k JOIN pipeline.job_post p ON p.code = k.tracking_code "
+    " WHERE k.application_id = application_state.id ORDER BY k.id LIMIT 1) AS arrival_channel, "
+    "(SELECT p.label FROM core.consent k JOIN pipeline.job_post p ON p.code = k.tracking_code "
+    " WHERE k.application_id = application_state.id ORDER BY k.id LIMIT 1) AS arrival_label, "
+    "EXISTS (SELECT 1 FROM core.consent k WHERE k.application_id = application_state.id) "
+    "  AS applied_themselves"
 )
 _MOVE = (
     "id, sequence, list_version, from_step, to_step, reason_code, actor_kind, moved_by, moved_at"

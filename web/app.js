@@ -307,11 +307,12 @@ async function openRequisition(id) {
       ),
       el("h2", {}, `Applications (${applications.items.length})`),
       table(
-        ["application", "candidate", "stage", "outcome"],
+        ["application", "candidate", "where it came from", "stage", "outcome"],
         applications.items.map((row) => ({
           cells: [
             row.id,
             candidateCell(row.candidate_id),
+            arrivedFrom(row),
             row.current_stage,
             text(row.outcome),
           ],
@@ -375,6 +376,20 @@ async function closeRequisition(id) {
   await api(`/v1/requisitions/${id}/close`, { method: "POST", body: { reason } });
   say("Closed.");
   await loadRequisitions();
+}
+
+// Where an application came from (BR-602): the job post's channel when there was a link, our own
+// page when they applied without one, and a recruiter when nobody applied at all.
+function arrivedFrom(row) {
+  const came = row.arrived_from;
+  if (!came) return el("span", { class: "muted" }, "—");
+  if (came.source === "job_post") {
+    return el("span", { title: came.label || came.tracking_code },
+      el("span", { class: "pill ok" }, came.channel || "job post"), " ",
+      el("span", { class: "mono muted" }, came.tracking_code));
+  }
+  if (came.source === "careers_page") return el("span", { class: "pill" }, "careers page");
+  return el("span", { class: "pill warn" }, "added by a recruiter");
 }
 
 /* --- candidates --------------------------------------------------------------------------- */
@@ -730,7 +745,8 @@ async function loadApplications() {
   );
   $("applications").replaceChildren(
     table(
-      ["application", "candidate", "requisition", "stage", "since", "outcome"],
+      ["application", "candidate", "requisition", "where it came from", "stage", "since",
+       "outcome"],
       page.items.map((row) => ({
         cells: [
           row.id,
@@ -740,6 +756,7 @@ async function loadApplications() {
             guard(() => openCandidate(row.candidate_id));
           }),
           row.requisition_id,
+          arrivedFrom(row),
           el("span", { class: "pill info" }, row.current_stage),
           when(row.stage_since),
           text(row.outcome),
@@ -767,6 +784,11 @@ async function openApplication(id) {
       el("p", { class: "muted" },
         `stage ${application.current_stage} since ${when(application.stage_since)}` +
         ` · owner ${text(application.owner_id)} · outcome ${text(application.outcome)}`),
+      el("p", {}, el("span", { class: "muted" }, "Where it came from: "),
+        arrivedFrom(application),
+        application.arrived_from && application.arrived_from.label
+          ? el("span", { class: "muted" }, ` · ${application.arrived_from.label}`)
+          : null),
       el("div", { class: "steps" }, moves.length ? moves : el("span", { class: "muted" },
         "Final: nothing moves from here.")),
       el("h2", {}, "Every move"),

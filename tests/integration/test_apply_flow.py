@@ -270,3 +270,43 @@ def test_applying_twice_to_the_same_job_is_answered_not_failed(api_client, job):
     assert answer["code"] == "already_applied"
     assert "already applied" in answer["message"]
     assert "request_id" in answer
+
+
+def test_an_application_says_where_it_came_from(api_client, job):
+    """A recruiter looking at an application should not have to ask (BR-602)."""
+    client, _connection = api_client
+    requisition, post = job
+    through_the_link = _apply(
+        client, _body(requisition, client, tracking_code=post["tracking_code"])
+    ).json()["application_id"]
+    straight_to_the_page = _apply(client, _body(requisition, client)).json()["application_id"]
+
+    headers = sign_in(client, "recruiter-a")
+
+    def arrival(application_id: str) -> dict:
+        return client.get(f"/v1/applications/{application_id}", headers=headers).json()[
+            "arrived_from"
+        ]
+
+    assert arrival(through_the_link) == {
+        "source": "job_post",
+        "channel": "tiktok",
+        "tracking_code": post["tracking_code"],
+        "label": "September sales post",
+    }
+    assert arrival(straight_to_the_page)["source"] == "careers_page"
+
+
+def test_a_candidate_a_recruiter_added_says_so(api_client, make_candidate):
+    """Nobody applied: a recruiter put them on the requisition, and the row says that rather
+    than implying they came through the careers page."""
+    client, connection = api_client
+    headers = sign_in(client, "ta-lead")
+    requisition = client.post("/v1/requisitions", json=JOB, headers=headers).json()
+    candidate = make_candidate(connection, full_name="A Recruiter's Own Find")
+    application = client.post(
+        "/v1/applications",
+        json={"requisition_id": requisition["id"], "candidate_id": f"cand_{candidate}"},
+        headers={**headers, "Idempotency-Key": str(uuid.uuid4())},
+    ).json()
+    assert application["arrived_from"]["source"] == "recruiter"
