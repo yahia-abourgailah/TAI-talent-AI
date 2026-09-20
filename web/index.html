@@ -72,6 +72,18 @@
           rejection.</p>
       </div>
     </div>
+    <div class="card">
+      <div class="row">
+        <div><label for="r-status">Show</label>
+          <select id="r-status">
+            <option value="open">open jobs</option>
+            <option value="all">open and closed</option>
+            <option value="closed">closed only</option>
+          </select></div>
+        <div><button id="r-reload">Reload</button></div>
+        <div><button id="r-clear">Clear the view</button></div>
+      </div>
+    </div>
     <div class="card scroll" id="requisitions"></div>
     <div id="requisition-detail"></div>
   </section>
@@ -87,6 +99,7 @@
         <div><label for="c-email">Email</label><input id="c-email" placeholder="name@example.com"></div>
         <div><button class="primary" id="c-search">Search</button></div>
         <div><button id="c-recent">Newest first</button></div>
+        <div><button id="c-clear">Clear the view</button></div>
         <div><label for="c-migrated">The old sheet</label>
           <select id="c-migrated">
             <option value="no">hidden</option>

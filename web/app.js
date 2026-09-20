@@ -195,11 +195,18 @@ function skillsAsked() {
 }
 
 async function loadRequisitions() {
+  // A closed requisition is never deleted, so the list only grows. Open jobs are the work;
+  // closed ones are there when somebody looks for them.
+  const showing = $("r-status") ? $("r-status").value : "open";
   const page = await api("/v1/requisitions?limit=50");
+  const items = page.items.filter((row) =>
+    showing === "all" ? true : showing === "closed" ? row.status !== "open" : row.status === "open"
+  );
+  $("requisition-detail").replaceChildren();
   $("requisitions").replaceChildren(
     table(
       ["id", "title", "brand", "department", "track", "kind", "status", "on the page"],
-      page.items.map((row) => ({
+      items.map((row) => ({
         cells: [
           row.id,
           text(row.title),
@@ -212,9 +219,18 @@ async function loadRequisitions() {
         ],
         onclick: () => guard(() => openRequisition(row.id)),
       })),
-      "No requisitions yet. Create one above."
+      showing === "open"
+        ? "No open requisition. Create one above, or show the closed ones."
+        : "Nothing to show."
     )
   );
+}
+
+/* Clearing is a view, not a decision: nothing is closed, archived or deleted by these buttons.
+   They empty what is on the screen, and the next search or reload fills it again. */
+function clearView(...ids) {
+  for (const id of ids) $(id).replaceChildren();
+  say("Cleared the view. Nothing was deleted: reload or search to bring it back.");
 }
 
 async function openRequisition(id) {
@@ -892,6 +908,11 @@ $("r-jobtype").addEventListener("change", () => {
   }
 });
 $("r-skill-add").addEventListener("click", () => $("r-skills").append(skillRow()));
+$("r-status").addEventListener("change", () => guard(loadRequisitions));
+$("r-reload").addEventListener("click", () => guard(loadRequisitions));
+$("r-clear").addEventListener("click", () => clearView("requisitions", "requisition-detail"));
+$("c-clear").addEventListener("click", () =>
+  clearView("candidates", "candidate-detail", "explanation"));
 $("c-search").addEventListener("click", () => guard(searchCandidates));
 $("n-create").addEventListener("click", () => guard(typeInCandidate));
 $("c-recent").addEventListener("click", () => guard(listCandidates));
