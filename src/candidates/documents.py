@@ -56,7 +56,12 @@ def list_documents(
                    x.outcome AS reading, x.failure AS reading_failure,
                    coalesce(x.hidden_content, false) AS hidden_content, x.read_at
             FROM raw.capture r
-            LEFT JOIN intake.cv_reading x ON x.capture_id = r.id
+            -- A file may hold a reading from each reader that has seen it; the newest is the one
+            -- in force (migration 0016).
+            LEFT JOIN LATERAL (
+              SELECT y.outcome, y.failure, y.hidden_content, y.read_at
+              FROM intake.cv_reading y WHERE y.capture_id = r.id ORDER BY y.id DESC LIMIT 1
+            ) x ON true
             WHERE r.id IN (SELECT capture_id FROM intake.cv_upload WHERE candidate_id = :c)
             ORDER BY r.id
             """

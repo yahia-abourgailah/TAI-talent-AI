@@ -40,6 +40,7 @@ from api.pages import DEFAULT_LIMIT, MAX_LIMIT, decode_cursor, next_cursor
 from importer.blobs import BlobStore
 from intake import consent as consent_records
 from intake import files, public_apply, uploads
+from intake.ocr import reader_from_settings
 from pipeline.access import NotFound, Refused
 
 router = APIRouter(prefix="/v1/public", tags=["public: careers page"])
@@ -155,8 +156,11 @@ def upload_cv(
             "Upload a PDF, DOCX, JPEG or PNG file.",
             {"accepted": list(files.ACCEPTED)},
         )
-    received = uploads.receive_cv(conn, blobs, content, kind)
-    status = uploads.upload_status(conn, received.upload_id, received.token)
+    # Which reader is in force decides whether a file we have seen before is read again: an answer
+    # from the reader we used last week is not this week's answer.
+    reader = reader_from_settings(request.app.state.settings).name
+    received = uploads.receive_cv(conn, blobs, content, kind, reader)
+    status = uploads.upload_status(conn, received.upload_id, received.token, reader)
     assert status is not None
     response.headers.update(_NO_STORE)
     return CvUploadOut(
@@ -178,7 +182,8 @@ def cv_upload_status(
     """processing, ready (with the form to check) or failed (show an empty form). A wrong or
     expired token reads as not found."""
     _limited(request, STATUS_CHECKS)
-    found = uploads.upload_status(conn, decode("upload", upload_id), token)
+    reader = reader_from_settings(request.app.state.settings).name
+    found = uploads.upload_status(conn, decode("upload", upload_id), token, reader)
     if found is None:
         raise NotFound("Upload not found.")
     response.headers.update(_NO_STORE)

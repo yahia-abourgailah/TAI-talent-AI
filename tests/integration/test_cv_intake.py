@@ -3,6 +3,7 @@ anything goes wrong (BR-102, BR-106, BR-107, BR-308, NFR-01, NFR-04). Made-up fi
 OCR stands in for the API. Everything rolls back.
 """
 
+import hashlib
 import uuid
 from contextlib import contextmanager
 
@@ -39,6 +40,8 @@ def intake(app_engine):
         _env_file=None,
         env="dev",
         auth_mode="dev",
+        # Pinned: without it the developer's own TALENT_OCR_MODE decides what these tests mean.
+        ocr_mode="fake",
         db_dsn="postgresql+psycopg://unused:unused@localhost:1/unused",
         redis_url="redis://localhost:1/0",
         blob_endpoint="http://localhost:1",
@@ -118,7 +121,7 @@ def reading_row(connection, capture_id: int):
     return connection.execute(
         text(
             "SELECT outcome, failure, hidden_content, answer_capture_id, reader, attempts "
-            "FROM intake.cv_reading WHERE capture_id = :c"
+            "FROM intake.cv_reading WHERE capture_id = :c ORDER BY id DESC LIMIT 1"
         ),
         {"c": capture_id},
     ).one_or_none()
@@ -609,3 +612,58 @@ def test_a_document_item_cannot_be_confirmed_as_a_rejection(intake):
                 "VALUES ('flagged_document', NULL, 'hidden_content', 'x')"
             )
         )
+
+
+def test_a_cv_read_by_a_reader_no_longer_in_force_is_read_again(intake):
+    """The same file is read once (BR-106) — until the reader changes.
+
+    Otherwise, the day the stand-in is swapped for the real service, a candidate uploading the CV
+    they sent last week is shown the stand-in's invented answer as though it were their own.
+    """
+    client, connection, _blobs = intake
+    content = cv()
+    first = upload(client, content)
+    capture = upload_row(connection, first).capture_id
+    assert len(read_jobs(connection, capture)) == 1
+
+    # The stand-in answered, and then the real reader came into force.
+    _answered(connection, capture, "a-reader-we-no-longer-use")
+
+    again = upload(client, content)
+    assert upload_row(connection, again).capture_id == capture  # one file, one capture, still
+    assert len(read_jobs(connection, capture)) == 2, (
+        "the same bytes are read again by the new reader"
+    )
+
+
+def test_a_cv_already_read_by_the_reader_in_force_is_not_read_twice(intake):
+    client, connection, _blobs = intake
+    content = cv()
+    first = upload(client, content)
+    capture = upload_row(connection, first).capture_id
+    _answered(connection, capture, "fake-ocr")
+    upload(client, content)
+    assert len(read_jobs(connection, capture)) == 1
+
+
+def _answered(connection, capture_id: int, reader: str) -> None:
+    """A reading as the worker would have written it: an answer kept as its own capture."""
+    answer = connection.execute(
+        text(
+            "INSERT INTO raw.capture (source, external_id, content_sha256, blob_key, media_type, "
+            "byte_size, received_by) VALUES ('ocr_answer', :external, :hash, :key, "
+            "'application/json', 12, 'integration-test') RETURNING id"
+        ),
+        {
+            "external": f"answer-{capture_id}-{reader}",
+            "hash": hashlib.sha256(f"{capture_id}{reader}".encode()).digest(),
+            "key": f"made-up/answer-{capture_id}-{reader}",
+        },
+    ).scalar_one()
+    connection.execute(
+        text(
+            "INSERT INTO intake.cv_reading (capture_id, outcome, answer_capture_id, reader, "
+            "attempts) VALUES (:capture, 'read', :answer, :reader, 1)"
+        ),
+        {"capture": capture_id, "answer": answer, "reader": reader},
+    )

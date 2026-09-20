@@ -93,7 +93,9 @@ _DOCUMENT = text(
     FROM raw.capture r WHERE r.id = :id
     """
 )
-_ALREADY_READ = text("SELECT 1 FROM intake.cv_reading WHERE capture_id = :id")
+# Once per reader, not once forever: a file read by the stand-in is read again by the real
+# service, and its old answer is kept beside the new one (migration 0016).
+_ALREADY_READ = text("SELECT 1 FROM intake.cv_reading WHERE capture_id = :id AND reader = :reader")
 _RECORD = text(
     """
     INSERT INTO intake.cv_reading
@@ -103,7 +105,7 @@ _RECORD = text(
        (SELECT id FROM jobs.job WHERE kind = 'read_cv' AND status = 'running'
           AND params ->> 'capture_id' = CAST(:capture AS text)
         ORDER BY id DESC LIMIT 1))
-    ON CONFLICT (capture_id) DO NOTHING
+    ON CONFLICT (capture_id, reader) DO NOTHING
     RETURNING id
     """
 )
@@ -168,10 +170,10 @@ def read_cv(
     requested_by: str = READ_BY,
 ) -> None:
     document = _document(conn, capture_id)
-    if conn.execute(_ALREADY_READ, {"id": capture_id}).first():
+    reader = svc.reader.name
+    if conn.execute(_ALREADY_READ, {"id": capture_id, "reader": reader}).first():
         log.count("already_read")
         return
-    reader = svc.reader.name
     limits = svc.limits
 
     if not _take_slot(conn, limits.max_concurrency):

@@ -48,6 +48,21 @@ profile, and each value's language is read from its own letters because the serv
 The answer is still stored exactly as it came (BR-107) — the translation happens on the way in, not
 to the stored copy.
 
+### Read once by each reader, not once forever
+
+A file is read once (BR-106) and its answer is kept and reused. That is right while one reader is
+in force, and wrong the day it changes: a candidate re-uploading the CV they sent last week would
+be shown what the stand-in invented, under their own name. Found by doing exactly that.
+
+So the rule is now **one reading per file per reader** (migration 0016). Upload a file whose newest
+answer came from a reader no longer in force and it is read again; until the new answer arrives the
+upload reads as `processing`, never as ready-with-somebody-else's-answer. Nothing is edited or
+removed — the old answer stays beside the new one, which is how we can still say what a candidate
+was shown and when.
+
+A *failure* counts whoever recorded it, including the worker that gave up: the CV needs a person
+either way.
+
 ### What the OCR team still has to answer
 
 1. **Hidden content (BR-308).** The answer says nothing about hidden text, and the rule requires

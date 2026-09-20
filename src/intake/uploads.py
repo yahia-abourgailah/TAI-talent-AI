@@ -9,6 +9,11 @@ queued for reading, so a CV is read once.
 The upload token is shown once and stored only as its SHA-256. Status is read with the upload id
 and the token, and says processing, ready (with the form) or failed. It never says whether the OCR
 found hidden content (BR-308): a flagged CV is ready like any other, and a person reviews it.
+
+One exception to "read once": a file whose stored answer came from a reader that is no longer in
+force is read again. Otherwise the day the stand-in is swapped for the real service, a candidate
+uploading the CV they sent last week would be shown the stand-in's invented answer as if it were
+their own.
 """
 
 import hashlib
@@ -50,7 +55,9 @@ def token_hash(token: str) -> bytes:
     return hashlib.sha256(token.encode("utf-8")).digest()
 
 
-def receive_cv(conn: Connection, blobs: BlobStore, content: bytes, kind: FileKind) -> Upload:
+def receive_cv(
+    conn: Connection, blobs: BlobStore, content: bytes, kind: FileKind, reader_in_force: str
+) -> Upload:
     capture = keep_original(
         conn,
         blobs,
@@ -62,7 +69,7 @@ def receive_cv(conn: Connection, blobs: BlobStore, content: bytes, kind: FileKin
         received_by=RECEIVED_BY,
     )
     candidate_id = add_candidate(conn, capture.id, f"{SOURCE}:{capture.sha256.hex()}", RECEIVED_BY)
-    if capture.new:
+    if capture.new or _answered_by_another_reader(conn, capture.id, reader_in_force):
         enqueue(conn, JOB_KIND, {"capture_id": capture.id, "attempt": 1}, RECEIVED_BY)
 
     token = secrets.token_urlsafe(32)
@@ -92,14 +99,45 @@ def receive_cv(conn: Connection, blobs: BlobStore, content: bytes, kind: FileKin
     )
 
 
-def upload_status(conn: Connection, upload_id: int, token: str) -> dict[str, Any] | None:
-    """processing, ready or failed, with the form when ready. None for a wrong or expired token."""
+def _answered_by_another_reader(conn: Connection, capture_id: int, in_force: str) -> bool:
+    """Whether this file's stored answer came from a reader we no longer use.
+
+    The same file is read once (BR-106), and its answer is kept and reused. That is right while one
+    reader is in force — and wrong the day it changes: an answer the stand-in invented would be
+    shown to a candidate as though their own CV had been read. So a file whose answer predates the
+    reader now in force is read again, and the new answer is kept beside the old one.
+    """
+    rows = conn.execute(
+        text(
+            "SELECT reader FROM intake.cv_reading WHERE capture_id = :capture "
+            "ORDER BY id DESC LIMIT 1"
+        ),
+        {"capture": capture_id},
+    ).all()
+    return bool(rows) and rows[0].reader != in_force
+
+
+def upload_status(
+    conn: Connection, upload_id: int, token: str, reader_in_force: str | None = None
+) -> dict[str, Any] | None:
+    """processing, ready or failed, with the form when ready. None for a wrong or expired token.
+
+    A file can have been read more than once — by a reader we no longer use, or after a retry — so
+    only the newest reading answers. An *answer* from a reader no longer in force is not an answer
+    to show: the stand-in's invention presented as the candidate's own CV would be a small lie with
+    their name on it, and a re-read has already been queued, so it reads as still processing. A
+    *failure* always counts, whoever recorded it, including the worker that gave up: the CV needs a
+    person either way.
+    """
     found = conn.execute(
         text(
             """
-            SELECT u.id, u.candidate_id, u.expires_at, r.id AS reading_id, r.outcome
+            SELECT u.id, u.candidate_id, u.expires_at, r.id AS reading_id, r.outcome, r.reader
             FROM intake.cv_upload u
-            LEFT JOIN intake.cv_reading r ON r.capture_id = u.capture_id
+            LEFT JOIN LATERAL (
+              SELECT x.id, x.outcome, x.reader FROM intake.cv_reading x
+              WHERE x.capture_id = u.capture_id ORDER BY x.id DESC LIMIT 1
+            ) r ON true
             WHERE u.id = :id AND u.token_sha256 = :token AND u.expires_at > clock_timestamp()
             """
         ),
@@ -108,6 +146,8 @@ def upload_status(conn: Connection, upload_id: int, token: str) -> dict[str, Any
     if found is None:
         return None
     status = {None: PROCESSING, "read": READY, "failed": FAILED}[found.outcome]
+    if status == READY and reader_in_force is not None and found.reader != reader_in_force:
+        status = PROCESSING
     result: dict[str, Any] = {
         "upload_id": int(found.id),
         "status": status,
