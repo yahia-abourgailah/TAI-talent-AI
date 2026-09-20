@@ -15,6 +15,11 @@ moved_at (from inclusive, to exclusive); what happened next is counted up to the
 
 Contactability sits next to volume: how many of the candidates counted have a phone or an email in
 core.candidate_field_current.
+
+Archived records are left out, everywhere. Archiving is how a record that should not be there is
+put away (BR-205) — a test row, a duplicate, a file that was never a person — and a report that
+still counts them reports work nobody did. Locked records are left out too: a candidate who asked
+us to stop is out of the working views, and a count is a view.
 """
 
 from collections import Counter
@@ -65,10 +70,16 @@ def contactability_of_all_candidates(conn: Connection) -> dict[str, Any]:
             """
             -- One pass over the phone and email rows: filtering on field reaches inside the
             -- current-value view, where a per-candidate EXISTS would rebuild it for every one.
-            SELECT (SELECT count(*) FROM core.candidate),
-                   count(DISTINCT candidate_id)
-            FROM core.candidate_field_current
-            WHERE field = ANY(:fields) AND value IS NOT NULL
+            SELECT (SELECT count(*) FROM core.candidate c WHERE c.archived_at IS NULL
+                      AND NOT EXISTS (SELECT 1 FROM core.consent_withdrawal w
+                                      WHERE w.candidate_id = c.id AND w.lifted_at IS NULL)),
+                   count(DISTINCT f.candidate_id)
+            FROM core.candidate_field_current f
+            JOIN core.candidate c ON c.id = f.candidate_id
+            WHERE f.field = ANY(:fields) AND f.value IS NOT NULL
+              AND c.archived_at IS NULL
+              AND NOT EXISTS (SELECT 1 FROM core.consent_withdrawal w
+                              WHERE w.candidate_id = c.id AND w.lifted_at IS NULL)
             """
         ),
         {"fields": CONTACT_FIELDS},
@@ -110,9 +121,13 @@ def funnel_report(
                    s.outcome AS to_outcome, a.candidate_id, {key} AS group_key
             FROM pipeline.move m
             JOIN pipeline.application a ON a.id = m.application_id
+            JOIN core.candidate c ON c.id = a.candidate_id
             JOIN pipeline.opening o ON o.id = a.opening_id
             LEFT JOIN pipeline.step s ON s.list_version = m.list_version AND s.code = m.to_step
-            WHERE (CAST(:date_to AS timestamptz) IS NULL OR m.moved_at < :date_to)
+            WHERE c.archived_at IS NULL
+              AND NOT EXISTS (SELECT 1 FROM core.consent_withdrawal w
+                              WHERE w.candidate_id = c.id AND w.lifted_at IS NULL)
+              AND (CAST(:date_to AS timestamptz) IS NULL OR m.moved_at < :date_to)
               AND (CAST(:openings AS bigint[]) IS NULL OR a.opening_id = ANY(:openings))
             ORDER BY m.application_id, m.sequence
             """
