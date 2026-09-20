@@ -392,8 +392,7 @@ async function openCandidate(id) {
             ),
             when(row.evaluated_at || row.recorded_at),
             row.origin === "ai"
-              ? el("span", { class: "muted" },
-                  `${text(row.model_version)} · ${text(row.application_id)}`)
+              ? el("button", { onclick: () => guard(() => showReading(row)) }, "Show what it read")
               : el("button", { onclick: () => guard(() => explainScore(row.id)) }, "Show the sums"),
           ],
         })),
@@ -487,6 +486,45 @@ async function explainScore(evaluationId) {
             found.disqualify_reason || "")
         : null,
       table(["what the criteria weighed", "scored", "full mark"], rows, "")
+    )
+  );
+  $("explanation").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function showReading(row) {
+  // The same place "Show the sums" opens, because it answers the same question: where did this
+  // number come from. There are no sums here — the answer is the CV's own words (BR-305).
+  const found = (row.signals || []).map((signal) => {
+    const cut = signal.indexOf(" \u2014 \u201c");
+    return cut === -1
+      ? { says: signal, quote: null }
+      : { says: signal.slice(0, cut), quote: signal.slice(cut + 4).replace(/\u201d$/, "") };
+  });
+  const missing = (row.flags || []).map((flag) => flag.replace(/^The job asks for: /, ""));
+  $("explanation").replaceChildren(
+    el("div", { class: "card" },
+      el("h2", { style: "margin-top:0" },
+        `What the model read for ${text(row.application_id)}: ${text(row.score)} out of 100`),
+      el("p", { class: "muted", style: "margin-top:0" },
+        `${text(row.model_version)} · prompt ${text(row.prompt_version)} · ` +
+        `${when(row.evaluated_at || row.recorded_at)}. The score is how much of what this job ` +
+        "asks for the CV shows, and nothing else: no tier, no rejection, no comparison with a " +
+        "sales score."),
+      row.recommendation ? el("p", {}, row.recommendation) : null,
+      el("h2", {}, "What it found in the CV"),
+      table(
+        ["what it says", "the CV's own words"],
+        found.map((reason) => ({
+          cells: [reason.says, el("span", { class: "mono" }, text(reason.quote))],
+        })),
+        "Nothing it could quote from the CV."
+      ),
+      el("h2", {}, "What the job asks for and the CV does not show"),
+      table(
+        ["missing"],
+        missing.map((item) => ({ cells: [el("span", { class: "pill bad" }, item)] })),
+        "Nothing missing that it could name."
+      )
     )
   );
   $("explanation").scrollIntoView({ behavior: "smooth", block: "nearest" });
