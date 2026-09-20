@@ -76,7 +76,7 @@ function say(message, kind = "ok") {
 
 /* --- talking to the API ------------------------------------------------------------------- */
 
-async function api(path, { method = "GET", body, idempotent = false } = {}) {
+async function api(path, { method = "GET", body, idempotent = false, retried = false } = {}) {
   const headers = { Accept: "application/json" };
   if (state.token) headers.Authorization = `Bearer ${state.token}`;
   if (body !== undefined) headers["Content-Type"] = "application/json";
@@ -86,6 +86,13 @@ async function api(path, { method = "GET", body, idempotent = false } = {}) {
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
+  // The development sign-in signs with a key made when the process starts, so every restart of the
+  // API leaves this page holding a token nobody will accept — and every button looks broken. These
+  // accounts are fake and one click away, so sign in again and carry on. Once, then give up.
+  if (response.status === 401 && state.account && !retried) {
+    await signIn(state.account);
+    return api(path, { method, body, idempotent, retried: true });
+  }
   const payload = response.status === 204 ? null : await response.json().catch(() => null);
   if (!response.ok) {
     const error = payload && payload.error ? payload.error : {};
@@ -127,6 +134,7 @@ async function loadAccounts() {
 
 async function signIn(account) {
   if (!account) throw Object.assign(new Error("No account to sign in as."), { code: "no_account" });
+  state.token = null; // a token the API will not accept is worse than none
   const answer = await api("/dev/token", { method: "POST", body: { account } });
   state.token = answer.access_token;
   state.account = account;
