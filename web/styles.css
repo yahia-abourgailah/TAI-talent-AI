@@ -82,5 +82,8 @@ td.id{font-family:var(--mono);font-size:12px;color:var(--ink)}
 /* The sums panel, and the reading that opens in the same place: a quotation is longer than a
    label, so that column wraps instead of running the table off the side. */
 #explanation td:last-child{white-space:normal;max-width:46ch}
+/* The last column holds the button. It keeps its width so the button is never the thing that
+   gets squeezed, and never has to be looked for outside the card. */
+td:last-child .row,td:last-child button{white-space:nowrap}
 #explanation .mono{font-size:12px;line-height:1.45}
 #explanation tr:last-child td{background:var(--sunken)}

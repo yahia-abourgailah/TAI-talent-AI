@@ -789,7 +789,9 @@ const stat = (label, value) =>
 
 function table(headers, rows, empty) {
   if (!rows.length) return el("p", { class: "muted" }, empty);
-  return el("table", {},
+  // Wrapped, because a wide table inside a card used to push its last column — the button —
+  // outside the card's own edge. A table too wide for its card scrolls inside it.
+  return el("div", { class: "scroll" }, el("table", {},
     el("thead", {}, el("tr", {}, ...headers.map((head) => el("th", {}, head)))),
     el("tbody", {},
       ...rows.map((row) =>
@@ -799,7 +801,7 @@ function table(headers, rows, empty) {
         )
       )
     )
-  );
+  ));
 }
 
 function show(name) {
