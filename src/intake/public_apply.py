@@ -25,6 +25,7 @@ from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
+from sqlalchemy.exc import IntegrityError
 
 from candidates.withdrawal import is_locked
 from importer.blobs import BlobStore
@@ -43,6 +44,8 @@ CONTACT_TYPES = ("phone", "whatsapp")
 BAD_REQUEST_CODES = frozenset(
     {"contact_channel_required", "consent_required", "upload_token_required", "invalid_request"}
 )
+# The database's own name for "this candidate has already applied to this job" (migration 0005).
+ALREADY_APPLIED = "application_once_per_opening"
 FIELDS: tuple[str, ...] = STORED_FIELDS
 NUMBER_FIELDS = frozenset({"age", "years_experience", "graduation_year"})
 
@@ -218,16 +221,28 @@ def apply(conn: Connection, blobs: BlobStore, application: Application) -> Recei
         source_ref=f"raw.capture:{capture.id}",
         recorded_by=RECEIVED_BY,
     )
-    (row,) = conn.execute(
-        _APPLICATION,
-        {
-            "opening": opening["id"],
-            "candidate": candidate_id,
-            "owner": opening["owner_recruiter"],
-            "team": opening["team"],
-            "by": RECEIVED_BY,
-        },
-    ).all()
+    # A candidate applies to a job once (migration 0005). Applying again is an ordinary thing for
+    # a person to do — a second click, a reopened tab — and it deserves a sentence, not a failure.
+    try:
+        with conn.begin_nested():
+            (row,) = conn.execute(
+                _APPLICATION,
+                {
+                    "opening": opening["id"],
+                    "candidate": candidate_id,
+                    "owner": opening["owner_recruiter"],
+                    "team": opening["team"],
+                    "by": RECEIVED_BY,
+                },
+            ).all()
+    except IntegrityError as clash:
+        if ALREADY_APPLIED not in str(clash.orig):
+            raise
+        raise Refused(
+            "You have already applied for this job. We have your application and a recruiter "
+            "will be in touch.",
+            code="already_applied",
+        ) from None
     application_id = int(row.id)
     consent_id = consent_records.record(
         conn,

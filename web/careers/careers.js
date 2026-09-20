@@ -219,11 +219,25 @@ async function submit() {
   if (code) body.tracking_code = code;
   const headers = { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() };
   if (state.token) headers["X-Upload-Token"] = state.token;
-  const answer = await api("/v1/public/applications", {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  });
+  let answer;
+  try {
+    answer = await api("/v1/public/applications", {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+  } catch (failure) {
+    // Already applied is not a failure to the person doing it: their application exists, which is
+    // what they wanted. Say so as an outcome, not as a red error with a code in it.
+    if (failure.code !== "already_applied") throw failure;
+    $("step-done").classList.remove("hidden");
+    $("done").textContent = failure.message;
+    for (const id of ["step-job", "step-cv", "step-form", "step-consent"]) {
+      $(id).setAttribute("aria-disabled", "true");
+    }
+    $("step-done").scrollIntoView({ behavior: "smooth" });
+    return;
+  }
   $("step-done").classList.remove("hidden");
   $("done").textContent =
     `Thank you. Your application is ${answer.application_id} and a recruiter will be in touch. ` +

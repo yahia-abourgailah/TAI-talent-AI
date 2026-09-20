@@ -238,3 +238,35 @@ def test_the_consent_wording_is_shown_in_both_languages(api_client):
     assert body["purposes"] == ["recruitment_contact"]
     assert body["text_ar"] and body["text_en"]
     assert wording.headers["cache-control"] == "no-store"
+
+
+def test_applying_twice_to_the_same_job_is_answered_not_failed(api_client, job):
+    """A second click, a reopened tab, a change of mind: an ordinary thing for a person to do.
+
+    One person applies to one job once (migration 0005), and the way a public application is one
+    person twice is the CV: the same file is the same candidate (BR-106). Before this, the second
+    attempt reached the database and came back as an internal error, which tells the candidate
+    nothing and the recruiter less.
+    """
+    client, _connection = api_client
+    requisition, _post = job
+    upload = client.post(
+        "/v1/public/cv-uploads",
+        files={"file": ("cv.pdf", b"%PDF-1.4 FAKE-OCR:en applying twice", "application/pdf")},
+    )
+    uploaded = upload.json()
+    body = _body(requisition, client, upload_id=uploaded["upload_id"])
+
+    first = _apply(client, body, token=uploaded["upload_token"])
+    assert first.status_code == 201, first.text
+
+    again = _apply(
+        client,
+        _body(requisition, client, upload_id=uploaded["upload_id"]),
+        token=uploaded["upload_token"],
+    )
+    assert again.status_code == 409, again.text
+    answer = again.json()["error"]
+    assert answer["code"] == "already_applied"
+    assert "already applied" in answer["message"]
+    assert "request_id" in answer
