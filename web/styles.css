@@ -7,15 +7,10 @@
   --good:#28623E; --good-soft:#DBE9DF; --warn:#8A5A10; --warn-soft:#F5E9D2;
   --crit:#9B3520; --crit-soft:#F5DFD9;
   --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-}
-@media (prefers-color-scheme:dark){
-  :root{
-    --ground:#0C1116; --surface:#131A20; --surface-2:#1B242C; --sunken:#0F161B;
-    --ink:#E4EBF0; --ink-2:#B0BEC8; --ink-3:#7B8B96;
-    --rule:#243039; --accent:#6FB3DE; --accent-soft:#0F2A3C;
-    --good:#6FBE87; --good-soft:#142C1C; --warn:#D6A343; --warn-soft:#2F2410;
-    --crit:#E28068; --crit-soft:#361B14;
-  }
+  /* Light, whatever the machine prefers: these pages are read next to the API's own output and
+     next to a spreadsheet, and a recruiter checking a value should not have to re-read it in a
+     second palette. It also tells the browser to draw inputs, selects and scrollbars light. */
+  color-scheme:light;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--ground);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
