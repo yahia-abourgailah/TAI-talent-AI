@@ -278,7 +278,6 @@ async function openRequisition(id) {
                 `${asked.skill} · ${asked.level}`)))
         : null,
       el("div", { class: "row" },
-        el("button", { onclick: () => guard(() => makeJobPost(id)) }, "New job post link"),
         requisition.status === "open"
           ? el("button", { onclick: () => guard(() => closeRequisition(id)) }, "Close")
           : null
@@ -287,6 +286,7 @@ async function openRequisition(id) {
       el("p", { class: "muted", style: "margin-top:0" },
         "One link per place you publish. Whoever applies through it is counted under that " +
         "channel in the arrivals report — which is how the scrapers get argued about."),
+      newLinkForm(id),
       table(
         ["code", "channel", "what it is for", "the link to publish", ""],
         posts.items.map((post) => ({
@@ -323,21 +323,33 @@ async function openRequisition(id) {
   );
 }
 
-async function makeJobPost(id) {
-  const channel = prompt(
-    "Where are you publishing it? One word, lower case: linkedin, tiktok, facebook, whatsapp…",
-    "linkedin"
+function newLinkForm(id) {
+  // No dialogs: a prompt that is cancelled, or blocked by the browser after the first one,
+  // leaves nothing on screen and nothing in the log, and looks exactly like a broken button.
+  const channel = el("select", { id: "j-channel" },
+    ...["linkedin", "tiktok", "facebook", "instagram", "whatsapp", "referral", "careers_page",
+        "other"].map((name) => el("option", { value: name }, name)));
+  const label = el("input", {
+    id: "j-label", placeholder: "What is this link for? (TikTok bio, 20 September)",
+    style: "min-width:280px",
+  });
+  return el("div", { class: "row", style: "margin:0 0 12px" },
+    el("div", {}, el("label", { for: "j-channel" }, "Where you publish it"), channel),
+    el("div", { style: "flex:1" }, el("label", { for: "j-label" }, "What it is for"), label),
+    el("div", {},
+      el("button", { class: "primary", onclick: () => guard(() => makeJobPost(id)) },
+        "Make a link"))
   );
-  if (!channel) return;
-  const label = prompt("What is this link for? (e.g. LinkedIn post, 20 September)");
-  if (!label) return;
+}
+
+async function makeJobPost(id) {
+  const channel = $("j-channel").value;
+  const label = $("j-label").value.trim();
   const post = await api(`/v1/requisitions/${id}/job-posts`, {
     method: "POST",
     idempotent: true,
-    body: { channel: channel.trim().toLowerCase(), label },
+    body: label ? { channel, label } : { channel },
   });
-  // The API builds the link from the careers page's own address, so it is the same link
-  // everywhere and nobody types the query by hand.
   if (post.url) await copyLink(post.url);
   say(
     post.url
