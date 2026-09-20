@@ -171,6 +171,29 @@ async function loadReference() {
 
 /* --- requisitions ------------------------------------------------------------------------ */
 
+const LEVELS = ["beginner", "intermediate", "advanced", "expert"];
+
+function skillRow(skill = "", level = "intermediate") {
+  const name = el("input", { value: skill, placeholder: "Python", style: "min-width:200px" });
+  const wanted = el("select", {},
+    ...LEVELS.map((value) =>
+      el("option", value === level ? { value, selected: "selected" } : { value }, value)));
+  const row = el("div", { class: "row", style: "margin-bottom:6px" },
+    name, wanted,
+    el("button", { class: "quiet", onclick: () => row.remove() }, "Remove"));
+  row.dataset.skill = "1";
+  return row;
+}
+
+function skillsAsked() {
+  return [...$("r-skills").children]
+    .map((row) => ({
+      skill: row.querySelector("input").value.trim(),
+      level: row.querySelector("select").value,
+    }))
+    .filter((asked) => asked.skill);
+}
+
 async function loadRequisitions() {
   const page = await api("/v1/requisitions?limit=50");
   $("requisitions").replaceChildren(
@@ -209,6 +232,13 @@ async function openRequisition(id) {
                                             : "sales: scored by the criteria"}`),
       requisition.description
         ? el("p", { class: "muted", style: "white-space:pre-wrap" }, text(requisition.description))
+        : null,
+      (requisition.requirements || []).length
+        ? el("p", {},
+            el("span", { class: "muted" }, "Every CV is matched against: "),
+            ...requisition.requirements.map((asked) =>
+              el("span", { class: "pill info", style: "margin:0 4px 4px 0" },
+                `${asked.skill} · ${asked.level}`)))
         : null,
       el("div", { class: "row" },
         el("button", { onclick: () => guard(() => makeJobPost(id)) }, "New job post link"),
@@ -374,7 +404,7 @@ async function openCandidate(id) {
           cells: [
             row.origin === "ai"
               ? el("span", {}, row.id, " ",
-                  el("span", { class: "pill info" }, "read by the model"))
+                  el("span", { class: "pill info" }, "matched against the job"))
               : row.id,
             text(row.score),
             // An assessment carries no tier and never will: BR-306 keeps that a person's decision.
@@ -383,13 +413,13 @@ async function openCandidate(id) {
               : el("span", { class: "pill info" }, text(row.tier)),
             row.origin === "ai" ? el("span", { class: "muted" }, "for a person to decide")
                                 : text(row.outcome),
-            // A score's signals are short labels and fit here. A reading's are whole sentences
-            // with a quotation inside them, which is a panel's worth of text, not a cell's: the
-            // row says how it came out, the button opens what it read.
+            // A score's signals are short labels and fit here. A match's are a line per skill
+            // with the CV's own words in them, which is a panel's worth of text, not a cell's:
+            // the row says how it came out, the button opens the lines behind it.
             row.origin === "ai"
               ? el("span", {},
                   el("span", { class: "pill ok", style: "margin:0 4px 4px 0" },
-                    `${(row.signals || []).length} shown`),
+                    `${(row.signals || []).length} skills shown`),
                   el("span", { class: "pill bad", style: "margin:0 4px 4px 0" },
                     `${(row.flags || []).length} not shown`))
               : el("span", {},
@@ -500,32 +530,35 @@ async function explainScore(evaluationId) {
   $("explanation").scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
+function matchLine(line, shown) {
+  // "Python: advanced, advanced asked for — “the CV's own words”" (assess.match.Line.as_text)
+  const cut = line.indexOf(" \u2014 \u201c");
+  const said = cut === -1 ? line : line.slice(0, cut);
+  const quote = cut === -1 ? null : line.slice(cut + 4).replace(/\u201d$/, "");
+  const colon = said.indexOf(": ");
+  const skill = colon === -1 ? said : said.slice(0, colon);
+  const state = colon === -1 ? "" : said.slice(colon + 2);
+  const missing = state.startsWith("not in the CV");
+  return {
+    cells: [
+      skill,
+      el("span", {},
+        el("span", { class: `pill ${shown ? "ok" : missing ? "bad" : "warn"}` },
+          shown ? "shown" : missing ? "not shown" : "below"),
+        " ",
+        el("span", { class: "muted" }, state)),
+      el("span", { class: "mono muted" }, quote || (missing ? "nothing in the CV" : "\u2014")),
+    ],
+  };
+}
+
 function showReading(row) {
   // The same panel a score opens, in the same place, reading the same way: a line per thing
   // weighed, and a total at the bottom. The difference is what is in the middle column — a score
-  // has points, a reading has the CV's own words or nothing (BR-305, BR-307).
-  const found = (row.signals || []).map((signal) => {
-    const cut = signal.indexOf(" \u2014 \u201c");
-    return cut === -1
-      ? { says: signal, quote: null }
-      : { says: signal.slice(0, cut), quote: signal.slice(cut + 4).replace(/\u201d$/, "") };
-  });
-  const missing = (row.flags || []).map((flag) => flag.replace(/^The job asks for: /, ""));
+  // has points, a match has what the CV showed of each skill (BR-305, BR-307).
   const rows = [
-    ...found.map((reason) => ({
-      cells: [
-        reason.says,
-        el("span", { class: "pill ok" }, "shown"),
-        el("span", { class: "mono muted" }, text(reason.quote)),
-      ],
-    })),
-    ...missing.map((item) => ({
-      cells: [
-        item,
-        el("span", { class: "pill bad" }, "not shown"),
-        el("span", { class: "mono muted" }, "nothing in the CV"),
-      ],
-    })),
+    ...(row.signals || []).map((line) => matchLine(line, true)),
+    ...(row.flags || []).map((line) => matchLine(line, false)),
   ];
   rows.push({
     cells: [
@@ -538,10 +571,10 @@ function showReading(row) {
     el("div", { class: "card" },
       el("h2", { style: "margin-top:0" }, `How ${row.id} reached ${text(row.score)}`),
       el("p", { class: "muted", style: "margin-top:0" },
-        `Read against the job's own description for ${text(row.application_id)} by ` +
-        `${text(row.model_version)}, prompt ${text(row.prompt_version)}. No rules were run and ` +
-        "no tier was set: the score is how much of what this job asks for the CV shows, and it " +
-        "is not comparable with a sales score."),
+        `The CV on file for ${text(row.application_id)}, matched against the skills this job ` +
+        `asks for by ${text(row.model_version)} (${text(row.prompt_version)}). No rules were ` +
+        "run and no tier was set: the percentage is how much of what this job asks for the CV " +
+        "shows, and it is not comparable with a sales score."),
       row.recommendation
         ? el("p", {}, el("span", { class: "pill info" }, "in one sentence"), " ",
             row.recommendation)
@@ -841,15 +874,25 @@ $("r-create").addEventListener("click", () =>
       public: $("r-public").value === "true",
       job_type: $("r-jobtype").value,
       description: $("r-description").value.trim() || null,
+      requirements: $("r-jobtype").value === "other" ? skillsAsked() : null,
     };
+    if (body.job_type === "other" && !body.requirements.length) {
+      return say("A job that is not sales needs at least one skill: it is what each CV is " +
+                 "matched against.", "err");
+    }
     const created = await api("/v1/requisitions", { method: "POST", idempotent: true, body });
     say(`Created ${created.id}.`);
     await loadRequisitions();
   })
 );
-$("r-jobtype").addEventListener("change", () =>
-  $("r-description-row").classList.toggle("hidden", $("r-jobtype").value !== "other")
-);
+$("r-jobtype").addEventListener("change", () => {
+  const other = $("r-jobtype").value === "other";
+  $("r-description-row").classList.toggle("hidden", !other);
+  if (other && !$("r-skills").children.length) {
+    $("r-skills").append(skillRow("Python", "advanced"), skillRow());
+  }
+});
+$("r-skill-add").addEventListener("click", () => $("r-skills").append(skillRow()));
 $("c-search").addEventListener("click", () => guard(searchCandidates));
 $("n-create").addEventListener("click", () => guard(typeInCandidate));
 $("c-recent").addEventListener("click", () => guard(listCandidates));

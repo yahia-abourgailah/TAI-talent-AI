@@ -304,7 +304,7 @@
         "type": "object"
       },
       "AssessmentOut": {
-        "description": "A CV read against one job by the model (BR-305). No tier: an AI never sets one (BR-306).",
+        "description": "A CV matched against one job's skills (BR-305). No tier: an AI never sets one (BR-306).",
         "properties": {
           "application_id": {
             "anyOf": [
@@ -2531,6 +2531,21 @@
             "title": "Public",
             "type": "boolean"
           },
+          "requirements": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SkillIn"
+                },
+                "maxItems": 40,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requirements"
+          },
           "team": {
             "maxLength": 200,
             "minLength": 1,
@@ -2667,6 +2682,20 @@
           "public": {
             "title": "Public",
             "type": "boolean"
+          },
+          "requirements": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SkillOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requirements"
           },
           "status": {
             "title": "Status",
@@ -2961,6 +2990,77 @@
           "out_of"
         ],
         "title": "ScorePartOut",
+        "type": "object"
+      },
+      "SkillIn": {
+        "description": "One thing the job asks for, and how much of it.\n\nThe four levels are the ones the CV service grades against; a level it does not know would\ngive a percentage that means nothing, so nothing else is accepted (migration 0020).",
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 1,
+                "pattern": "\\S",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "level": {
+            "enum": [
+              "beginner",
+              "intermediate",
+              "advanced",
+              "expert"
+            ],
+            "title": "Level",
+            "type": "string"
+          },
+          "skill": {
+            "maxLength": 80,
+            "minLength": 1,
+            "pattern": "\\S",
+            "title": "Skill",
+            "type": "string"
+          }
+        },
+        "required": [
+          "skill",
+          "level"
+        ],
+        "title": "SkillIn",
+        "type": "object"
+      },
+      "SkillOut": {
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "level": {
+            "title": "Level",
+            "type": "string"
+          },
+          "skill": {
+            "title": "Skill",
+            "type": "string"
+          }
+        },
+        "required": [
+          "skill",
+          "level"
+        ],
+        "title": "SkillOut",
         "type": "object"
       },
       "StageCountsOut": {

@@ -13,8 +13,7 @@
 | Destination | Why | Carries candidate data? | Setting | Code |
 |---|---|---|---|---|
 | **Object storage** | The original CVs and submissions (BR-107) | Yes, inside our network | `TALENT_BLOB_ENDPOINT` | `src/importer/blobs.py`, `src/infra/probes.py`, `src/infra/dev_storage.py` |
-| **The OCR host** | Reading CVs | Yes, on our own host (CR-01) | `TALENT_OCR_BASE_URL` | `src/intake/ocr_http.py` |
-| **The company language model** | Reading a CV against a job that the criteria version cannot score (BR-305) | Yes, on the same host as the OCR, inside the company (CR-01) | `TALENT_VLLM_BASE_URL` | `src/assess/model.py` |
+| **The OCR host** | Reading CVs, and matching one against a job that the criteria version cannot score (BR-305) | Yes, on our own host (CR-01) | `TALENT_OCR_BASE_URL` | `src/intake/ocr_http.py`, `src/assess/match.py` |
 | **The CRM webhook** | Telling the dashboard something happened | Ids and codes only | `TALENT_CRM_WEBHOOK_URL` | `src/integrations/webhooks.py` |
 | **Redis** | Queue and limits | No | `TALENT_REDIS_URL` | `src/infra/probes.py` |
 | **The company identity provider** | Staff sign-in: discovery and signing keys | No. Our own people's accounts, never a candidate's | `TALENT_OIDC_ISSUER` | `src/auth/oidc.py` |
@@ -41,8 +40,10 @@ read `python -m ops.watch --json`.
 
 ## Nothing else
 
-- **No language model is called.** `TALENT_LLM_BASE_URL` and `TALENT_EMBED_BASE_URL` are read by
-  nothing, and `python -m ops.preflight` warns when they are set.
+- **No language model of our own is called.** `TALENT_LLM_BASE_URL`, `TALENT_EMBED_BASE_URL` and
+  `TALENT_VLLM_BASE_URL` are read by nothing, and `python -m ops.preflight` warns when they are
+  set. A CV is read, and matched against a job, by the CV service on our own host — one
+  destination, already listed above.
 - **The outside AI key is deleted last** (BR-705, step 4). Even if something tried to call it,
   there would be nothing to authenticate with.
 
@@ -59,20 +60,20 @@ Once the machine exists:
 |---|---|---|---|
 | — | — | — | — |
 
-## What the model is sent, and what it is not
+## What the CV service is sent, and what comes back
 
-A CV read against a job is the one place a candidate's words are given to a language model. What
-goes: the job's own description, and the CV as the reader extracted it — title, employer, years,
-education, location, and the CV's text. What does not: the candidate's **name**, and nothing about
-age, sex, marital status, nationality, religion or a photograph is asked for or weighed (CR-07).
-The name is withheld rather than merely forbidden, because the surest way to keep something out of
-an answer is not to send it.
+Two calls, both to `TALENT_OCR_BASE_URL`, both carrying a CV file exactly as the candidate gave
+it:
 
-It runs on `vllm.addressinv.com` — the same machine as the CV reader, inside the company — so this
-is not an outside AI service and CR-01 holds. Nothing from an answer is logged, and the answer
-itself is kept as it came.
+- `POST /extract` — reading a CV into fields (`src/intake/ocr_http.py`).
+- `POST /extract_and_match` — the same file, plus the skills the job asks for, graded against them
+  (`src/assess/match.py`). The skills are the requisition's own list: a name and a level, nothing
+  about the candidate.
 
-The model serves the chatbots too, so the platform asks for one assessment at a time with a
-timeout, and waits rather than queueing behind itself (NFR-01). **It never decides anything**: the
-score cannot become a tier, the database refuses to store one on an AI evaluation, and a person
-reads every assessment before anything happens (BR-306, CR-05).
+Nothing else is sent. No name, age, sex, marital status, nationality, religion or photograph is
+added to either call, and nothing from either answer is logged; the answer is kept as it came
+(BR-107, CR-07).
+
+It runs on our own host, so CR-01 holds. **The match never decides anything**: the percentage
+cannot become a tier, the database refuses to store one on an AI evaluation, and a person reads
+every match before anything happens (BR-306, CR-05).

@@ -66,7 +66,7 @@ class BorderlineOut(BaseModel):
 
 
 class AssessmentOut(BaseModel):
-    """A CV read against one job by the model (BR-305). No tier: an AI never sets one (BR-306)."""
+    """A CV matched against one job's skills (BR-305). No tier: an AI never sets one (BR-306)."""
 
     evaluation_id: str
     application_id: str | None
@@ -128,7 +128,9 @@ def _item(row: Mapping[str, Any]) -> CandidateReviewItemOut:
         assessment = AssessmentOut(
             evaluation_id=encode("evaluation", row["evaluation_id"]),
             application_id=None if assessed is None else encode("application", assessed),
-            score=None if row.get("assessed_score") is None else int(row["assessed_score"]),
+            score=(
+                None if row.get("assessed_score") is None else round(float(row["assessed_score"]))
+            ),
         )
     return CandidateReviewItemOut(
         id=encode("review_item", row["id"]),

@@ -69,9 +69,10 @@ MIN_SECRET_LENGTH = 16
 MIN_JWT_SECRET_LENGTH = 32
 # Settings nothing reads any more. Left in a file, they only mislead the next person.
 UNUSED = ("TALENT_EVAL_PATH", "TALENT_VECTOR_URL")
-# The platform calls one language model, the company's own (CR-01, BR-305): TALENT_VLLM_BASE_URL.
-# Any other address for a model is a door nobody needs.
-MODEL_HOSTS = ("TALENT_LLM_BASE_URL", "TALENT_EMBED_BASE_URL")
+# The platform calls one outside service, the company CV service, which both reads a CV and
+# matches it against a job (CR-01, BR-305). An address for a model of our own is a door nobody
+# needs.
+MODEL_HOSTS = ("TALENT_LLM_BASE_URL", "TALENT_EMBED_BASE_URL", "TALENT_VLLM_BASE_URL")
 LOOPBACK = {"127.0.0.1", "localhost", "::1"}
 
 
@@ -235,42 +236,12 @@ def check(env: Mapping[str, str], *, api_bind: str | None = None) -> list[Findin
                 Finding(
                     WARN,
                     name,
-                    "is set, but the only language model the platform calls is the company's own, "
-                    "TALENT_VLLM_BASE_URL (CR-01); remove it",
+                    "is set, but the platform calls no language model of its own: a CV is read "
+                    "and matched by the CV service (CR-01); remove it",
                 )
             )
-    findings.extend(model_findings(env))
     if not findings:
         findings.append(Finding(OK, "(all)", "nothing missing or dangerous"))
-    return findings
-
-
-def model_findings(env: Mapping[str, str]) -> list[Finding]:
-    """The company model that reads a CV against a job that is not sales (BR-305)."""
-    base = env.get("TALENT_VLLM_BASE_URL", "").strip()
-    if not base:
-        return [
-            Finding(
-                WARN,
-                "TALENT_VLLM_BASE_URL",
-                "is not set: an application to a job that is not sales waits for a person "
-                "instead of being assessed",
-            )
-        ]
-    findings = []
-    host = urlsplit(base).hostname or ""
-    if urlsplit(base).scheme != "https" and host not in LOOPBACK:
-        findings.append(
-            Finding(ERROR, "TALENT_VLLM_BASE_URL", f"sends CVs to {host} unencrypted; use https")
-        )
-    if not env.get("TALENT_VLLM_API_KEY", "").strip():
-        findings.append(
-            Finding(
-                WARN,
-                "TALENT_VLLM_API_KEY",
-                "is empty: the model will refuse every assessment if it wants a key",
-            )
-        )
     return findings
 
 

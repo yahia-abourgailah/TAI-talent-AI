@@ -57,8 +57,8 @@ KIND_TEXT: dict[str, str] = {
     "possible_duplicate": "This may be the same person as another record.",
     "borderline_score": "The score is close to a tier line.",
     "ai_assessment": (
-        "A CV was read against what this job asks for. Read it and decide; nothing was decided "
-        "for you."
+        "A CV was matched against the skills this job asks for. Read it and decide; nothing was "
+        "decided for you."
     ),
 }
 
@@ -72,12 +72,12 @@ def reason_text(item: dict[str, Any]) -> str:
         score = item.get("assessed_score")
         if score is None:
             return (
-                "A CV needs reading against what this job asks for: nothing usable came back. "
-                "Read it yourself."
+                "A CV needs matching against the skills this job asks for: nothing usable came "
+                "back. Read it yourself."
             )
         return (
-            f"A CV was read against what this job asks for and came out at {int(score)} out of "
-            "100. Read it and decide; nothing was decided for you."
+            f"A CV was matched against the skills this job asks for and came out at "
+            f"{round(float(score))} out of 100. Read it and decide; nothing was decided for you."
         )
     if kind == "borderline_score":
         return (

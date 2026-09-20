@@ -117,6 +117,24 @@ def reasons(
 # --- Requisitions -------------------------------------------------------------------------------
 
 
+class SkillIn(BaseModel):
+    """One thing the job asks for, and how much of it.
+
+    The four levels are the ones the CV service grades against; a level it does not know would
+    give a percentage that means nothing, so nothing else is accepted (migration 0020).
+    """
+
+    skill: Annotated[str, Field(min_length=1, max_length=80, pattern=r"\S")]
+    level: Literal["beginner", "intermediate", "advanced", "expert"]
+    category: Annotated[str, Field(min_length=1, max_length=40, pattern=r"\S")] | None = None
+
+
+class SkillOut(BaseModel):
+    skill: str
+    level: str
+    category: str | None = None
+
+
 class RequisitionIn(BaseModel):
     brand: Text
     department: Text
@@ -132,17 +150,32 @@ class RequisitionIn(BaseModel):
     location: Text | None = None
     public: bool = False
     # How a candidate for this job is judged. `sales` is the criteria version, as always. `other`
-    # is judged against `description`, by reading the CV against it, for a person to act on — and
-    # a job of that kind must say what it asks for (BR-305).
+    # is judged against the skills it lists, matched against the candidate's own CV file, for a
+    # person to act on. A job of that kind says what it asks for twice: in prose for a person to
+    # read, and as skills for the match (BR-305).
     job_type: Literal["sales", "other"] = "sales"
     description: Annotated[str, Field(min_length=40, max_length=8000)] | None = None
+    requirements: Annotated[list[SkillIn], Field(max_length=40)] | None = None
 
     @model_validator(mode="after")
     def _other_jobs_say_what_they_ask_for(self) -> "RequisitionIn":
         if self.job_type == "other" and not (self.description or "").strip():
             raise ValueError(
-                "a job that is not sales needs a description: it is what the CV is read against"
+                "a job that is not sales needs a description: it is what a person reads"
             )
+        if self.job_type == "other" and not self.requirements:
+            raise ValueError(
+                "a job that is not sales needs the skills it asks for: they are what each CV is "
+                "matched against"
+            )
+        if self.job_type != "other" and self.requirements:
+            raise ValueError(
+                "a sales job is scored by the criteria version, which has its own rules: it does "
+                "not take a list of skills"
+            )
+        seen = {skill.skill.strip().lower() for skill in self.requirements or []}
+        if len(seen) != len(self.requirements or []):
+            raise ValueError("the same skill is asked for twice")
         return self
 
 
@@ -170,6 +203,7 @@ class RequisitionOut(BaseModel):
     public: bool
     job_type: str
     description: str | None
+    requirements: list[SkillOut] | None = None
 
 
 class RequisitionPage(BaseModel):
@@ -198,6 +232,11 @@ def _requisition(row: Mapping[str, Any]) -> RequisitionOut:
         public=row["public"],
         job_type=row["job_type"],
         description=row["description"],
+        requirements=(
+            None
+            if row["requirements"] is None
+            else [SkillOut(**skill) for skill in row["requirements"]]
+        ),
     )
 
 
@@ -226,6 +265,18 @@ def create_requisition(
             public=body.public,
             job_type=body.job_type,
             description=body.description,
+            requirements=(
+                None
+                if body.requirements is None
+                else [
+                    {
+                        "skill": skill.skill.strip(),
+                        "level": skill.level,
+                        **({"category": skill.category.strip()} if skill.category else {}),
+                    }
+                    for skill in body.requirements
+                ]
+            ),
         )
         return _requisition(row)
 

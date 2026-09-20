@@ -5,6 +5,7 @@ the database (migration 0005): this module never decides whether a move is allow
 database and reports the refusal.
 """
 
+import json
 from typing import Any
 
 from sqlalchemy import text
@@ -15,7 +16,7 @@ from pipeline.access import Actor, NotFound, NotPermitted, Refused, not_locked, 
 _OPENING = (
     "id, brand, department, track, headcount, status, owner_recruiter, team, "
     "criteria_version_id, created_at, created_by, closed_at, closed_reason, closed_by, "
-    "title, location, public, job_type, description"
+    "title, location, public, job_type, description, requirements"
 )
 _APPLICATION = (
     "id, opening_id, candidate_id, owner_recruiter, team, reopens_application_id, created_at, "
@@ -110,13 +111,15 @@ def create_opening(
     public: bool = False,
     job_type: str = "sales",
     description: str | None = None,
+    requirements: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Uses the criteria version given, or the one in force when none is given.
 
     `job_type` decides how a candidate for it is judged: `sales` by the criteria version, as
-    always; `other` by its own description, read against the CV, for a person to act on. A job of
-    kind `other` must say what it asks for — the database insists, because an assessment nobody
-    can check against the job is not evidence of anything (BR-305).
+    always; `other` by the skills it lists, matched against the candidate's own CV file, for a
+    person to act on. A job of kind `other` must say what it asks for, in prose for a person
+    (`description`) and as skills for the match (`requirements`) — the database insists on both,
+    because an assessment nobody can check against the job is not evidence of anything (BR-305).
     """
     owner = owner_recruiter or actor.subject
     if not actor.sees_all and owner != actor.subject:
@@ -127,9 +130,10 @@ def create_opening(
             f"""
             INSERT INTO pipeline.opening
               (brand, department, track, headcount, owner_recruiter, team, criteria_version_id,
-               created_by, title, location, public, job_type, description)
+               created_by, title, location, public, job_type, description, requirements)
             SELECT :brand, :department, :track, :headcount, :owner, :team, cv.id, :by,
-                   :title, :location, :public, :job_type, :description
+                   :title, :location, :public, :job_type, :description,
+                   CAST(:requirements AS jsonb)
             FROM (
               SELECT id FROM core.criteria_version
               WHERE CASE WHEN CAST(:criteria AS text) IS NULL THEN effective_from <= current_date
@@ -153,6 +157,7 @@ def create_opening(
             "public": public,
             "job_type": job_type,
             "description": description,
+            "requirements": None if requirements is None else json.dumps(requirements),
         },
     )
     if not rows:
