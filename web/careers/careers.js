@@ -2,12 +2,22 @@
    It is here so the whole flow can be tried end to end; the real page is the website team's. */
 "use strict";
 
+// Every field a CV can fill, so what the reader found can be checked and what it could not find
+// can be typed. Age is not here on purpose: it is worked out from the graduation year by the
+// criteria's own rule, and a careers page should not ask for it when it does not have to.
 const FIELDS = ["full_name", "phone", "whatsapp", "email", "current_title", "current_employer",
-  "location", "education", "years_experience"];
+  "location", "education", "graduation_year", "years_experience", "profile_url"];
 const LABELS = {
   full_name: "Full name", phone: "Phone", whatsapp: "WhatsApp", email: "Email",
   current_title: "Current title", current_employer: "Current employer", location: "Location",
-  education: "Education", years_experience: "Years of experience",
+  education: "Education", graduation_year: "Graduation year",
+  years_experience: "Years of experience", profile_url: "LinkedIn or portfolio link",
+};
+const PLACEHOLDERS = {
+  graduation_year: "2020",
+  years_experience: "6",
+  profile_url: "https://www.linkedin.com/in/…",
+  whatsapp: "01xxxxxxxxx",
 };
 
 // How long a candidate is asked to wait before the form is theirs to fill. The reader usually
@@ -162,6 +172,9 @@ function buildForm() {
     const input = document.createElement("input");
     input.id = `f-${name}`;
     input.style.width = "100%";
+    if (PLACEHOLDERS[name]) input.placeholder = PLACEHOLDERS[name];
+    if (name === "email") input.type = "email";
+    if (name === "profile_url") input.type = "url";
     wrapper.append(label, input);
     // A CV gives one number and never says whether it is on WhatsApp, so this box comes back
     // empty however well the CV was read. The candidate is the only one who knows; this is them
