@@ -235,7 +235,9 @@ def test_candidates_are_read_in_scope_with_where_each_field_came_from(api):
         "/v1/candidates", params={"requisition_id": application["requisition_id"]}, headers=headers
     ).json()["items"]
     assert [item["id"] for item in listed] == [f"cand_{number}"]
-    assert set(listed[0]) == {"id", "source", "created_at", "archived"}
+    # A list says who each row is about and nothing more: the name, never a field with its
+    # provenance, and never a phone or an address (those come from fetching the one candidate).
+    assert set(listed[0]) == {"id", "full_name", "source", "created_at", "archived"}
 
 
 # --- Evaluations ---

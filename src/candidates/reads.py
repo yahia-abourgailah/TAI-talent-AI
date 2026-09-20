@@ -20,6 +20,17 @@ from pipeline.access import Actor, NotFound, not_locked, run
 CANDIDATE_NOT_FOUND = "Candidate not found."
 EVALUATION_NOT_FOUND = "Evaluation not found."
 
+# The name as it stands today, for a list of your own candidates. A list carries no field with its
+# provenance — that is what fetching one candidate is for — but a page of bare ids is not something
+# a person can work from, and the name is the one value that says who each row is about.
+#
+# Not in a search answer. A search is given values and must not hand any back: someone who guesses
+# an address should learn nothing from the guess but whether they may open the record.
+NAME = """
+    (SELECT f.value FROM core.candidate_field_current f
+     WHERE f.candidate_id = c.id AND f.field = 'full_name') AS full_name
+"""
+
 VISIBLE = f"""
     {not_locked("c.id")} AND
     (:sees_all OR EXISTS (
@@ -79,12 +90,12 @@ def list_candidates(
     opening_id: int | None = None,
     owner: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Newest first. Summaries only: a list carries no candidate fields."""
+    """Newest first. Summaries: the name, and where the record came from. No fields."""
     return run(
         conn,
         text(
             f"""
-            SELECT c.id, c.created_at, c.archived_at, r.source
+            SELECT c.id, c.created_at, c.archived_at, r.source, {NAME}
             FROM core.candidate c JOIN raw.capture r ON r.id = c.capture_id
             WHERE {VISIBLE}
               AND (CAST(:before AS bigint) IS NULL OR c.id < :before)

@@ -709,6 +709,17 @@
             "title": "Created At",
             "type": "string"
           },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -720,6 +731,7 @@
         },
         "required": [
           "id",
+          "full_name",
           "source",
           "created_at",
           "archived"

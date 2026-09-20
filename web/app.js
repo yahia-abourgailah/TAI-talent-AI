@@ -3,7 +3,49 @@
    the network tab, not in a bundle. */
 "use strict";
 
-const state = { token: null, account: null, stages: [], reasons: [] };
+const state = { token: null, account: null, stages: [], reasons: [], names: new Map() };
+
+/* Who a candidate is, for the tables that only carry ids. The list hands us names; anything else
+   is asked for once and remembered, because a page of ids is not something a person can read. */
+function remember(rows) {
+  for (const row of rows) {
+    if (row.id && row.full_name) state.names.set(row.id, row.full_name);
+  }
+}
+
+async function nameOf(candidateId) {
+  if (!candidateId) return null;
+  if (state.names.has(candidateId)) return state.names.get(candidateId);
+  try {
+    const candidate = await api(`/v1/candidates/${candidateId}`);
+    const field = (candidate.fields || {}).full_name || {};
+    state.names.set(candidateId, field.value || null);
+  } catch {
+    state.names.set(candidateId, null); // out of scope, or locked: the id is all we may say
+  }
+  return state.names.get(candidateId);
+}
+
+/** The cell for a candidate: their name when we may know it, with the id underneath. */
+function candidateCell(candidateId, onclick) {
+  const name = state.names.get(candidateId);
+  const label = el("span", {}, name || candidateId);
+  const cell = el(
+    "span",
+    { class: "row", style: "flex-direction:column;gap:0;align-items:flex-start" },
+    onclick ? el("button", { class: "quiet", style: "padding:0", onclick }, label) : label,
+    name ? el("span", { class: "muted mono", style: "font-size:11px" }, candidateId) : null
+  );
+  if (!name) {
+    nameOf(candidateId).then((found) => {
+      if (found) {
+        label.textContent = found;
+        cell.append(el("span", { class: "muted mono", style: "font-size:11px" }, candidateId));
+      }
+    });
+  }
+  return cell;
+}
 const $ = (id) => document.getElementById(id);
 const el = (tag, attrs = {}, ...children) => {
   const node = document.createElement(tag);
@@ -160,7 +202,12 @@ async function openRequisition(id) {
       table(
         ["application", "candidate", "stage", "outcome"],
         applications.items.map((row) => ({
-          cells: [row.id, row.candidate_id, row.current_stage, text(row.outcome)],
+          cells: [
+            row.id,
+            candidateCell(row.candidate_id),
+            row.current_stage,
+            text(row.outcome),
+          ],
           onclick: () => guard(() => openApplication(row.id)),
         })),
         "Nobody has applied yet."
@@ -207,11 +254,18 @@ async function listCandidates() {
 }
 
 function showCandidates(items, empty) {
+  remember(items);
   $("candidates").replaceChildren(
     table(
-      ["id", "source", "added", "archived"],
+      ["name", "id", "source", "added", "archived"],
       items.map((row) => ({
-        cells: [row.id, row.source, when(row.created_at), row.archived ? "yes" : "no"],
+        cells: [
+          row.full_name || el("span", { class: "muted" }, "not recorded"),
+          el("span", { class: "mono" }, row.id),
+          row.source,
+          when(row.created_at),
+          row.archived ? "yes" : "no",
+        ],
         onclick: () => guard(() => openCandidate(row.id)),
       })),
       empty
@@ -246,9 +300,12 @@ async function openCandidate(id) {
           ),
     ],
   }));
+  const named = (candidate.fields || {}).full_name || {};
+  if (named.value) state.names.set(candidate.id, named.value);
   $("candidate-detail").replaceChildren(
     el("div", { class: "card" },
-      el("h2", { style: "margin-top:0" }, candidate.id),
+      el("h2", { style: "margin-top:0" },
+        named.value ? `${named.value} · ${candidate.id}` : candidate.id),
       el("p", { class: "muted" },
         `from ${candidate.source} · added ${when(candidate.created_at)}` +
         (group && group.members.length > 1 ? ` · read under ${group.primary_candidate_id}` : "")),
@@ -367,7 +424,11 @@ async function loadApplications() {
       page.items.map((row) => ({
         cells: [
           row.id,
-          row.candidate_id,
+          candidateCell(row.candidate_id, (event) => {
+            event.stopPropagation();
+            show("candidates");
+            guard(() => openCandidate(row.candidate_id));
+          }),
           row.requisition_id,
           el("span", { class: "pill info" }, row.current_stage),
           when(row.stage_since),
@@ -390,7 +451,9 @@ async function openApplication(id) {
   );
   $("application-detail").replaceChildren(
     el("div", { class: "card" },
-      el("h2", { style: "margin-top:0" }, `${application.id} · ${application.candidate_id}`),
+      el("h2", { style: "margin-top:0" },
+        `${application.id} · ${state.names.get(application.candidate_id) || ""}`.trim() +
+        ` (${application.candidate_id})`),
       el("p", { class: "muted" },
         `stage ${application.current_stage} since ${when(application.stage_since)}` +
         ` · owner ${text(application.owner_id)} · outcome ${text(application.outcome)}`),
@@ -441,9 +504,11 @@ async function loadQueue() {
           el("span", { class: "pill warn" }, row.kind),
           row.reason,
           row.candidate_id
-            ? el("button", { class: "quiet", onclick: (event) => { event.stopPropagation();
-                show("candidates"); guard(() => openCandidate(row.candidate_id)); } },
-                row.candidate_id)
+            ? candidateCell(row.candidate_id, (event) => {
+                event.stopPropagation();
+                show("candidates");
+                guard(() => openCandidate(row.candidate_id));
+              })
             : text(row.application_id),
           when(row.waiting_since),
           el("span", { class: "row" },

@@ -38,6 +38,8 @@ Blobs = Annotated[BlobStore, Depends(blob_store)]
 
 class CandidateSummaryOut(BaseModel):
     id: str
+    # The name as it stands, so a list says who each row is about. Null when nobody recorded one.
+    full_name: str | None
     source: str
     created_at: Timestamp
     archived: bool
@@ -140,6 +142,7 @@ def list_candidates(
     items = [
         CandidateSummaryOut(
             id=encode("candidate", row["id"]),
+            full_name=row.get("full_name"),
             source=row["source"],
             created_at=row["created_at"],
             archived=row["archived_at"] is not None,
@@ -203,6 +206,7 @@ def search_candidates(body: CandidateSearchIn, principal: Signed, conn: Db) -> C
     items = [
         CandidateSummaryOut(
             id=encode("candidate", row["id"]),
+            full_name=None,  # a search answers with no values of its own
             source=row["source"],
             created_at=row["created_at"],
             archived=row["archived_at"] is not None,
