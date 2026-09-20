@@ -9,6 +9,7 @@ from contextlib import contextmanager
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from api.app import create_app
 from config import Settings
@@ -63,3 +64,34 @@ def test_it_is_served_nowhere_else(app_engine, env):
         assert client.get(path).status_code == 404, path
     # The API itself is unchanged by any of this.
     assert client.get("/health").status_code == 200
+
+
+@pytest.mark.parametrize("env", ["staging", "prod"])
+def test_the_clear_out_exists_nowhere_but_a_developer_s_machine(app_engine, env):
+    """It archives in one call what a person would archive one row at a time. That is a
+    convenience for a test run and has no business anywhere real — so it lives on the dev
+    sign-in router, which only exists where fake accounts do, and the settings refuse those
+    outside dev whatever anybody writes in the environment."""
+    client = _client(
+        app_engine,
+        env=env,
+        auth_mode="oidc",
+        oidc_issuer="https://login.example.com",
+        oidc_audience="talent-platform",
+        ocr_mode="api",
+        ocr_base_url="https://ocr.internal",
+    )
+    assert client.post("/dev/clear-test-data").status_code == 404
+    assert client.post("/dev/token", json={"account": "ta-lead"}).status_code == 404
+
+    with pytest.raises(ValidationError):
+        Settings(
+            _env_file=None,
+            env=env,
+            auth_mode="dev",
+            db_dsn="postgresql+psycopg://unused:unused@localhost:1/unused",
+            redis_url="redis://localhost:1/0",
+            blob_endpoint="http://localhost:1",
+            blob_access_key="unused-but-long-enough-for-a-key",
+            blob_secret_key="unused-but-long-enough-for-a-key",
+        )

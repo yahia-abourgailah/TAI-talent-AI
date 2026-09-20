@@ -226,6 +226,26 @@ async function loadRequisitions() {
   );
 }
 
+async function clearTestData() {
+  // Archiving and closing, which is what putting something away means here: the app role has no
+  // DELETE grant and the tables refuse one, so nothing can be lost by a button (BR-205, BR-401).
+  const sure = confirm(
+    "Put away everything made while trying the platform out?\n\n" +
+    "Every candidate who did not come from the TAI_Master import is archived, and every open " +
+    "requisition is closed, with a reason and a name on each.\n\n" +
+    "Nothing is deleted, and the 5,140 imported records are left alone."
+  );
+  if (!sure) return;
+  const done = await api("/dev/clear-test-data", { method: "POST" });
+  say(
+    `${done.candidates_archived} candidates archived and ${done.requisitions_closed} ` +
+    `requisitions closed. ${done.kept_from_the_import} imported records were left alone, and ` +
+    "nothing was deleted."
+  );
+  await loadRequisitions();
+  clearView("candidates", "candidate-detail", "explanation");
+}
+
 /* Clearing is a view, not a decision: nothing is closed, archived or deleted by these buttons.
    They empty what is on the screen, and the next search or reload fills it again. */
 function clearView(...ids) {
@@ -911,6 +931,7 @@ $("r-skill-add").addEventListener("click", () => $("r-skills").append(skillRow()
 $("r-status").addEventListener("change", () => guard(loadRequisitions));
 $("r-reload").addEventListener("click", () => guard(loadRequisitions));
 $("r-clear").addEventListener("click", () => clearView("requisitions", "requisition-detail"));
+$("d-clear").addEventListener("click", () => guard(clearTestData));
 $("c-clear").addEventListener("click", () =>
   clearView("candidates", "candidate-detail", "explanation"));
 $("c-search").addEventListener("click", () => guard(searchCandidates));

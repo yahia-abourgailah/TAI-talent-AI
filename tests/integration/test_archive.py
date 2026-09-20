@@ -184,3 +184,50 @@ def test_archiving_takes_the_candidate_out_of_the_review_queue(api_client, make_
         ).scalar_one()
         >= 1
     )
+
+
+def test_putting_the_test_data_away_archives_what_we_made_and_keeps_the_import(
+    api_client, make_candidate
+):
+    """One button for what a week of trying things leaves behind (BR-205, BR-401)."""
+    client, connection = api_client
+    headers = sign_in(client, "ta-lead")
+    ours = make_candidate(connection, full_name="Console Test Person")
+    imported = make_candidate(connection, full_name="From The Sheet")
+    connection.execute(
+        text(
+            "INSERT INTO core.candidate_field "
+            "(candidate_id, field, value, source, verification_status, recorded_by) "
+            "VALUES (:c, 'full_name', 'From The Sheet', 'migrated from TAI_Master', "
+            "'unverified', 'test')"
+        ),
+        {"c": imported},
+    )
+    requisition = client.post(
+        "/v1/requisitions",
+        json={
+            "brand": "The Address",
+            "department": "Sales",
+            "track": "A",
+            "headcount": 1,
+            "team": "team-a",
+            "title": "Sales Agent",
+        },
+        headers={**headers, "Idempotency-Key": str(uuid.uuid4())},
+    ).json()
+
+    done = client.post("/dev/clear-test-data").json()
+    assert done["candidates_archived"] >= 1
+    assert done["requisitions_closed"] >= 1
+
+    assert client.get(f"/v1/candidates/cand_{ours}", headers=headers).json()["archived_at"]
+    assert client.get(f"/v1/candidates/cand_{imported}", headers=headers).json()["archived_at"] is (
+        None
+    ), "the import is not test data"
+    assert (
+        client.get(f"/v1/requisitions/{requisition['id']}", headers=headers).json()["status"]
+        == "closed"
+    )
+    # Nothing was deleted: both records still read, with the reason and who did it.
+    put_away = client.get(f"/v1/candidates/cand_{ours}", headers=headers).json()
+    assert put_away["archived_reason"] == "Made while trying the platform out (dev)"
