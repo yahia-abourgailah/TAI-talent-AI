@@ -163,8 +163,33 @@ function buildForm() {
     input.id = `f-${name}`;
     input.style.width = "100%";
     wrapper.append(label, input);
+    // A CV gives one number and never says whether it is on WhatsApp, so this box comes back
+    // empty however well the CV was read. The candidate is the only one who knows; this is them
+    // saying so, in one tap, rather than us copying their phone and hoping.
+    if (name === "whatsapp") wrapper.append(sameAsPhone());
     return wrapper;
   }));
+}
+
+function sameAsPhone() {
+  const tick = document.createElement("input");
+  tick.type = "checkbox";
+  tick.id = "f-whatsapp-same";
+  const label = document.createElement("label");
+  label.setAttribute("for", tick.id);
+  label.className = "same";
+  label.append(tick, document.createTextNode(" Same as my phone"));
+  const copy = () => {
+    if (!tick.checked) return;
+    $("f-whatsapp").value = $("f-phone").value;
+    $("f-whatsapp").parentElement.classList.add("prefilled");
+  };
+  tick.addEventListener("change", copy);
+  $("fields").addEventListener("input", (event) => {
+    if (event.target.id === "f-phone") copy();
+    if (event.target.id === "f-whatsapp") tick.checked = false;
+  });
+  return label;
 }
 
 /* 4 · consent, in the words the candidate was actually shown */
