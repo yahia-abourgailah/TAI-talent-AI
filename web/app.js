@@ -251,9 +251,26 @@ async function searchCandidates() {
   showCandidates(page.items, "Nobody matches every value you sent.");
 }
 
+// The 5,140 migrated from the sheet drown out everyone who has arrived since, so by default the
+// list is the people who came through the platform. The sheet is one dropdown away.
+const ARRIVED_SINCE = ["cv_upload", "public_apply", "manual_entry"];
+
+function sourceQuery() {
+  const choice = $("c-migrated").value;
+  if (choice === "yes") return "";
+  if (choice === "only") return "&source=tai_master";
+  return ARRIVED_SINCE.map((name) => `&source=${name}`).join("");
+}
+
 async function listCandidates() {
-  const page = await api("/v1/candidates?limit=25");
-  showCandidates(page.items, "No candidates you can see.");
+  const page = await api(`/v1/candidates?limit=25${sourceQuery()}`);
+  showCandidates(
+    page.items,
+    $("c-migrated").value === "no"
+      ? "Nobody has come through the platform yet. The 5,140 from the old sheet are hidden — " +
+        "change “The old sheet” above to see them."
+      : "No candidates you can see."
+  );
 }
 
 function showCandidates(items, empty) {
@@ -682,6 +699,7 @@ $("r-create").addEventListener("click", () =>
 $("c-search").addEventListener("click", () => guard(searchCandidates));
 $("n-create").addEventListener("click", () => guard(typeInCandidate));
 $("c-recent").addEventListener("click", () => guard(listCandidates));
+$("c-migrated").addEventListener("change", () => guard(listCandidates));
 $("p-reload").addEventListener("click", () => guard(loadApplications));
 $("q-reload").addEventListener("click", () => guard(loadQueue));
 $("q-kind").addEventListener("change", () => guard(loadQueue));

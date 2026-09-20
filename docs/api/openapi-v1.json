@@ -3985,7 +3985,7 @@
     },
     "/v1/candidates": {
       "get": {
-        "description": "Candidates in your scope, newest first, as summaries.",
+        "description": "Candidates in your scope, newest first, as summaries.\n\n`source` narrows by where a record came from: `?source=cv_upload&source=public_apply` is the\npeople who have arrived since the migration, without the 5,140 that came from the sheet.",
         "operationId": "list_candidates_v1_candidates_get",
         "parameters": [
           {
@@ -4049,6 +4049,33 @@
                 }
               ],
               "title": "Owner Id"
+            }
+          },
+          {
+            "description": "Where the record came from; repeat for more than one",
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "tai_master",
+                      "cv_upload",
+                      "manual_entry",
+                      "public_apply"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Where the record came from; repeat for more than one",
+              "title": "Source"
             }
           }
         ],

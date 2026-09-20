@@ -8,6 +8,7 @@ came from and whether anyone verified it; a field nobody recorded is not recorde
 Evaluations are read with the same scope, except that the criteria owner reads all of them.
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Self
@@ -89,8 +90,14 @@ def list_candidates(
     before: int | None = None,
     opening_id: int | None = None,
     owner: str | None = None,
+    sources: Sequence[str] | None = None,
 ) -> list[dict[str, Any]]:
-    """Newest first. Summaries: the name, and where the record came from. No fields."""
+    """Newest first. Summaries: the name, and where the record came from. No fields.
+
+    `sources` narrows by where the record came from — the 5,140 migrated from the sheet
+    (tai_master) drown out everyone who has arrived since, and a recruiter's working list is
+    usually the people who applied, not the backlog.
+    """
     return run(
         conn,
         text(
@@ -98,6 +105,7 @@ def list_candidates(
             SELECT c.id, c.created_at, c.archived_at, r.source, {NAME}
             FROM core.candidate c JOIN raw.capture r ON r.id = c.capture_id
             WHERE {VISIBLE}
+              AND (CAST(:sources AS text[]) IS NULL OR r.source = ANY(:sources))
               AND (CAST(:before AS bigint) IS NULL OR c.id < :before)
               AND (CAST(:opening AS bigint) IS NULL OR EXISTS (
                 SELECT 1 FROM pipeline.application o
@@ -111,7 +119,14 @@ def list_candidates(
             ORDER BY c.id DESC LIMIT :limit
             """
         ),
-        {"limit": limit, "before": before, "opening": opening_id, "owner": owner, **actor.scope()},
+        {
+            "limit": limit,
+            "before": before,
+            "opening": opening_id,
+            "owner": owner,
+            "sources": list(sources) if sources else None,
+            **actor.scope(),
+        },
     )
 
 

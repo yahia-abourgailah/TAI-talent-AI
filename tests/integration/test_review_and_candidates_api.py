@@ -3,6 +3,7 @@ BR-405 to BR-408). Made-up candidates; the API commits nothing, everything rolls
 """
 
 from contextlib import contextmanager
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -313,3 +314,32 @@ def test_an_admin_sees_and_acts_on_every_application_with_their_name(api):
     )
     assert moved.status_code == 201
     assert moved.json()["actor"]["id"] == "dev|admin"
+
+
+def test_a_list_can_leave_out_where_a_record_came_from(api_client, make_candidate):
+    """The 5,140 migrated from the sheet drown out everyone who has arrived since."""
+    client, connection = api_client
+    headers = _as(client, "ta-lead")
+    typed_in = client.post(
+        "/v1/candidates",
+        json={"fields": {"full_name": "Typed In By Hand"}},
+        headers={**headers, "Idempotency-Key": str(uuid4())},
+    )
+    assert typed_in.status_code == 201, typed_in.text
+    typed_id = typed_in.json()["id"]
+    migrated_id = f"cand_{make_candidate(connection, full_name='Came From The Sheet')}"
+
+    arrived = client.get("/v1/candidates", params={"source": "manual_entry"}, headers=headers)
+    ids = {row["id"] for row in arrived.json()["items"]}
+    assert typed_id in ids
+    assert migrated_id not in ids
+    assert {row["source"] for row in arrived.json()["items"]} == {"manual_entry"}
+
+    everyone = client.get("/v1/candidates", headers=headers).json()["items"]
+    assert {typed_id, migrated_id} <= {row["id"] for row in everyone}
+
+    # A source nobody records is refused, rather than answering with an empty page that looks
+    # like "we have nobody" instead of "you asked for something that does not exist".
+    wrong = client.get("/v1/candidates", params={"source": "somewhere_else"}, headers=headers)
+    assert wrong.status_code == 400
+    assert wrong.json()["error"]["code"] == "invalid_request"

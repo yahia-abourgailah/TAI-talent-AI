@@ -36,6 +36,11 @@ Db = Annotated[Connection, Depends(db_connection)]
 Blobs = Annotated[BlobStore, Depends(blob_store)]
 
 
+# Where a candidate's record came from. The names are the raw capture's own, so they are the same
+# words the source field carries back.
+SourceName = Literal["tai_master", "cv_upload", "manual_entry", "public_apply"]
+
+
 class CandidateSummaryOut(BaseModel):
     id: str
     # The name as it stands, so a list says who each row is about. Null when nobody recorded one.
@@ -129,8 +134,16 @@ def list_candidates(
     cursor: Annotated[str | None, Query(max_length=200)] = None,
     requisition_id: Annotated[str | None, Query(max_length=40)] = None,
     owner_id: Annotated[str | None, Query(max_length=200)] = None,
+    source: Annotated[
+        list[SourceName] | None,
+        Query(description="Where the record came from; repeat for more than one"),
+    ] = None,
 ) -> CandidatePage:
-    """Candidates in your scope, newest first, as summaries."""
+    """Candidates in your scope, newest first, as summaries.
+
+    `source` narrows by where a record came from: `?source=cv_upload&source=public_apply` is the
+    people who have arrived since the migration, without the 5,140 that came from the sheet.
+    """
     rows = reads.list_candidates(
         conn,
         actor_from_principal(principal),
@@ -138,6 +151,7 @@ def list_candidates(
         before=decode_cursor(cursor),
         opening_id=decode_filter("requisition", "requisition_id", requisition_id),
         owner=owner_id,
+        sources=[str(name) for name in source] if source else None,
     )
     items = [
         CandidateSummaryOut(
