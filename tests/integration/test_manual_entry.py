@@ -2,9 +2,12 @@
 BR-201). Made-up values; everything rolls back.
 """
 
+import hashlib
 import uuid
 
+import pytest
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
 
 from .conftest import sign_in
 
@@ -187,3 +190,70 @@ def test_a_retried_entry_with_the_same_key_creates_one_candidate(api_client):
     assert first.status_code == again.status_code == 201
     assert again.headers["idempotent-replayed"] == "true"
     assert first.json() == again.json()
+
+
+def test_a_person_can_check_a_field_that_came_from_the_sheet(api_client, owner_engine):
+    """The importer writes each field once. That rule was written for the importer, and it caught
+    a person: confirming a migrated value looked to the database like a second import, so nobody
+    could check any of the 66,820 fields that came across (migration 0017)."""
+    client, connection = api_client
+    capture = connection.execute(
+        text(
+            "INSERT INTO raw.capture (source, external_id, content_sha256, blob_key, media_type, "
+            "byte_size, received_by) VALUES ('tai_master', :external, :hash, :key, "
+            "'application/json', 10, 'integration-test') RETURNING id"
+        ),
+        {
+            "external": f"sheet-row-{uuid.uuid4().hex[:8]}",
+            "hash": hashlib.sha256(uuid.uuid4().bytes).digest(),
+            "key": f"made-up/sheet-{uuid.uuid4().hex[:8]}",
+        },
+    ).scalar_one()
+    candidate = connection.execute(
+        text(
+            "INSERT INTO core.candidate (capture_id, source_key, created_by, pipeline_state) "
+            "VALUES (:capture, :key, 'integration-test', 'not_recorded') RETURNING id"
+        ),
+        {"capture": capture, "key": f"tai_master:{capture}"},
+    ).scalar_one()
+    connection.execute(
+        text(
+            "INSERT INTO core.candidate_field (candidate_id, field, value, source, "
+            "verification_status, recorded_by) VALUES (:c, 'full_name', 'Made Up From The Sheet', "
+            "'migrated from TAI_Master', 'unverified', 'integration-test')"
+        ),
+        {"c": candidate},
+    )
+
+    checked = client.post(
+        f"/v1/candidates/cand_{candidate}/fields/full_name/verification",
+        json={"value": None},
+        headers={**sign_in(client, "ta-lead"), "Idempotency-Key": str(uuid.uuid4())},
+    )
+    assert checked.status_code == 201, checked.text
+    assert checked.json()["verification"] == "verified"
+    # Where the value came from is unchanged — it did come from the sheet — and the old row stays.
+    assert checked.json()["source"] == "migrated from TAI_Master"
+    rows = (
+        connection.execute(
+            text(
+                "SELECT verification_status FROM core.candidate_field WHERE candidate_id = :c "
+                "AND field = 'full_name' ORDER BY id"
+            ),
+            {"c": candidate},
+        )
+        .scalars()
+        .all()
+    )
+    assert rows == ["unverified", "verified"]
+
+    # And the importer still cannot write the same field twice.
+    with pytest.raises(DBAPIError), connection.begin_nested():
+        connection.execute(
+            text(
+                "INSERT INTO core.candidate_field (candidate_id, field, value, source, "
+                "verification_status, recorded_by) VALUES (:c, 'full_name', 'Imported Again', "
+                "'migrated from TAI_Master', 'unverified', 'integration-test')"
+            ),
+            {"c": candidate},
+        )

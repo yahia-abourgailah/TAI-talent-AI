@@ -66,7 +66,10 @@ const text = (value, fallback = "—") =>
 const when = (value) => (value ? new Date(value).toLocaleString() : "—");
 
 function say(message, kind = "ok") {
+  // The banner lives at the top of the page and the tables are long: an answer nobody can see is
+  // the same as no answer, which is how "nothing happened" gets reported for a button that worked.
   $("message").replaceChildren(el("div", { class: `msg ${kind}` }, message));
+  $("message").scrollIntoView({ behavior: "smooth", block: "nearest" });
   if (kind === "ok") setTimeout(() => $("message").replaceChildren(), 4000);
 }
 
@@ -344,12 +347,19 @@ async function checkField(candidateId, field, current) {
     value = prompt(`What is the right ${field}?`, "");
     if (value === null || !value.trim()) return;
   }
-  await api(`/v1/candidates/${candidateId}/fields/${field}/verification`, {
+  const done = await api(`/v1/candidates/${candidateId}/fields/${field}/verification`, {
     method: "POST",
     idempotent: true,
     body: { value: current === null ? value.trim() : null },
   });
-  say(`${field} checked.`);
+  say(
+    done.corrected
+      ? `${field} corrected and checked. The old value is kept beside the new one.`
+      : `${field} checked as it stands.` +
+        (done.resolved_review_item_id
+          ? " Nothing is left unchecked, so the review item closed itself."
+          : "")
+  );
   await openCandidate(candidateId);
 }
 
