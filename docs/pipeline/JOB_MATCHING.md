@@ -16,12 +16,8 @@ So a requisition now says what kind of job it is.
 | `sales` (the default) | `score_application`, the criteria version, a tier. Nothing changed. |
 | `other` | `assess_application`: the candidate's own CV file and the job's skills go to the company CV service's `POST /extract_and_match`, which extracts the CV and grades it against those skills in code. |
 
-A requisition of kind `other` says what it asks for **twice**, and the database insists on both
-(migrations 0018 and 0020):
-
-- `description` — prose, at least 40 characters. What a person reads. It is not what the match
-  uses: a paragraph is not something a machine can check a CV against line by line.
-- `requirements` — the list the match uses. One to forty skills, each with the level the job wants:
+A requisition of kind `other` must list what it asks for (migration 0020). One to forty skills,
+each with the level the job wants:
 
 ```json
 [{"skill": "Python", "level": "advanced"},
@@ -33,6 +29,10 @@ it does not know would give a percentage that means nothing, so the database ref
 everything else about an opening, the list never changes once the opening exists — a requisition
 whose requirements move is a different requisition, and every assessment made under the old ones
 would quietly become an assessment of something else.
+
+A requisition may still carry a `description`, a note for whoever reads it, but nothing is judged
+by it: it was required while a language model read the CV against those words, and since the match
+replaced that, nothing reads it at all (migration 0021).
 
 ## What comes back
 
@@ -92,8 +92,8 @@ stand-in that never leaves the process.
 
 ## Trying it
 
-In the console (dev only), create a requisition with **Kind of job = other**, write what the job is
-and add the skills it asks for, then add a candidate who has a CV file on record. The Queue tab
+In the console (dev only), create a requisition with **Kind of job = other**, add the skills it
+asks for, then add a candidate who has a CV file on record. The Queue tab
 shows the item with the percentage in its sentence, and the candidate's Evaluations row opens the
 same "Show the sums" panel a score does — a line per skill, shown or not shown, with the CV's own
 words beside it.

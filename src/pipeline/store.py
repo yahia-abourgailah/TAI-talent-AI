@@ -117,9 +117,9 @@ def create_opening(
 
     `job_type` decides how a candidate for it is judged: `sales` by the criteria version, as
     always; `other` by the skills it lists, matched against the candidate's own CV file, for a
-    person to act on. A job of kind `other` must say what it asks for, in prose for a person
-    (`description`) and as skills for the match (`requirements`) — the database insists on both,
+    person to act on. A job of kind `other` must list those skills — the database insists,
     because an assessment nobody can check against the job is not evidence of anything (BR-305).
+    `description` is only a note for whoever reads the requisition; nothing is judged by it.
     """
     owner = owner_recruiter or actor.subject
     if not actor.sees_all and owner != actor.subject:

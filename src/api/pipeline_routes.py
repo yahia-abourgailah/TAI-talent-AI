@@ -151,18 +151,15 @@ class RequisitionIn(BaseModel):
     public: bool = False
     # How a candidate for this job is judged. `sales` is the criteria version, as always. `other`
     # is judged against the skills it lists, matched against the candidate's own CV file, for a
-    # person to act on. A job of that kind says what it asks for twice: in prose for a person to
-    # read, and as skills for the match (BR-305).
+    # person to act on (BR-305).
     job_type: Literal["sales", "other"] = "sales"
-    description: Annotated[str, Field(min_length=40, max_length=8000)] | None = None
+    # A note for whoever reads the requisition. Nothing is judged by it: the match is done against
+    # `requirements` (migration 0021).
+    description: Annotated[str, Field(min_length=1, max_length=8000)] | None = None
     requirements: Annotated[list[SkillIn], Field(max_length=40)] | None = None
 
     @model_validator(mode="after")
     def _other_jobs_say_what_they_ask_for(self) -> "RequisitionIn":
-        if self.job_type == "other" and not (self.description or "").strip():
-            raise ValueError(
-                "a job that is not sales needs a description: it is what a person reads"
-            )
         if self.job_type == "other" and not self.requirements:
             raise ValueError(
                 "a job that is not sales needs the skills it asks for: they are what each CV is "

@@ -37,10 +37,6 @@ JOB = {
     "team": "team-tech",
     "title": "Machine Learning Engineer",
     "job_type": "other",
-    "description": (
-        "We need a machine learning engineer: Python, models in production, and a degree in "
-        "computer science or engineering."
-    ),
     "requirements": [
         {"skill": "Python", "level": "advanced"},
         {"skill": "Docker", "level": "intermediate", "category": "Technical"},
@@ -416,7 +412,6 @@ def test_a_sales_job_is_untouched_by_any_of_this(api, make_candidate):
         blobs,
         make_candidate,
         job_type="sales",
-        description=None,
         requirements=None,
     )
     assert _queued(connection, application["id"], "score_application") is not None
@@ -465,7 +460,6 @@ def test_a_service_that_is_down_is_waited_for_then_handed_to_a_person(api, make_
     ("change", "because"),
     [
         ({"requirements": None}, "a job that is not sales needs the skills"),
-        ({"description": None}, "a job that is not sales needs a description"),
         (
             {"requirements": [{"skill": "Python", "level": "wizard"}]},
             "level",
@@ -496,7 +490,24 @@ def test_a_sales_job_may_not_carry_a_skills_list(api):
     client, _connection, _settings, _blobs = api
     refused = client.post(
         "/v1/requisitions",
-        json={**JOB, "job_type": "sales", "description": None},
+        json={**JOB, "job_type": "sales"},
         headers={**sign_in(client, "ta-lead"), "Idempotency-Key": str(uuid.uuid4())},
     )
     assert refused.status_code == 400
+
+
+def test_a_job_that_is_not_sales_needs_no_prose(api):
+    """Nothing reads it: the match is against the skills, and the careers page never shows it."""
+    client, _connection, _settings, _blobs = api
+    made = client.post(
+        "/v1/requisitions",
+        json={**JOB, "description": None},
+        headers={**sign_in(client, "ta-lead"), "Idempotency-Key": str(uuid.uuid4())},
+    )
+    assert made.status_code == 201, made.text
+    assert made.json()["description"] is None
+    assert [skill["skill"] for skill in made.json()["requirements"]] == [
+        "Python",
+        "Docker",
+        "Machine Learning",
+    ]

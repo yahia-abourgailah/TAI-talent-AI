@@ -873,7 +873,6 @@ $("r-create").addEventListener("click", () =>
       location: $("r-location").value.trim() || null,
       public: $("r-public").value === "true",
       job_type: $("r-jobtype").value,
-      description: $("r-description").value.trim() || null,
       requirements: $("r-jobtype").value === "other" ? skillsAsked() : null,
     };
     if (body.job_type === "other" && !body.requirements.length) {
@@ -887,7 +886,7 @@ $("r-create").addEventListener("click", () =>
 );
 $("r-jobtype").addEventListener("change", () => {
   const other = $("r-jobtype").value === "other";
-  $("r-description-row").classList.toggle("hidden", !other);
+  $("r-skills-row").classList.toggle("hidden", !other);
   if (other && !$("r-skills").children.length) {
     $("r-skills").append(skillRow("Python", "advanced"), skillRow());
   }
