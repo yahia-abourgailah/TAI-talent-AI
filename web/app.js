@@ -254,9 +254,10 @@ function clearView(...ids) {
 }
 
 async function openRequisition(id) {
-  const [requisition, applications] = await Promise.all([
+  const [requisition, applications, posts] = await Promise.all([
     api(`/v1/requisitions/${id}`),
     api(`/v1/applications?requisition_id=${id}&limit=50&archived=false`),
+    api(`/v1/requisitions/${id}/job-posts`),
   ]);
   $("requisition-detail").replaceChildren(
     el("div", { class: "card" },
@@ -282,6 +283,28 @@ async function openRequisition(id) {
           ? el("button", { onclick: () => guard(() => closeRequisition(id)) }, "Close")
           : null
       ),
+      el("h2", {}, `Job post links (${posts.items.length})`),
+      el("p", { class: "muted", style: "margin-top:0" },
+        "One link per place you publish. Whoever applies through it is counted under that " +
+        "channel in the arrivals report — which is how the scrapers get argued about."),
+      table(
+        ["code", "channel", "what it is for", "the link to publish", ""],
+        posts.items.map((post) => ({
+          cells: [
+            post.tracking_code,
+            post.channel,
+            text(post.label),
+            post.url
+              ? el("a", { href: post.url, target: "_blank", rel: "noreferrer" }, post.url)
+              : el("span", { class: "muted" },
+                  "set TALENT_CAREERS_URL to get a link"),
+            post.url
+              ? el("button", { onclick: () => guard(() => copyLink(post.url)) }, "Copy")
+              : null,
+          ],
+        })),
+        "No link yet. Make one for each place you publish this job."
+      ),
       el("h2", {}, `Applications (${applications.items.length})`),
       table(
         ["application", "candidate", "stage", "outcome"],
@@ -301,15 +324,37 @@ async function openRequisition(id) {
 }
 
 async function makeJobPost(id) {
+  const channel = prompt(
+    "Where are you publishing it? One word, lower case: linkedin, tiktok, facebook, whatsapp…",
+    "linkedin"
+  );
+  if (!channel) return;
   const label = prompt("What is this link for? (e.g. LinkedIn post, 20 September)");
   if (!label) return;
   const post = await api(`/v1/requisitions/${id}/job-posts`, {
     method: "POST",
     idempotent: true,
-    body: { channel: "linkedin", label },
+    body: { channel: channel.trim().toLowerCase(), label },
   });
-  const link = `${location.origin}/careers/?job=${id}&code=${post.code}`;
-  say(`Job post ${post.code} created. Link: ${link}`);
+  // The API builds the link from the careers page's own address, so it is the same link
+  // everywhere and nobody types the query by hand.
+  if (post.url) await copyLink(post.url);
+  say(
+    post.url
+      ? `Link ready and copied: ${post.url}`
+      : `Job post ${post.tracking_code} created. Set TALENT_CAREERS_URL to get a link with it.`
+  );
+  await openRequisition(id);
+}
+
+async function copyLink(url) {
+  try {
+    await navigator.clipboard.writeText(url);
+    say(`Copied: ${url}`);
+  } catch {
+    // A browser that refuses the clipboard (no https, no permission) still lets them take it.
+    window.prompt("Copy the link:", url);
+  }
 }
 
 async function closeRequisition(id) {

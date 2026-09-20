@@ -64,6 +64,11 @@ class Settings(BaseSettings):
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
+    # Where the careers page lives, so a job post comes back as a link somebody can paste into a
+    # post (BR-602). The website team owns that page; the platform only needs its address. Empty
+    # means a job post still has its code, and the link is left to whoever publishes it.
+    careers_url: str = ""
+
     # Events to the CRM (API plan section 7). Delivery is off while the URL is empty.
     crm_webhook_url: str = ""
     crm_webhook_secret: SecretStr = SecretStr("")
@@ -82,6 +87,14 @@ class Settings(BaseSettings):
         if self.ocr_mode is not None:
             return self.ocr_mode
         return OcrMode.FAKE if self.env is Environment.DEV else OcrMode.API
+
+    @model_validator(mode="after")
+    def _check_careers_url(self) -> Self:
+        if self.careers_url:
+            parts = urlsplit(self.careers_url)
+            if parts.scheme not in {"http", "https"} or not parts.hostname:
+                raise ValueError("TALENT_CAREERS_URL must be an http or https URL.")
+        return self
 
     @model_validator(mode="after")
     def _check_ocr(self) -> Self:

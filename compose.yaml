@@ -18,6 +18,11 @@ x-app-environment: &app-environment
 services:
   postgres:
     image: postgres:16-alpine
+    # Loopback only, so the integration tests can reach it from the host. It was in a second
+    # compose file, which meant any plain `docker compose up` quietly recreated the container
+    # without it and the tests stopped being able to connect.
+    ports:
+      - "127.0.0.1:${TALENT_TEST_DB_PORT:-55432}:5432"
     environment:
       POSTGRES_USER: talent_owner
       POSTGRES_PASSWORD: ${TALENT_DB_OWNER_PASSWORD:?set TALENT_DB_OWNER_PASSWORD in .env}
