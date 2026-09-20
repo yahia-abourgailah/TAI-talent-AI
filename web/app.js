@@ -368,15 +368,21 @@ async function openCandidate(id) {
         "new one. Once nothing is left unchecked, the review item closes by itself."),
       table(["field", "value", "where it came from", "checked", ""], fields, "Nothing recorded."),
       el("h2", {}, "Evaluations"),
-      ...readings(evaluations.items || []),
       table(
         ["evaluation", "score", "tier", "outcome", "why it scored that", "when", ""],
-        (evaluations.items || []).filter((row) => row.origin !== "ai").map((row) => ({
+        (evaluations.items || []).map((row) => ({
           cells: [
-            row.id,
+            row.origin === "ai"
+              ? el("span", {}, row.id, " ",
+                  el("span", { class: "pill info" }, "read by the model"))
+              : row.id,
             text(row.score),
-            el("span", { class: "pill info" }, text(row.tier)),
-            text(row.outcome),
+            // An assessment carries no tier and never will: BR-306 keeps that a person's decision.
+            row.origin === "ai"
+              ? el("span", { class: "muted" }, "—")
+              : el("span", { class: "pill info" }, text(row.tier)),
+            row.origin === "ai" ? el("span", { class: "muted" }, "for a person to decide")
+                                : text(row.outcome),
             el("span", {},
               ...(row.signals || []).map((signal) =>
                 el("span", { class: "pill", style: "margin:0 4px 4px 0" }, signal)),
@@ -385,62 +391,17 @@ async function openCandidate(id) {
               (row.signals || []).length || (row.flags || []).length ? null : "—"
             ),
             when(row.evaluated_at || row.recorded_at),
-            el("button", { onclick: () => guard(() => explainScore(row.id)) }, "Show the sums"),
+            row.origin === "ai"
+              ? el("span", { class: "muted" },
+                  `${text(row.model_version)} · ${text(row.application_id)}`)
+              : el("button", { onclick: () => guard(() => explainScore(row.id)) }, "Show the sums"),
           ],
         })),
-        "No score from the criteria: scoring happens when the candidate is added to a " +
-          "requisition for a sales job."
+        "Not scored yet: scoring happens when the candidate is added to a requisition."
       ),
       el("div", { id: "explanation" })
     )
   );
-}
-
-/* A reading by the model is not a score, and a row in the score table is the wrong shape for it:
-   there is no tier, no outcome and no arithmetic, and what matters is the evidence, which is
-   sentences. So it gets its own panel (BR-305, BR-306). */
-function readings(items) {
-  return items.filter((row) => row.origin === "ai").map((row) => {
-    const found = (row.signals || []).map((signal) => {
-      // "what it says — “the CV's own words”". The quotation marks come back from <q>, so they
-      // are taken off here rather than shown twice.
-      const cut = signal.indexOf(" \u2014 \u201c");
-      if (cut === -1) return { says: signal, quote: null };
-      return {
-        says: signal.slice(0, cut),
-        quote: signal.slice(cut + 4).replace(/\u201d$/, ""),
-      };
-    });
-    const missing = (row.flags || []).map((flag) => flag.replace(/^The job asks for: /, ""));
-    return el("div", { class: "reading" },
-      el("div", { class: "reading-head" },
-        el("div", { class: "reading-score" },
-          el("b", {}, row.score === null ? "—" : Math.round(row.score)),
-          el("span", {}, "/ 100")),
-        el("div", {},
-          el("div", {}, "Read against the job, not scored by the sales criteria"),
-          el("p", { class: "muted" },
-            `${text(row.application_id)} · ${text(row.model_version)} · ` +
-            `${when(row.evaluated_at || row.recorded_at)} · no tier: a person decides`))
-      ),
-      row.recommendation ? el("p", { class: "reading-summary" }, row.recommendation) : null,
-      el("div", { class: "reading-columns" },
-        el("div", {},
-          el("h3", {}, `What it found in the CV (${found.length})`),
-          found.length
-            ? el("ul", { class: "reading-list" },
-                ...found.map((reason) =>
-                  el("li", {}, reason.says,
-                    reason.quote ? el("q", { class: "quote" }, reason.quote) : null)))
-            : el("p", { class: "muted" }, "Nothing it could quote from the CV.")),
-        el("div", {},
-          el("h3", {}, `What the job asks for and the CV does not show (${missing.length})`),
-          missing.length
-            ? el("ul", { class: "reading-list missing" }, ...missing.map((item) => el("li", {}, item)))
-            : el("p", { class: "muted" }, "Nothing missing that it could name."))
-      )
-    );
-  });
 }
 
 async function checkField(candidateId, field, current) {
