@@ -492,8 +492,9 @@ async function explainScore(evaluationId) {
 }
 
 function showReading(row) {
-  // The same place "Show the sums" opens, because it answers the same question: where did this
-  // number come from. There are no sums here — the answer is the CV's own words (BR-305).
+  // The same panel a score opens, in the same place, reading the same way: a line per thing
+  // weighed, and a total at the bottom. The difference is what is in the middle column — a score
+  // has points, a reading has the CV's own words or nothing (BR-305, BR-307).
   const found = (row.signals || []).map((signal) => {
     const cut = signal.indexOf(" \u2014 \u201c");
     return cut === -1
@@ -501,30 +502,42 @@ function showReading(row) {
       : { says: signal.slice(0, cut), quote: signal.slice(cut + 4).replace(/\u201d$/, "") };
   });
   const missing = (row.flags || []).map((flag) => flag.replace(/^The job asks for: /, ""));
+  const rows = [
+    ...found.map((reason) => ({
+      cells: [
+        reason.says,
+        el("span", { class: "pill ok" }, "shown"),
+        el("span", { class: "mono muted" }, text(reason.quote)),
+      ],
+    })),
+    ...missing.map((item) => ({
+      cells: [
+        item,
+        el("span", { class: "pill bad" }, "not shown"),
+        el("span", { class: "mono muted" }, "nothing in the CV"),
+      ],
+    })),
+  ];
+  rows.push({
+    cells: [
+      el("b", {}, "Total (no tier: a person decides)"),
+      el("b", { class: "mono" }, text(row.score)),
+      el("b", { class: "mono muted" }, "of 100"),
+    ],
+  });
   $("explanation").replaceChildren(
     el("div", { class: "card" },
-      el("h2", { style: "margin-top:0" },
-        `What the model read for ${text(row.application_id)}: ${text(row.score)} out of 100`),
+      el("h2", { style: "margin-top:0" }, `How ${row.id} reached ${text(row.score)}`),
       el("p", { class: "muted", style: "margin-top:0" },
-        `${text(row.model_version)} · prompt ${text(row.prompt_version)} · ` +
-        `${when(row.evaluated_at || row.recorded_at)}. The score is how much of what this job ` +
-        "asks for the CV shows, and nothing else: no tier, no rejection, no comparison with a " +
-        "sales score."),
-      row.recommendation ? el("p", {}, row.recommendation) : null,
-      el("h2", {}, "What it found in the CV"),
-      table(
-        ["what it says", "the CV's own words"],
-        found.map((reason) => ({
-          cells: [reason.says, el("span", { class: "mono" }, text(reason.quote))],
-        })),
-        "Nothing it could quote from the CV."
-      ),
-      el("h2", {}, "What the job asks for and the CV does not show"),
-      table(
-        ["missing"],
-        missing.map((item) => ({ cells: [el("span", { class: "pill bad" }, item)] })),
-        "Nothing missing that it could name."
-      )
+        `Read against the job's own description for ${text(row.application_id)} by ` +
+        `${text(row.model_version)}, prompt ${text(row.prompt_version)}. No rules were run and ` +
+        "no tier was set: the score is how much of what this job asks for the CV shows, and it " +
+        "is not comparable with a sales score."),
+      row.recommendation
+        ? el("p", {}, el("span", { class: "pill info" }, "in one sentence"), " ",
+            row.recommendation)
+        : null,
+      table(["what the job asks for", "the CV", "the CV's own words"], rows, "")
     )
   );
   $("explanation").scrollIntoView({ behavior: "smooth", block: "nearest" });
