@@ -89,7 +89,11 @@ _INSERT_FIELD = text(
       (candidate_id, field, value, source, source_ref, verification_status, inference, recorded_by)
     VALUES
       (:candidate_id, :field, :value, :source, :source_ref, :status, :inference, :recorded_by)
-    ON CONFLICT (candidate_id, field) WHERE source = '{FIELD_SOURCE}' DO NOTHING
+    -- The index this matches covers unchecked import rows only, so that a person can check one
+    -- without it looking like a second import (migration 0017).
+    ON CONFLICT (candidate_id, field)
+      WHERE source = '{FIELD_SOURCE}' AND verification_status IS DISTINCT FROM 'verified'
+      DO NOTHING
     RETURNING id
     """
 )
