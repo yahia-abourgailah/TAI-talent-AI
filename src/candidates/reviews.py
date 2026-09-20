@@ -45,7 +45,7 @@ _ITEMS = f"""
     LEFT JOIN pipeline.review_resolution x ON x.review_item_id = r.id
     LEFT JOIN core.candidate_match m ON m.id = r.match_id
     LEFT JOIN core.evaluation e ON e.id = r.evaluation_id
-    WHERE r.kind IN {tuple(KINDS)!r} AND {VISIBLE}
+    WHERE r.kind IN {tuple(KINDS)!r} AND c.archived_at IS NULL AND {VISIBLE}
 """
 
 

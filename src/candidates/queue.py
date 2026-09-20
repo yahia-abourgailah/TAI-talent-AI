@@ -100,6 +100,9 @@ _OPEN = f"""
     LEFT JOIN pipeline.rejection_reason rr
       ON rr.list_version = r.list_version AND rr.code = r.reason_code
     WHERE NOT EXISTS (SELECT 1 FROM pipeline.review_resolution x WHERE x.review_item_id = r.id)
+      -- An archived record is out of play (BR-205). Asking somebody to work an item about one is
+      -- asking for work that cannot lead anywhere.
+      AND c.archived_at IS NULL
       AND {not_locked("c.id")}
       AND CASE WHEN r.application_id IS NOT NULL
                THEN (:sees_all OR a.owner_recruiter = :subject)

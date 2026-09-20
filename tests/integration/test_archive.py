@@ -146,3 +146,41 @@ def test_a_list_can_leave_out_what_was_put_away(api_client, make_candidate):
     # Nothing is lost: the record still reads, with the reason and who did it.
     one = client.get(f"/v1/candidates/cand_{put_away}", headers=headers).json()
     assert one["archived_reason"] == "Made-up file from a test run"
+
+
+def test_archiving_takes_the_candidate_out_of_the_review_queue(api_client, make_candidate):
+    """A queue is a list of work. Work on a record that is out of play leads nowhere (BR-205)."""
+    client, connection = api_client
+    headers = sign_in(client, "ta-lead")
+    typed_in = client.post(
+        "/v1/candidates",
+        json={"fields": {"full_name": "A Test Upload, Not A Person", "phone": "01000000000"}},
+        headers={**headers, "Idempotency-Key": str(uuid.uuid4())},
+    ).json()
+    candidate = int(typed_in["id"].removeprefix("cand_"))
+
+    def waiting() -> set[str]:
+        items = client.get("/v1/review-queue", params={"limit": 100}, headers=headers).json()
+        return {row["candidate_id"] for row in items["items"]}
+
+    def waiting_about_candidates() -> set[str]:
+        items = client.get(
+            "/v1/candidate-review-items", params={"limit": 100}, headers=headers
+        ).json()
+        return {row["candidate_id"] for row in items["items"]}
+
+    assert typed_in["id"] in waiting(), "a typed-in candidate waits to be checked"
+    assert typed_in["id"] in waiting_about_candidates()
+
+    archive_candidate(connection, candidate, "Made-up file from a test run", "integration-test")
+
+    assert typed_in["id"] not in waiting()
+    assert typed_in["id"] not in waiting_about_candidates()
+    # The item itself is not resolved, and nothing is deleted: it is out of the way, not gone.
+    assert (
+        connection.execute(
+            text("SELECT count(*) FROM pipeline.review_item WHERE candidate_id = :id"),
+            {"id": candidate},
+        ).scalar_one()
+        >= 1
+    )
