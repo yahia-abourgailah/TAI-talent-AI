@@ -672,12 +672,6 @@ async function loadReports() {
     el("p", { class: "muted" },
       `Step list ${funnel.stage_list}` +
       (funnel.provisional ? " — provisional: TA has not confirmed it yet." : ".")),
-    (queue.kinds || []).length
-      ? table(["waiting", "open", "oldest (h)"],
-          queue.kinds.map((kind) => ({
-            cells: [kind.kind, String(kind.open), text(kind.oldest_waiting_hours)],
-          })), "")
-      : null
   );
   const groups = funnel.groups || [];
   if (!groups.length) {
