@@ -383,16 +383,25 @@ async function openCandidate(id) {
               : el("span", { class: "pill info" }, text(row.tier)),
             row.origin === "ai" ? el("span", { class: "muted" }, "for a person to decide")
                                 : text(row.outcome),
-            el("span", {},
-              ...(row.signals || []).map((signal) =>
-                el("span", { class: "pill", style: "margin:0 4px 4px 0" }, signal)),
-              ...(row.flags || []).map((flag) =>
-                el("span", { class: "pill bad", style: "margin:0 4px 4px 0" }, flag)),
-              (row.signals || []).length || (row.flags || []).length ? null : "—"
-            ),
+            // A score's signals are short labels and fit here. A reading's are whole sentences
+            // with a quotation inside them, which is a panel's worth of text, not a cell's: the
+            // row says how it came out, the button opens what it read.
+            row.origin === "ai"
+              ? el("span", {},
+                  el("span", { class: "pill ok", style: "margin:0 4px 4px 0" },
+                    `${(row.signals || []).length} shown`),
+                  el("span", { class: "pill bad", style: "margin:0 4px 4px 0" },
+                    `${(row.flags || []).length} not shown`))
+              : el("span", {},
+                  ...(row.signals || []).map((signal) =>
+                    el("span", { class: "pill", style: "margin:0 4px 4px 0" }, signal)),
+                  ...(row.flags || []).map((flag) =>
+                    el("span", { class: "pill bad", style: "margin:0 4px 4px 0" }, flag)),
+                  (row.signals || []).length || (row.flags || []).length ? null : "—"
+                ),
             when(row.evaluated_at || row.recorded_at),
             row.origin === "ai"
-              ? el("button", { onclick: () => guard(() => showReading(row)) }, "Show what it read")
+              ? el("button", { onclick: () => guard(() => showReading(row)) }, "Show the sums")
               : el("button", { onclick: () => guard(() => explainScore(row.id)) }, "Show the sums"),
           ],
         })),

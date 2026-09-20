@@ -78,3 +78,9 @@ td.id{font-family:var(--mono);font-size:12px;color:var(--ink)}
 .steps{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
 .hidden{display:none!important}
 @media (max-width:640px){main{padding:12px}header.top{padding:10px 12px}nav.tabs{padding:0 6px}}
+
+/* The sums panel, and the reading that opens in the same place: a quotation is longer than a
+   label, so that column wraps instead of running the table off the side. */
+#explanation td:last-child{white-space:normal;max-width:46ch}
+#explanation .mono{font-size:12px;line-height:1.45}
+#explanation tr:last-child td{background:var(--sunken)}
