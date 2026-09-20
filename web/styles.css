@@ -78,3 +78,22 @@ td.id{font-family:var(--mono);font-size:12px;color:var(--ink)}
 .steps{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
 .hidden{display:none!important}
 @media (max-width:640px){main{padding:12px}header.top{padding:10px 12px}nav.tabs{padding:0 6px}}
+
+/* A CV read against a job (BR-305): evidence in sentences, so it is not a table row. */
+.reading{background:var(--sunken);border:1px solid var(--rule);border-left:3px solid var(--accent);
+  border-radius:6px;padding:12px 14px;margin:0 0 12px}
+.reading-head{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.reading-score{display:flex;align-items:baseline;gap:4px;color:var(--ink-3)}
+.reading-score b{font-size:30px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;
+  line-height:1}
+.reading-head .muted{margin:2px 0 0;font-size:12px}
+.reading-summary{margin:10px 0 0;color:var(--ink-2);max-width:80ch}
+.reading-columns{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px 22px;
+  margin-top:10px}
+.reading h3{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);
+  margin:6px 0 4px;font-weight:600}
+.reading-list{margin:0;padding-left:18px;color:var(--ink-2);font-size:14px}
+.reading-list li{margin-bottom:6px}
+.reading-list.missing li{color:var(--crit)}
+.reading-list .quote{display:block;font-family:var(--mono);font-size:12px;color:var(--ink-3);
+  margin-top:2px}
