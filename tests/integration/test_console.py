@@ -6,6 +6,7 @@ pages has been through their review, so neither is served anywhere but a develop
 """
 
 from contextlib import contextmanager
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -38,6 +39,15 @@ def _client(app_engine, **extra) -> TestClient:
     )
 
 
+# The pages are not in the production tree: `main` carries the API the front-end team integrates
+# with, and nothing half-built that looks like their work (scripts/promote.sh).
+CONSOLE = Path(__file__).resolve().parents[2] / "web"
+without_the_console = pytest.mark.skipif(
+    not (CONSOLE / "careers").is_dir(), reason="the console is not in this tree"
+)
+
+
+@without_the_console
 def test_the_console_is_served_in_development(app_engine):
     client = _client(app_engine, env="dev", auth_mode="dev")
     console = client.get("/app/")
