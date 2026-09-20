@@ -14,6 +14,8 @@ The platform reads one shape (intake.answer.OcrAnswer), so this translates. The 
 are the platform's, not the service's:
 
   * the newest job is the current one, so experience[0] gives the title and the employer;
+  * the service gives each job's dates and never a total, so the years are added up here
+    (intake.experience) and marked **inferred**: it is our arithmetic, not the candidate's word;
   * education[0] gives the degree, and its year is the graduation year — nothing else is inferred
     here, and the age rule stays where it is (intake.cv_fields, OPN-02);
   * `address` is the candidate's location as written: never translated, never re-spelled;
@@ -35,6 +37,7 @@ from intake.answer import (
     OcrAnswer,
     language_of,
 )
+from intake.experience import total_years
 
 SCHEMA = "cv-extractor/1.0.0"
 PROFILE_SOURCES = ("linkedin", "github", "portfolio", "website")
@@ -75,6 +78,18 @@ def _profile(links: Any) -> AnswerField | None:
     return None
 
 
+def _years(experience: Any) -> AnswerField | None:
+    """How long they have worked, added up from the jobs' own dates. Never a guess: when no job's
+    dates can be read, there is no total and the field is not recorded (BR-703)."""
+    if not isinstance(experience, list):
+        return None
+    durations = [str(job.get("duration") or "") for job in experience if isinstance(job, dict)]
+    years = total_years(durations)
+    if years is None:
+        return None
+    return AnswerField(text=str(years), language=None, inference="inferred")
+
+
 def translate(payload: dict[str, Any]) -> OcrAnswer:
     """The service's answer in the shape the platform reads, with values as the CV wrote them."""
     newest_job = _first(payload.get("experience"))
@@ -89,6 +104,7 @@ def translate(payload: dict[str, Any]) -> OcrAnswer:
         "education": _field(newest_study.get("degree")),
         "graduation_year": _field(newest_study.get("year")),
         "profile_url": _profile(payload.get("links")),
+        "years_experience": _years(payload.get("experience")),
     }
     fields = {name: found for name, found in candidates.items() if found is not None}
     spoken = [str(value) for value in payload.get("languages") or [] if str(value).strip()]

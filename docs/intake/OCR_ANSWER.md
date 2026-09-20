@@ -122,6 +122,15 @@ Each field becomes one `core.candidate_field` row: source `cv_extraction`, `unve
   1. The age the CV states (`stated`).
   2. Worked out from the date of birth (`inferred`). The date of birth itself is not stored.
   3. Worked out from the graduation year, using the criteria's own rule (`inferred`, OPN-02).
+- **Years of experience:** the company service gives each job's dates and never a total, so the
+  jobs are added up (`src/intake/experience.py`) and the value is recorded as `inferred`. Months
+  are summed across jobs — two jobs at once count twice — a job whose dates cannot be read is
+  skipped, and the total is whole years rounded down. If no job's dates can be read there is no
+  total and the field is `not_recorded`. On the careers page the candidate sees the number and
+  can correct it, and their correction is `stated`.
+- **What the company service never gives:** `whatsapp` (a CV has one number and does not say
+  whether it is on WhatsApp), `age` and `date_of_birth`. Those stay `not_recorded` until a person
+  or the candidate fills them in.
 - **Hidden content:** if the OCR reports any, the CV is read as usual and also sent to a person (`flagged_document` / `hidden_content`). The candidate is never told.
 
 ## What we need from the OCR team

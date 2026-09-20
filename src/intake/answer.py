@@ -56,6 +56,9 @@ class AnswerField(BaseModel):
     text: str = Field(max_length=MAX_TEXT)
     language: Language | None = None
     confidence: float | None = Field(default=None, ge=0, le=1)
+    # "inferred" when the reader worked the value out rather than reading it off the CV. Absent
+    # means it was written there (BR-201).
+    inference: Literal["stated", "inferred"] | None = None
 
 
 class HiddenContent(BaseModel):

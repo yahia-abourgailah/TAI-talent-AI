@@ -14,7 +14,9 @@ language it was written in. The rules:
                     is no age.
   Inferred          A value worked out rather than read says so. Age comes from, in order: the age
                     the CV states (stated); the date of birth (inferred); the graduation year, with
-                    the criteria's own rule (inferred, OPN-02). Nothing else is inferred.
+                    the criteria's own rule (inferred, OPN-02). Years of experience are added up
+                    from the jobs' own dates when the CV gives no total (inferred; the reader says
+                    which). Nothing else is inferred.
 
 The date of birth itself is not stored: only the age worked out from it.
 """
@@ -185,7 +187,12 @@ def map_answer(answer: OcrAnswer, today: date) -> Mapped:
         return CvField(name, _digits(value), UNVERIFIED, inference, None)
 
     years = number("years_experience", 0, MAX_YEARS_EXPERIENCE)
-    values["years_experience"] = as_field("years_experience", years, STATED)
+    said = found.get("years_experience")
+    values["years_experience"] = as_field(
+        "years_experience",
+        years,
+        INFERRED if said is not None and said.inference == INFERRED else STATED,
+    )
 
     graduation = number("graduation_year", EARLIEST_GRADUATION, CURRENT_YEAR + 6)
     if graduation is not None and not graduation.is_integer():

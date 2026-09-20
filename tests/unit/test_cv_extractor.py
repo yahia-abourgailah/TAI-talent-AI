@@ -99,3 +99,26 @@ def test_the_services_shape_is_recognised_by_the_one_entry_point():
 def test_an_answer_that_is_not_json_says_so():
     with pytest.raises(AnswerUnreadable, match="UTF-8 JSON"):
         parse_answer(b"<html>not json</html>")
+
+
+def test_the_years_are_added_up_from_the_jobs_and_marked_as_ours():
+    """The service gives each job's dates and never a total (BR-309, BR-201)."""
+    answer = translate(
+        {
+            "name": "Made Up Person",
+            "experience": [
+                {"role": "Senior Agent", "company": "Invented Co", "duration": "2022 - 2026"},
+                {"role": "Agent", "company": "Fictional Co", "duration": "Jan 2020 - Jan 2022"},
+            ],
+        }
+    )
+    years = answer.fields["years_experience"]
+    assert years.text == "6"
+    assert years.inference == "inferred", "our arithmetic, not the candidate's word"
+
+
+def test_jobs_with_dates_nobody_can_read_leave_no_total():
+    answer = translate(
+        {"name": "Made Up Person", "experience": [{"role": "Agent", "duration": "a while"}]}
+    )
+    assert "years_experience" not in answer.fields
