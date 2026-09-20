@@ -12,6 +12,8 @@ from sqlalchemy.exc import DBAPIError
 
 from candidates.archive import ArchiveError, archive_candidate
 
+from .conftest import sign_in
+
 
 def _candidate(conn) -> int:
     capture_id = conn.execute(
@@ -118,3 +120,29 @@ def test_the_app_cannot_delete_an_archived_candidate(app_engine):
         with pytest.raises(DBAPIError) as error:
             conn.execute(text("DELETE FROM core.candidate WHERE id = :id"), {"id": candidate_id})
     assert _sqlstate(error) == "42501"
+
+
+def test_a_list_can_leave_out_what_was_put_away(api_client, make_candidate):
+    """Archiving takes a record out of the way (BR-205). A list that still shows it has not."""
+    client, connection = api_client
+    headers = sign_in(client, "ta-lead")
+    kept = f"cand_{make_candidate(connection, full_name='Still In Play')}"
+    put_away = make_candidate(connection, full_name="A Test Upload, Not A Person")
+    archive_candidate(connection, put_away, "Made-up file from a test run", "integration-test")
+
+    in_play = {
+        row["id"]
+        for row in client.get(
+            "/v1/candidates", params={"archived": "false"}, headers=headers
+        ).json()["items"]
+    }
+    assert kept in in_play
+    assert f"cand_{put_away}" not in in_play
+
+    archived = client.get("/v1/candidates", params={"archived": "true"}, headers=headers).json()
+    assert f"cand_{put_away}" in {row["id"] for row in archived["items"]}
+    assert all(row["archived"] for row in archived["items"])
+
+    # Nothing is lost: the record still reads, with the reason and who did it.
+    one = client.get(f"/v1/candidates/cand_{put_away}", headers=headers).json()
+    assert one["archived_reason"] == "Made-up file from a test run"

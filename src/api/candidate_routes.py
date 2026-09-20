@@ -138,6 +138,10 @@ def list_candidates(
         list[SourceName] | None,
         Query(description="Where the record came from; repeat for more than one"),
     ] = None,
+    archived: Annotated[
+        bool | None,
+        Query(description="true: only archived records; false: only the ones still in play"),
+    ] = None,
 ) -> CandidatePage:
     """Candidates in your scope, newest first, as summaries.
 
@@ -152,6 +156,7 @@ def list_candidates(
         opening_id=decode_filter("requisition", "requisition_id", requisition_id),
         owner=owner_id,
         sources=[str(name) for name in source] if source else None,
+        archived=archived,
     )
     items = [
         CandidateSummaryOut(

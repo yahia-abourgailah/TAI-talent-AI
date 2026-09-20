@@ -4077,6 +4077,24 @@
               "description": "Where the record came from; repeat for more than one",
               "title": "Source"
             }
+          },
+          {
+            "description": "true: only archived records; false: only the ones still in play",
+            "in": "query",
+            "name": "archived",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "true: only archived records; false: only the ones still in play",
+              "title": "Archived"
+            }
           }
         ],
         "responses": {

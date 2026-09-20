@@ -91,12 +91,17 @@ def list_candidates(
     opening_id: int | None = None,
     owner: str | None = None,
     sources: Sequence[str] | None = None,
+    archived: bool | None = None,
 ) -> list[dict[str, Any]]:
     """Newest first. Summaries: the name, and where the record came from. No fields.
 
     `sources` narrows by where the record came from — the 5,140 migrated from the sheet
     (tai_master) drown out everyone who has arrived since, and a recruiter's working list is
     usually the people who applied, not the backlog.
+
+    `archived` leaves out (or shows only) the records somebody archived with a reason. Archiving is
+    how a record is taken out of the way without being lost (BR-205), so a list that still shows
+    them has not really put anything away.
     """
     return run(
         conn,
@@ -106,6 +111,8 @@ def list_candidates(
             FROM core.candidate c JOIN raw.capture r ON r.id = c.capture_id
             WHERE {VISIBLE}
               AND (CAST(:sources AS text[]) IS NULL OR r.source = ANY(:sources))
+              AND (CAST(:archived AS boolean) IS NULL
+                   OR (c.archived_at IS NOT NULL) = :archived)
               AND (CAST(:before AS bigint) IS NULL OR c.id < :before)
               AND (CAST(:opening AS bigint) IS NULL OR EXISTS (
                 SELECT 1 FROM pipeline.application o
@@ -125,6 +132,7 @@ def list_candidates(
             "opening": opening_id,
             "owner": owner,
             "sources": list(sources) if sources else None,
+            "archived": archived,
             **actor.scope(),
         },
     )

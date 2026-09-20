@@ -263,8 +263,16 @@ function sourceQuery() {
   return ARRIVED_SINCE.map((name) => `&source=${name}`).join("");
 }
 
+/* Archived is how a record is put away without being lost: a wrong entry, a test upload, a file
+   that was never a person. Hidden here by default, and never gone. */
+function archivedQuery() {
+  const choice = $("c-archived").value;
+  if (choice === "yes") return "";
+  return choice === "only" ? "&archived=true" : "&archived=false";
+}
+
 async function listCandidates() {
-  const page = await api(`/v1/candidates?limit=25${sourceQuery()}`);
+  const page = await api(`/v1/candidates?limit=25${sourceQuery()}${archivedQuery()}`);
   showCandidates(
     page.items,
     $("c-migrated").value === "no"
@@ -281,7 +289,8 @@ function showCandidates(items, empty) {
       ["name", "id", "source", "added", "archived"],
       items.map((row) => ({
         cells: [
-          row.full_name || el("span", { class: "muted" }, "not recorded"),
+          row.full_name
+            || el("span", { class: "muted" }, "no name yet — the CV is waiting for a person"),
           el("span", { class: "mono" }, row.id),
           row.source,
           when(row.created_at),
@@ -704,6 +713,7 @@ $("c-search").addEventListener("click", () => guard(searchCandidates));
 $("n-create").addEventListener("click", () => guard(typeInCandidate));
 $("c-recent").addEventListener("click", () => guard(listCandidates));
 $("c-migrated").addEventListener("change", () => guard(listCandidates));
+$("c-archived").addEventListener("change", () => guard(listCandidates));
 $("p-reload").addEventListener("click", () => guard(loadApplications));
 $("q-reload").addEventListener("click", () => guard(loadQueue));
 $("q-kind").addEventListener("change", () => guard(loadQueue));
