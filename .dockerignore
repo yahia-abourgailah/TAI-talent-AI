@@ -4,7 +4,4 @@
 !src/
 !alembic.ini
 !migrations/
-# The development console and the example careers page: static files, no data, and the API only
-# mounts them when TALENT_ENV=dev.
-!web/
 **/__pycache__
