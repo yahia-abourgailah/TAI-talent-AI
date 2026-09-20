@@ -1860,6 +1860,17 @@
           "tracking_code": {
             "title": "Tracking Code",
             "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
           }
         },
         "required": [
@@ -6327,7 +6338,7 @@
     },
     "/v1/requisitions/{requisition_id}/job-posts": {
       "get": {
-        "description": "Every job post of a requisition, oldest first.",
+        "description": "Every job post of a requisition, oldest first, each with the link to publish.",
         "operationId": "list_job_posts_v1_requisitions__requisition_id__job_posts_get",
         "parameters": [
           {

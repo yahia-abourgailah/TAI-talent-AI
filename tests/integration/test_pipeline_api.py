@@ -391,3 +391,69 @@ def test_an_archived_candidates_application_leaves_the_working_list(api_client, 
     # Asked for, they are still there: archiving hides nothing from someone looking for it.
     every = {row["id"] for row in client.get("/v1/applications", headers=headers).json()["items"]}
     assert hidden in every
+
+
+def _with_careers(app_engine, careers_url: str = ""):
+    connection = app_engine.connect()
+
+    @contextmanager
+    def transaction():
+        with connection.begin_nested():
+            yield connection
+
+    settings = Settings(
+        _env_file=None,
+        env="dev",
+        auth_mode="dev",
+        careers_url=careers_url,
+        db_dsn="postgresql+psycopg://unused:unused@localhost:1/unused",
+        redis_url="redis://localhost:1/0",
+        blob_endpoint="http://localhost:1",
+        blob_access_key="unused",
+        blob_secret_key="unused",
+    )
+    return TestClient(create_app(settings, probes={}, transaction=transaction)), connection
+
+
+def test_a_job_post_comes_back_as_a_link_somebody_can_publish(app_engine):
+    """The code is what the platform needs; the link is what a person needs (BR-602)."""
+    client, connection = _with_careers(app_engine, "https://careers.example.com/jobs")
+    try:
+        headers = _as(client, "ta-lead")
+        requisition = _requisition(client, headers, title="Sales Agent")
+        made = client.post(
+            f"/v1/requisitions/{requisition['id']}/job-posts",
+            json={"channel": "tiktok", "label": "TikTok bio"},
+            headers={**headers, "Idempotency-Key": str(uuid.uuid4())},
+        ).json()
+
+        expected = (
+            f"https://careers.example.com/jobs?job={requisition['id']}&code={made['tracking_code']}"
+        )
+        assert made["url"] == expected
+        # The same link when it is read back, not one every caller has to build for itself.
+        listed = client.get(
+            f"/v1/requisitions/{requisition['id']}/job-posts", headers=headers
+        ).json()
+        assert listed["items"][0]["url"] == expected
+    finally:
+        connection.rollback()
+        connection.close()
+
+
+def test_without_a_careers_address_a_job_post_still_has_its_code(app_engine):
+    """The page belongs to the website team. Until we know where it is, the code is the answer."""
+    client, connection = _with_careers(app_engine)
+    try:
+        headers = _as(client, "ta-lead")
+        requisition = _requisition(client, headers)
+        made = client.post(
+            f"/v1/requisitions/{requisition['id']}/job-posts",
+            json={"channel": "linkedin"},
+            headers={**headers, "Idempotency-Key": str(uuid.uuid4())},
+        ).json()
+        assert made["url"] is None
+        assert made["tracking_code"].startswith("linkedin-")
+    finally:
+        connection.rollback()
+        connection.close()

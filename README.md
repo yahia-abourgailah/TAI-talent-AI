@@ -60,9 +60,9 @@ In `/docs`, use **Authorize** and paste the token.
 python3.12 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 .venv/bin/pytest tests/unit
 
-# integration: a real database, reached on loopback
-docker compose -f compose.yaml -f compose.test.yaml up -d --wait postgres
-docker compose -f compose.yaml -f compose.test.yaml run --rm migrate
+# integration: a real database, reached on loopback (127.0.0.1:55432)
+docker compose up -d --wait postgres
+docker compose run --rm migrate
 .venv/bin/pytest tests/integration
 ```
 

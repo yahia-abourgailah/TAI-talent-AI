@@ -7,6 +7,7 @@ A stage changes only by POSTing a transition; the database decides whether it is
 
 from collections.abc import Mapping
 from typing import Annotated, Any, Literal
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Header, Query, Request
 from fastapi.responses import JSONResponse
@@ -574,6 +575,9 @@ class JobPostIn(BaseModel):
 
 
 class JobPostOut(BaseModel):
+    # The link to publish, when the careers page's address is configured (TALENT_CAREERS_URL).
+    # The code is what the platform needs; the link is what a person needs.
+    url: str | None = None
     tracking_code: str
     requisition_id: str
     channel: str
@@ -586,10 +590,25 @@ class JobPostList(BaseModel):
     items: list[JobPostOut]
 
 
-def _job_post(row: Mapping[str, Any]) -> JobPostOut:
+def job_post_url(careers_url: str, requisition_id: str, code: str) -> str | None:
+    """Where a candidate lands, and what tells us the post they came from.
+
+    The careers page reads `job` and `code` from the query (web/careers). The website team's page
+    must read the same two, which is why this is built here and not typed out by a recruiter.
+    """
+    if not careers_url.strip():
+        return None
+    base = careers_url.strip()
+    joiner = "&" if "?" in base else "?"
+    return f"{base}{joiner}job={quote(requisition_id)}&code={quote(code)}"
+
+
+def _job_post(row: Mapping[str, Any], careers_url: str = "") -> JobPostOut:
+    requisition_id = encode("requisition", row["opening_id"])
     return JobPostOut(
+        url=job_post_url(careers_url, requisition_id, row["code"]),
         tracking_code=row["code"],
-        requisition_id=encode("requisition", row["opening_id"]),
+        requisition_id=requisition_id,
         channel=row["channel"],
         label=row["label"],
         created_at=row["created_at"],
@@ -620,15 +639,19 @@ def create_job_post(
         return _job_post(
             job_posts.issue(
                 conn, actor, number, channel=body.channel, label=body.label, code=body.code
-            )
+            ),
+            request.app.state.settings.careers_url,
         )
 
     return idempotency.respond(conn, request, principal.subject, key, body, 201, create)
 
 
 @router.get("/requisitions/{requisition_id}/job-posts", tags=["requisitions"])
-def list_job_posts(requisition_id: str, principal: Signed, conn: Db) -> JobPostList:
-    """Every job post of a requisition, oldest first."""
+def list_job_posts(
+    requisition_id: str, request: Request, principal: Signed, conn: Db
+) -> JobPostList:
+    """Every job post of a requisition, oldest first, each with the link to publish."""
     actor = actor_from_principal(principal)
     rows = job_posts.list_for_opening(conn, actor, decode("requisition", requisition_id))
-    return JobPostList(items=[_job_post(row) for row in rows])
+    careers_url = request.app.state.settings.careers_url
+    return JobPostList(items=[_job_post(row, careers_url) for row in rows])

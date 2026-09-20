@@ -37,7 +37,19 @@ if ! git rev-parse --verify --quiet "$target" >/dev/null; then
   git branch "$target" "$source_branch"
 else
   git checkout --quiet "$target"
-  git merge --no-edit "$source_branch"
+  # main keeps `web/` deleted. A change to the console on dev is then a modify/delete conflict,
+  # and the answer is always the same: it stays deleted here.
+  if ! git merge --no-edit "$source_branch"; then
+    conflicted="$(git diff --name-only --diff-filter=U)"
+    outside_web="$(echo "$conflicted" | grep -v '^web/' || true)"
+    if [ "$target" != "main" ] || [ -n "$outside_web" ]; then
+      echo "Merge conflict that is not the console. Resolve it by hand:" >&2
+      echo "$conflicted" >&2
+      exit 1
+    fi
+    git rm -r --quiet --force web
+    git commit --no-edit --quiet
+  fi
 fi
 git checkout --quiet "$target"
 
