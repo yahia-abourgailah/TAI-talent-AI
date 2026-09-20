@@ -88,6 +88,9 @@ class ScorePartOut(BaseModel):
     part: str
     says: str
     points: int
+    # The most this part can come to on this track, so a number has something to be read against.
+    # 0 where the part is only ever a penalty.
+    out_of: int
 
 
 class ExplanationOut(BaseModel):

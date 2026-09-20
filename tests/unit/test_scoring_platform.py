@@ -71,3 +71,43 @@ def test_a_disqualification_with_no_agreed_reason_is_not_guessed():
         None,
     )
     assert reason_for("No tenured title match") == (False, None)
+
+
+def test_the_full_mark_of_each_part_is_the_criteria_own(monkeypatch):
+    """The explanation says what each part is out of. Those numbers are the ruleset's, and this
+    holds them to it: a candidate who is the best possible on one part scores exactly its full
+    mark, so the column cannot quietly drift from the criteria it describes."""
+    from scoring.explain import PARTS, explain
+
+    best_entry = {
+        "full_name": "Best Possible Entry",
+        "age": "24",
+        "location": "New Cairo",
+        "current_title": "Sales Representative",
+        "current_employer": "Coldwell Banker",
+        "education": "bachelor",
+        "years_experience": "1",
+        "phone": "01000000001",
+        "email": "best@example.com",
+    }
+    found = explain(best_entry, "2026-08-04", "A")
+    out_of = {part["part"]: part["out_of"] for part in found.parts}
+    points = {part["part"]: part["points"] for part in found.parts}
+    assert out_of["location_score"] == 30 and points["location_score"] == 30
+    assert out_of["education_score"] == 15 and points["education_score"] == 15
+    assert out_of["contact_score"] == 10 and points["contact_score"] == 10
+    # The five parts of the entry track are a hundred between them, before bonuses and penalties.
+    core = (
+        "location_score",
+        "sales_fit_score",
+        "entry_level_score",
+        "education_score",
+        "contact_score",
+    )
+    assert sum(out_of[name] for name in core) == 100
+    # No part is ever scored above its full mark.
+    for part in found.parts:
+        assert part["points"] <= part["out_of"] or part["out_of"] == 0
+
+    headhunt = sum(most for _name, _says, most in PARTS["headhunt"])
+    assert headhunt == 100

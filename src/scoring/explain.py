@@ -17,16 +17,31 @@ from typing import Any
 from scoring.platform import TRACK_MODE, candidate_from_fields
 from scoring.versions import RULESETS
 
-# Each part of the score, in the order the criteria apply them.
-PARTS: tuple[tuple[str, str], ...] = (
-    ("location_score", "Where they are"),
-    ("sales_fit_score", "How well the work fits sales"),
-    ("entry_level_score", "How well it fits an entry-level hire"),
-    ("education_score", "Education"),
-    ("contact_score", "Whether we can reach them"),
-    ("competitor_bonus", "Coming from a known brokerage"),
-    ("platform_adjustment", "Where the profile came from"),
-)
+# Each part of the score: what it is called in the result, what it weighs, and the most it can come
+# to on each track. The two tracks share the fields and use them for different things — on the
+# headhunt track "sales fit" holds the title's score and "entry level" holds the tenure — so the
+# labels and the full marks are read from the track, never assumed.
+#
+# The numbers are the criteria's own (v2026_08_04): entry 30 + 25 + 20 + 15 + 10 = 100 before
+# bonuses and penalties; headhunt 15 + 25 + 20 + 25 + 15 = 100. A unit test holds them to it.
+PARTS: dict[str, tuple[tuple[str, str, int], ...]] = {
+    "entry": (
+        ("location_score", "Where they are", 30),
+        ("sales_fit_score", "How well the work fits sales", 25),
+        ("entry_level_score", "How well it fits an entry-level hire", 20),
+        ("education_score", "Education", 15),
+        ("contact_score", "Whether we can reach them", 10),
+        ("competitor_bonus", "Coming from a known brokerage", 10),
+        ("platform_adjustment", "Where the profile came from", 0),
+    ),
+    "headhunt": (
+        ("location_score", "Where they are", 15),
+        ("sales_fit_score", "How senior the title is", 25),
+        ("entry_level_score", "How long they have stayed", 20),
+        ("competitor_bonus", "Who they work for now", 25),
+        ("platform_adjustment", "Signs they are looking to move", 15),
+    ),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,11 +78,17 @@ def explain(fields: dict[str, str | None], criteria_version: str, track: str) ->
     if ruleset is None:
         raise KeyError(f"no scorer for criteria version {criteria_version}")
     mode = TRACK_MODE.get(track.upper(), track)
+    if mode not in PARTS:
+        raise KeyError(f"no parts recorded for the {mode} track")
     candidate, _unreadable = candidate_from_fields(fields)
     result = ruleset.score_candidate(candidate, mode=mode)
 
-    points = {name: int(getattr(result, name, 0) or 0) for name, _label in PARTS}
-    parts = [{"part": name, "says": label, "points": points[name]} for name, label in PARTS]
+    weighed = PARTS[mode]
+    points = {name: int(getattr(result, name, 0) or 0) for name, _label, _most in weighed}
+    parts = [
+        {"part": name, "says": label, "points": points[name], "out_of": most}
+        for name, label, most in weighed
+    ]
     counted = sum(points.values())
     total = int(result.overall_score)
     return Explanation(

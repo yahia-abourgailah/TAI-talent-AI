@@ -432,20 +432,27 @@ async function typeInCandidate() {
 
 async function explainScore(evaluationId) {
   const found = await api(`/v1/evaluations/${evaluationId}/explanation`);
+  const sign = (points) => (points > 0 ? `+${points}` : String(points));
   const rows = found.parts.map((part) => ({
-    cells: [part.says, el("span", { class: "mono" }, part.points > 0 ? `+${part.points}` : part.points)],
+    cells: [
+      part.says,
+      el("span", { class: "mono" }, sign(part.points)),
+      el("span", { class: "mono muted" }, part.out_of ? `of ${part.out_of}` : "penalty only"),
+    ],
   }));
+  const fullMark = found.parts.reduce((sum, part) => sum + part.out_of, 0);
   rows.push({
     cells: [
       "Other bonuses and penalties the criteria apply",
-      el("span", { class: "mono" },
-        found.other_adjustments > 0 ? `+${found.other_adjustments}` : found.other_adjustments),
+      el("span", { class: "mono" }, sign(found.other_adjustments)),
+      el("span", { class: "mono muted" }, "no fixed mark"),
     ],
   });
   rows.push({
     cells: [
       el("b", {}, `Total (tier ${found.tier})`),
       el("b", { class: "mono" }, String(found.total)),
+      el("b", { class: "mono muted" }, `of ${Math.min(100, fullMark)}`),
     ],
   });
   $("explanation").replaceChildren(
@@ -463,7 +470,7 @@ async function explainScore(evaluationId) {
         ? el("p", {}, el("span", { class: "pill bad" }, "disqualified"), " ",
             found.disqualify_reason || "")
         : null,
-      table(["what the criteria weighed", "points"], rows, "")
+      table(["what the criteria weighed", "scored", "full mark"], rows, "")
     )
   );
   $("explanation").scrollIntoView({ behavior: "smooth", block: "nearest" });
