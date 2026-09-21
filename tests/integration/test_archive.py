@@ -231,3 +231,44 @@ def test_putting_the_test_data_away_archives_what_we_made_and_keeps_the_import(
     # Nothing was deleted: both records still read, with the reason and who did it.
     put_away = client.get(f"/v1/candidates/cand_{ours}", headers=headers).json()
     assert put_away["archived_reason"] == "Made while trying the platform out (dev)"
+
+
+def test_an_application_says_its_candidate_was_put_away(api_client, make_candidate):
+    """An application follows its candidate out of the working lists (BR-205). It is still there,
+    and a list that leaves it out without saying so is how a real application goes missing."""
+    client, connection = api_client
+    headers = sign_in(client, "ta-lead")
+    requisition = client.post(
+        "/v1/requisitions",
+        json={
+            "brand": "The Address",
+            "department": "Sales",
+            "track": "A",
+            "headcount": 1,
+            "team": "team-a",
+        },
+        headers={**headers, "Idempotency-Key": str(uuid.uuid4())},
+    ).json()
+    candidate = make_candidate(connection, full_name="Applied, Then Put Away")
+    application = client.post(
+        "/v1/applications",
+        json={"requisition_id": requisition["id"], "candidate_id": f"cand_{candidate}"},
+        headers={**headers, "Idempotency-Key": str(uuid.uuid4())},
+    ).json()
+    assert application["candidate_archived"] is False
+
+    archive_candidate(connection, candidate, "A test record (Q-13)", "integration-test")
+
+    one = client.get(f"/v1/applications/{application['id']}", headers=headers).json()
+    assert one["candidate_archived"] is True
+    # Asking for the working list still leaves it out; asking without the filter finds it.
+    working = client.get(
+        "/v1/applications",
+        params={"requisition_id": requisition["id"], "archived": "false"},
+        headers=headers,
+    ).json()["items"]
+    assert [row["id"] for row in working] == []
+    everything = client.get(
+        "/v1/applications", params={"requisition_id": requisition["id"]}, headers=headers
+    ).json()["items"]
+    assert [row["id"] for row in everything] == [application["id"]]

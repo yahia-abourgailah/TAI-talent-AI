@@ -256,7 +256,9 @@ function clearView(...ids) {
 async function openRequisition(id) {
   const [requisition, applications, posts] = await Promise.all([
     api(`/v1/requisitions/${id}`),
-    api(`/v1/applications?requisition_id=${id}&limit=50&archived=false`),
+    // Every application, including those whose candidate has been put away: a requisition that
+    // says "nobody has applied yet" while somebody has is worse than a row with a pill on it.
+    api(`/v1/applications?requisition_id=${id}&limit=50`),
     api(`/v1/requisitions/${id}/job-posts`),
   ]);
   $("requisition-detail").replaceChildren(
@@ -310,7 +312,10 @@ async function openRequisition(id) {
         ["application", "candidate", "where it came from", "stage", "outcome"],
         applications.items.map((row) => ({
           cells: [
-            row.id,
+            row.candidate_archived
+              ? el("span", {}, row.id, " ",
+                  el("span", { class: "pill warn" }, "candidate put away"))
+              : row.id,
             candidateCell(row.candidate_id),
             arrivedFrom(row),
             row.current_stage,

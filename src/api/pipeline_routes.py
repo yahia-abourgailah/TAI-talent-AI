@@ -363,6 +363,9 @@ class ApplicationOut(BaseModel):
     created_at: Timestamp
     created_by: str
     arrived_from: ArrivedFromOut | None = None
+    # The candidate was put away (BR-205). The application is still here and still real; nobody
+    # should be working it until the record comes back.
+    candidate_archived: bool = False
 
 
 class ApplicationPage(BaseModel):
@@ -430,6 +433,7 @@ def _application(row: Mapping[str, Any], allowed: Mapping[str, list[str]]) -> Ap
         created_at=row["created_at"],
         created_by=row["created_by"],
         arrived_from=_arrived_from(row),
+        candidate_archived=bool(row.get("candidate_archived")),
     )
 
 

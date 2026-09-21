@@ -31,7 +31,12 @@ _APPLICATION = (
     "(SELECT p.label FROM core.consent k JOIN pipeline.job_post p ON p.code = k.tracking_code "
     " WHERE k.application_id = application_state.id ORDER BY k.id LIMIT 1) AS arrival_label, "
     "EXISTS (SELECT 1 FROM core.consent k WHERE k.application_id = application_state.id) "
-    "  AS applied_themselves"
+    "  AS applied_themselves, "
+    # Whether the person this application belongs to has been put away. An application is not
+    # archived itself — it follows its candidate (BR-205) — and a list that leaves it out without
+    # saying so is how an application that exists becomes an application nobody can find.
+    "(SELECT c.archived_at IS NOT NULL FROM core.candidate c "
+    " WHERE c.id = application_state.candidate_id) AS candidate_archived"
 )
 _MOVE = (
     "id, sequence, list_version, from_step, to_step, reason_code, actor_kind, moved_by, moved_at"
