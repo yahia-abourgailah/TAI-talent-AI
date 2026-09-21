@@ -92,6 +92,11 @@
               }
             ]
           },
+          "candidate_archived": {
+            "default": false,
+            "title": "Candidate Archived",
+            "type": "boolean"
+          },
           "candidate_id": {
             "title": "Candidate Id",
             "type": "string"
